@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
 import type { Tema } from '../../../shared/modelo'
 import { usarLoja } from '../estado/loja'
+import { corrigirEscalaDoMouse } from './escalaDoMouse'
 
 // O corpo de um cartão de terminal: um xterm ligado ao processo, que mora no processo principal. Montar liga
 // (o processo manda o retrato da tela e passa a mandar a saída); desmontar só desliga, o processo continua.
@@ -60,6 +61,8 @@ export function CorpoXterm({ id, ativo }: Props) {
     const ajuste = new FitAddon()
     terminal.loadAddon(ajuste)
     terminal.open(area)
+    // o xterm mede a célula sem escala e o clique com escala; sem isto a seleção cai na metade da altura
+    if (!corrigirEscalaDoMouse(terminal)) console.warn('não consegui corrigir a escala do mouse do xterm')
     try {
       const webgl = new WebglAddon()
       webgl.onContextLoss(() => webgl.dispose())
