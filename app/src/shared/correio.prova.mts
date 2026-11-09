@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 // Node executa provas TypeScript diretamente e precisa da extensão; o bundler resolve a fonte normalmente.
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
-import { ehRecado, idDoRecado, nomeDoRecado, respostaDe, SUFIXO_PARCIAL } from './correio.ts'
+import { ehRecado, idDoRecado, nomeDaPasta, nomeDoRecado, pastasMortas, respostaDe, SUFIXO_PARCIAL } from './correio.ts'
 
 const ID = 'a1b2c3d4e5f60718293a4b5c'
 
@@ -59,4 +59,27 @@ test('recado sendo escrito não é recado: o nome só vale depois do renomear', 
 test('nome com caminho não passa: recado é nome de arquivo, não caminho', () => {
   assert.equal(idDoRecado(`sub/pedido-${ID}.json`), null)
   assert.equal(idDoRecado(`..\\pedido-${ID}.json`), null)
+})
+
+test('pasta do correio leva o pid: é por ele que se sabe de quem ela é', () => {
+  assert.equal(nomeDaPasta(1234), 'orkester-correio-1234')
+})
+
+test('varre só as pastas de apps mortos; a minha e as dos vivos ficam', () => {
+  const vivo = (pid: number): boolean => pid === 500
+  const mortas = pastasMortas(
+    ['orkester-correio-100', 'orkester-correio-500', 'orkester-correio-900', 'outra-coisa', 'orkester-correio-'],
+    vivo,
+    900
+  )
+  assert.deepEqual(mortas, ['orkester-correio-100'])
+})
+
+test('pasta da versão antiga, de nome sorteado, é sempre lixo: ninguém mais cria uma', () => {
+  const mortas = pastasMortas(['orkester-correio-283b40829d772bfb4ab63bc3'], () => true, 900)
+  assert.deepEqual(mortas, ['orkester-correio-283b40829d772bfb4ab63bc3'])
+})
+
+test('nome que não é pasta de correio nunca entra na lista de apagar', () => {
+  assert.deepEqual(pastasMortas(['tmp-abc', 'orkester-outra-coisa', 'orkester-correio-abc'], () => false, 1), [])
 })

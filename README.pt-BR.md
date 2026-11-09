@@ -5,7 +5,7 @@
 
 **Um time de agentes de código num quadro infinito — e você desenha quem fala com quem.**
 
-![versão](https://img.shields.io/badge/vers%C3%A3o-1.0.2-4060e8)
+![versão](https://img.shields.io/badge/vers%C3%A3o-1.0.3-4060e8)
 ![plataforma](https://img.shields.io/badge/plataforma-Windows%2011%20x64-4060e8)
 
 [English](README.md) · Português
@@ -55,7 +55,7 @@ Três ideias seguram o resto:
 
 **[Baixar o instalador →](https://github.com/luisgcazeredo/orkester/releases/latest)**
 
-Um arquivo só, `Orkester-Instalador-1.0.2.exe` (119 MB). É só rodar: ele instala para o teu usuário — sem pedir
+Um arquivo só, `Orkester-Instalador-1.0.3.exe` (119 MB). É só rodar: ele instala para o teu usuário — sem pedir
 administrador — e põe o atalho **Orkester** na área de trabalho e no menu Iniciar. Precisa de **Windows 11
 x64** e de mais nada.
 
@@ -113,7 +113,7 @@ Electron · React · TypeScript · xterm.js · node-pty.
 
 O cálculo do quadro mora em módulos puros, cobertos por testes que rodam em Node sem abrir o app. Em cima
 deles, o autoteste abre o app de verdade, monta um quadro, mexe com mouse e teclado e confere o resultado na
-tela. Hoje: **134 provas** e **152 checagens** em 15 cenários.
+tela. Hoje: **138 provas** e **153 checagens** em 15 cenários.
 
 ```text
 app/src/shared/    regras puras do quadro (bandas, partituras, trocar, rotinas, janelas, arquivos)
@@ -125,7 +125,7 @@ docs/              a referência do `ork`
 
 ## Estado
 
-Versão **1.0.2**, lançada em 09/11/2026 e em uso diário no Windows. Só Windows 11 x64 — nada no código
+Versão **1.0.3**, lançada em 09/11/2026 e em uso diário no Windows. Só Windows 11 x64 — nada no código
 impede outro sistema de propósito, mas nada foi testado fora dele.
 
 ## Licença

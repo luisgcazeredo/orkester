@@ -308,7 +308,12 @@ async function recusarSeEmPergunta(s: Sessao): Promise<void> {
   )
 }
 
-async function digitarPedido(s: Sessao, texto: string): Promise<void> {
+/**
+ * Digita o pedido e confirma que ele **saiu**. Devolve falso se o texto ficou escrito sem enviar: quem
+ * chamou tem de contar isso a quem pediu. Voltar calado é o que fez um pedido sumir na tela do Codex em
+ * 09/11/2026 — o Maestro achou que tinha falado, e do outro lado ninguém tinha ouvido.
+ */
+async function digitarPedido(s: Sessao, texto: string): Promise<boolean> {
   const limpo = texto.replace(/\r\n?/g, '\n').trimEnd()
   if (s.espec.agente !== 'shell' && aceitaColagem(s)) {
     escreverNoProcesso(s, `\x1b[200~${limpo.replace(/\x1b\[20[01]~/g, '')}\x1b[201~`)
@@ -332,10 +337,11 @@ async function digitarPedido(s: Sessao, texto: string): Promise<void> {
     // shell, que responde na hora, cai no segundo caso antes de dar tempo de ficar "trabalhando"
     for (const limite = Date.now() + 2000; Date.now() < limite; await esperar(100)) {
       const agora = await situacao(s)
-      if (agora === 'trabalhando' || agora === 'pergunta') return
-      if ((await telaDe(s, 12)) !== antesDoEnter) return
+      if (agora === 'trabalhando' || agora === 'pergunta') return true
+      if ((await telaDe(s, 12)) !== antesDoEnter) return true
     }
   }
+  return false
 }
 
 /** Espera a tela mudar (a colagem aparecendo, por exemplo). Falso se nada mudou no prazo. */
@@ -356,7 +362,7 @@ export async function dispararNoTerminal(id: string, texto: string): Promise<Res
   if (!s || s.fim) return 'sem-cartao'
   const agora = await situacao(s)
   if (agora !== 'livre') return agora === 'encerrado' ? 'encerrado' : agora === 'pergunta' ? 'pergunta' : 'ocupado'
-  await digitarPedido(s, texto)
+  if (!(await digitarPedido(s, texto))) return 'nao-enviou'
   registrar(s, null, 'rotina', texto)
   return 'rodou'
 }
@@ -699,7 +705,14 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
       }[pronto]
       return { saida: `${aberto}\n${motivo}\nTela agora:\n${await telaDe(novo, 30)}` }
     }
-    await digitarPedido(novo, pedidoInicial)
+    if (!(await digitarPedido(novo, pedidoInicial))) {
+      return {
+        saida:
+          `${aberto}\nO pedido foi digitado e NÃO foi enviado: ele não aceitou o Enter (algum aviso ou ` +
+          `pergunta em cima, talvez). Veja a tela com \`ork ver "${novo.espec.nome}"\`, resolva com ` +
+          `\`ork teclas\` e mande de novo com \`ork pedir\`.\nTela agora:\n${await telaDe(novo, 30)}`
+      }
+    }
     if (!opcoes.esperar) return { saida: `${aberto} Pedido enviado. Acompanhe com \`ork esperar "${novo.espec.nome}"\` ou \`ork ver\`.` }
     return { saida: `${aberto}\n${await resultado(novo, tempoDe(opcoes), cancelado)}` }
   },
@@ -714,7 +727,13 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
       throw new Error(`"${alvo.espec.nome}" está rodando um comando; espere terminar (\`ork esperar "${alvo.espec.nome}"\`) e mande de novo`)
     }
     registrar(eu, alvo, 'pedir', texto)
-    await digitarPedido(alvo, texto)
+    if (!(await digitarPedido(alvo, texto))) {
+      throw new Error(
+        `o pedido foi digitado em "${alvo.espec.nome}" e NÃO foi enviado: ele não aceitou o Enter. Veja a ` +
+          `tela com \`ork ver "${alvo.espec.nome}"\`, resolva o que estiver em cima com \`ork teclas\` e ` +
+          `mande de novo.\nTela agora:\n${await telaDe(alvo, 25)}`
+      )
+    }
     if (opcoes['sem-esperar']) return { saida: `Pedido enviado para "${alvo.espec.nome}".` }
     return { saida: await resultado(alvo, tempoDe(opcoes), cancelado) }
   },

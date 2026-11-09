@@ -5,7 +5,7 @@
 
 **Run a team of coding agents on an infinite canvas — and draw who talks to whom.**
 
-![version](https://img.shields.io/badge/version-1.0.2-4060e8)
+![version](https://img.shields.io/badge/version-1.0.3-4060e8)
 ![platform](https://img.shields.io/badge/platform-Windows%2011%20x64-4060e8)
 
 English · [Português](README.pt-BR.md)
@@ -56,7 +56,7 @@ Three ideas hold the rest together:
 
 **[Download the installer →](https://github.com/luisgcazeredo/orkester/releases/latest)**
 
-One file, `Orkester-Instalador-1.0.2.exe` (119 MB). Run it and the app installs for your user only — no admin
+One file, `Orkester-Instalador-1.0.3.exe` (119 MB). Run it and the app installs for your user only — no admin
 rights — and puts an **Orkester** shortcut on the desktop and in the Start menu. Requires **Windows 11
 x64**; nothing else needs to be installed.
 
@@ -113,7 +113,7 @@ Electron · React · TypeScript · xterm.js · node-pty.
 
 The canvas logic lives in pure modules, covered by tests that run in plain Node without opening the app. On
 top of those, a self-test launches the real app, builds a canvas, drives it with mouse and keyboard and
-checks the result on screen. Today: **134 unit tests** and **152 UI checks** across 15 scenarios.
+checks the result on screen. Today: **138 unit tests** and **153 UI checks** across 15 scenarios.
 
 ```text
 app/src/shared/    pure canvas rules (bands, scores, agent swap, routines, windows, files)
@@ -125,7 +125,7 @@ docs/              the `ork` reference
 
 ## Status
 
-Version **1.0.2**, released on 09/11/2026 and in daily use on Windows. Windows 11 x64 only — nothing in the
+Version **1.0.3**, released on 09/11/2026 and in daily use on Windows. Windows 11 x64 only — nothing in the
 code assumes otherwise on purpose, but nothing was tested elsewhere either.
 
 ## License

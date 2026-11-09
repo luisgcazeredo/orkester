@@ -272,7 +272,7 @@ export type QuandoDaRotina =
   | { tipo: 'semanal'; dia: number; hora: number; minuto: number }
 
 /** O que aconteceu na última vez que a rotina venceu. */
-export type ResultadoDaRotina = 'rodou' | 'ocupado' | 'pergunta' | 'encerrado' | 'sem-cartao'
+export type ResultadoDaRotina = 'rodou' | 'ocupado' | 'pergunta' | 'encerrado' | 'sem-cartao' | 'nao-enviou'
 
 /**
  * Rotina: um pedido (ou comando) digitado num cartão de hora em hora, todo dia ou toda semana. O que só o

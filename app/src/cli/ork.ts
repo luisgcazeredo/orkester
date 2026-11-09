@@ -65,21 +65,39 @@ function principal(): void {
 
   const conexao = connect(pipe)
   let resposta = ''
+  let desistiu = false
   conexao.setEncoding('utf8')
-  conexao.on('connect', () => conexao.write(linha))
-  conexao.on('data', (parte: string) => (resposta += parte))
-  conexao.on('error', (erro: NodeJS.ErrnoException) => {
-    // Pipe recusado pelo sandbox do agente (o Codex no Windows dá EPERM): o mesmo pedido vai por arquivo.
-    // Não é erro nenhum do ponto de vista de quem chamou — é o outro caminho para a mesma casa.
-    if (erro.code === 'EPERM' || erro.code === 'EACCES') return void porCorreio(linha)
-    falhar(
-      erro.code === 'ENOENT'
-        ? 'não consegui falar com o app (ele foi fechado?)'
-        : `não consegui falar com o app (${erro.code ?? erro.message})`,
-      2
-    )
+  conexao.on('connect', () => {
+    clearTimeout(prazo)
+    conexao.write(linha)
   })
-  conexao.on('end', () => entregar(resposta))
+  conexao.on('data', (parte: string) => (resposta += parte))
+
+  /**
+   * Falhou o cano: se há correio, o mesmo pedido vai por arquivo — **qualquer** que seja o erro.
+   *
+   * Antes isto só acontecia em EPERM e EACCES, porque foi o que eu medi num sandbox. Na primeira vez que
+   * um Codex de verdade tentou, o erro veio outro e o `ork` disse "não consegui falar com o app" com o app
+   * aberto na frente dele. A lição: de dentro de um sandbox não se distingue "cano proibido" de "cano
+   * inexistente" — o errno é o que o sandbox quiser que seja, e cada versão pode mudar de ideia. Então o
+   * errno não decide nada: se existe um segundo caminho, tenta-se o segundo caminho. O erro só é relatado
+   * quando não há para onde ir.
+   */
+  const tentarCorreio = (motivo: string): void => {
+    if (desistiu) return
+    desistiu = true
+    clearTimeout(prazo)
+    conexao.destroy()
+    if (process.env.ORK_CORREIO) return void porCorreio(linha)
+    falhar(`não consegui falar com o app pelo cano e não há correio para usar (${motivo})`, 2)
+  }
+
+  // um connect que nem responde (o sandbox pode engolir em silêncio) não pode pendurar o agente para sempre
+  const prazo = setTimeout(() => tentarCorreio('o cano não respondeu'), 1500)
+  conexao.on('error', (erro: NodeJS.ErrnoException) => tentarCorreio(erro.code ?? erro.message))
+  conexao.on('end', () => {
+    if (!desistiu) entregar(resposta)
+  })
 }
 
 /**

@@ -3,7 +3,9 @@
  *
  * O caminho normal é o pipe local (ver `main/comandos.ts`): é instantâneo e não toca o disco. Só que o
  * Codex roda os comandos dele num sandbox do Windows que **recusa pipe** — medido em 09/11/2026, com
- * `connect EPERM`, igual em `read-only` e em `workspace-write`. O mesmo sandbox deixa ler e escrever
+ * `connect EPERM` num pipe de teste, igual em `read-only` e em `workspace-write`; contra o pipe do app, com
+ * um Codex de verdade, o erro veio **outro**. Por isso o `ork` não olha o errno para decidir: havendo
+ * correio, qualquer falha do cano cai aqui. O mesmo sandbox deixa ler e escrever
  * arquivo no diretório de trabalho e na pasta temporária, e a pasta temporária é a **mesma** que o app vê
  * (também medido: o app escreveu e o agente leu, e o contrário). Então quando o pipe é recusado o `ork`
  * passa a conversar por arquivo, sozinho, sem ninguém configurar nada.
@@ -42,6 +44,38 @@ export function idDoRecado(nome: string, tipo?: TipoDeRecado): string | null {
 
 export function ehRecado(nome: string, tipo?: TipoDeRecado): boolean {
   return idDoRecado(nome, tipo) !== null
+}
+
+/** O começo do nome da pasta de correio de um app; o resto é o pid de quem a criou. */
+export const PREFIXO_PASTA = 'orkester-correio-'
+
+export function nomeDaPasta(pid: number): string {
+  return `${PREFIXO_PASTA}${pid}`
+}
+
+/**
+ * Pastas de correio de apps que já morreram, para varrer na abertura.
+ *
+ * O app apaga a própria pasta ao sair, mas um encerramento forçado (ou um teste matando o processo) deixa
+ * ela para trás, e em 09/11/2026 havia três em `%TEMP%` de uma vez. O pid no nome resolve: dá para
+ * perguntar ao sistema quem ainda está vivo em vez de chutar por data — chutar por data apagaria a pasta
+ * de um app vivo que estivesse quieto.
+ */
+export function pastasMortas(nomes: string[], vivo: (pid: number) => boolean, meuPid: number): string[] {
+  const mortas: string[] = []
+  for (const nome of nomes) {
+    if (!nome.startsWith(PREFIXO_PASTA)) continue
+    const resto = nome.slice(PREFIXO_PASTA.length)
+    // nome sorteado: é da versão anterior, que nunca mais vai existir — logo, não é de ninguém vivo
+    if (/^[0-9a-f]{24}$/.test(resto)) {
+      mortas.push(nome)
+      continue
+    }
+    const pid = Number(resto)
+    if (!Number.isInteger(pid) || pid <= 0) continue
+    if (pid !== meuPid && !vivo(pid)) mortas.push(nome)
+  }
+  return mortas
 }
 
 /** O nome da resposta de um pedido. null se o nome não for de um pedido. */

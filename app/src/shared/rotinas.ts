@@ -82,6 +82,10 @@ export function textoDoResultado(resultado: ResultadoDaRotina): string {
       return 'pulou: o processo do cartão estava encerrado'
     case 'sem-cartao':
       return 'pulou: o cartão não está mais no quadro'
+    // o texto foi digitado e o Enter não pegou: dizer "rodou" seria mentira, e foi assim que um pedido
+    // ficou escrito na tela sem ninguém notar
+    case 'nao-enviou':
+      return 'não enviou: o texto foi digitado e o agente não aceitou o Enter'
   }
 }
 

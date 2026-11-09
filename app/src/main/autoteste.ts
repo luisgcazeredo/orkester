@@ -1796,11 +1796,14 @@ export async function rodarAutoteste(
 
     // o mesmo verbo pelos dois canais tem de dar a mesma resposta: é o que faz do correio um canal, e não
     // um caminho paralelo com regras próprias
-    await comando(chefe, 'ork quem')
+    await comando(chefe, 'cls; ork quem')
     const peloPipe = await aguardar(() => telaNoApp(chefe), 'Você é "PowerShell"')
+    // `cls` antes: sem limpar, a resposta do `ork quem` de cima já satisfaz a espera e a checagem passa
+    // sem o comando ter rodado — passou assim em 09/11/2026, e uma checagem que passa à toa é pior do que
+    // nenhuma, porque dá a impressão de cobertura
     const correio = await comandoAte(
       chefe,
-      '$env:ORK_SEM_PIPE=1; ork quem; Remove-Item Env:\\ORK_SEM_PIPE',
+      'cls; $env:ORK_SEM_PIPE=1; ork quem; Remove-Item Env:\\ORK_SEM_PIPE',
       'Você é "PowerShell"',
       30_000
     )
@@ -1821,6 +1824,23 @@ export async function rodarAutoteste(
       `window.__teste.loja.planoAtual().nos.some((n) => n.tipo === 'texto' && n.texto.includes('RECADO-PELO-CORREIO'))`
     )
     conferir('verbo que mexe no quadro também vai pelo correio', anotado, anotado ? 'o texto apareceu no quadro' : 'nada no quadro')
+
+    // O caso de verdade: o cano **quebrado**, não desligado por variável. Foi aqui que o conserto falhou na
+    // primeira vez — o `ork` só caía no correio em dois códigos de erro, o sandbox do Codex devolveu um
+    // terceiro, e o agente ouviu "não consegui falar com o app" com o app aberto na frente dele. Com o
+    // ORK_PIPE apontando para um cano que não existe, a resposta tem de vir igual, pelo correio.
+    const canoQuebrado = await comandoAte(
+      chefe,
+      // guarda e devolve o valor: apagar a variável deixaria o shell sem `ork` pelo resto do cenário
+      'cls; $ork=$env:ORK_PIPE; $env:ORK_PIPE="\\\\.\\pipe\\orkester-cano-que-nao-existe"; ork quem; $env:ORK_PIPE=$ork',
+      /Você é "PowerShell"|não consegui falar/,
+      30_000
+    )
+    conferir(
+      'cano quebrado cai no correio sozinho, qualquer que seja o erro',
+      canoQuebrado.includes('Você é "PowerShell"'),
+      ultimas(canoQuebrado, 2)
+    )
 
     // a pasta do correio não guarda conversa: pedido e resposta são apagados ao serem lidos
     const naPasta = recadosNoCorreio()
@@ -2802,7 +2822,21 @@ export async function rodarAutoteste(
     .split(',')
     .map((nome) => nome.trim().toLocaleLowerCase())
     .filter(Boolean)
-  const selecionados = cenarios.filter((cenario) => !filtro.length || filtro.some((nome) => cenario.nome.toLocaleLowerCase().includes(nome)))
+  // Pedir um cenário traz o que ele depende, em cadeia: sem isto, `ORK_CENARIOS=ork-correio` só dizia
+  // "não rodou: depende de ork", e a única saída era rodar a suíte inteira para conferir uma coisa só.
+  const pedidos = new Set(
+    cenarios.filter((cenario) => !filtro.length || filtro.some((nome) => cenario.nome.toLocaleLowerCase().includes(nome))).map((c) => c.nome)
+  )
+  for (let mudou = true; mudou; ) {
+    mudou = false
+    for (const cenario of cenarios) {
+      if (pedidos.has(cenario.nome) && cenario.depende && !pedidos.has(cenario.depende)) {
+        pedidos.add(cenario.depende)
+        mudou = true
+      }
+    }
+  }
+  const selecionados = cenarios.filter((cenario) => pedidos.has(cenario.nome))
   const situacao = new Map<string, 'passou' | 'falhou' | 'não rodou'>()
   const detalhesDeCenario = new Map<string, string>()
   for (const cenario of selecionados) {

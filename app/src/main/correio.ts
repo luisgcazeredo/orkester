@@ -1,8 +1,7 @@
-import { randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ehRecado, idDoRecado, MAX_RECADO, nomeDoRecado, SUFIXO_PARCIAL } from '../shared/correio'
+import { ehRecado, idDoRecado, MAX_RECADO, nomeDaPasta, nomeDoRecado, pastasMortas, SUFIXO_PARCIAL } from '../shared/correio'
 
 /**
  * O lado do app do correio — o segundo canal do `ork`, por arquivo. O porquê está em `shared/correio.ts`:
@@ -29,10 +28,37 @@ let atendente: Atendente | null = null
 /** Quem sabe responder um pedido. Vem de fora para o correio não conhecer os verbos nem fechar ciclo. */
 export type Atendente = (linha: string) => Promise<{ resposta: unknown; depois?: () => Promise<void> }>
 
-/** A pasta do correio deste app, criada na primeira vez. Nome aleatório: não é segredo, mas não é adivinhável. */
+/**
+ * A pasta do correio deste app. O nome leva o pid: assim um app que abre consegue saber quais pastas são
+ * de apps que já morreram e varrê-las (ver `pastasMortas`). Antes o nome era sorteado, e as pastas de
+ * execuções encerradas à força ficavam em `%TEMP%` para sempre.
+ */
 export function pastaDoCorreio(): string {
-  if (!pasta) pasta = join(tmpdir(), `orkester-correio-${randomBytes(12).toString('hex')}`)
+  if (!pasta) pasta = join(tmpdir(), nomeDaPasta(process.pid))
   return pasta
+}
+
+/** Vivo? Sinal 0 não mata ninguém: só pergunta se o processo existe e é alcançável. */
+function processoVivo(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (erro) {
+    // EPERM: existe, é de outro usuário. Só ESRCH quer dizer "não existe".
+    return (erro as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
+
+/** Apaga as pastas de correio que ficaram de apps mortos. Erro aqui não impede o app de abrir. */
+function varrerPastasMortas(): void {
+  try {
+    const temp = tmpdir()
+    for (const nome of pastasMortas(readdirSync(temp), processoVivo, process.pid)) {
+      rmSync(join(temp, nome), { recursive: true, force: true })
+    }
+  } catch {
+    // sem permissão de listar a temporária, ou ela sumiu: não é problema nosso agora
+  }
 }
 
 function responder(id: string, resposta: unknown): void {
@@ -99,6 +125,7 @@ function varrerPasta(): void {
 /** Abre o correio: cria a pasta e começa a vigiar. Devolve a pasta, que vai no ambiente dos terminais. */
 export function abrirCorreio(quemAtende: Atendente): string {
   atendente = quemAtende
+  varrerPastasMortas()
   const caminho = pastaDoCorreio()
   mkdirSync(caminho, { recursive: true })
   try {
