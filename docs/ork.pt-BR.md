@@ -17,7 +17,11 @@ aprende o comando sozinho na primeira vez que precisa dele.
 
 ### Se o agente roda num sandbox
 
-Nada a fazer: o `ork` funciona igual. O detalhe, para quem tiver curiosidade — o comando conversa com o app
+Nada a fazer: o `ork` funciona igual. O Codex é o caso que precisa de ajuda, e o app resolve sozinho: ele
+roda todo comando num sandbox e recusa sair dele, então o app grava uma regra de execpolicy em
+`~/.codex/rules/orkester.rules` liberando o programa `ork` — o mecanismo documentado do próprio Codex para
+isso. Sem ela, um agente Codex lê o quadro e nunca fala nele. A regra alarga o sandbox do Codex para esse
+comando; o arquivo diz quem escreveu e por quê, e apagá-lo devolve a pergunta. O detalhe, para quem tiver curiosidade — o comando conversa com o app
 por um cano nomeado, e alguns sandboxes recusam abrir um (o Codex no Windows responde `EPERM`). Quando isso
 acontece, o `ork` deixa o mesmo pedido como arquivo numa pasta própria que o app vigia, e lê a resposta de
 lá. Mesmos verbos, mesmas respostas, mesmos códigos de saída; a diferença são alguns milissegundos. A pasta

@@ -5,7 +5,7 @@
 
 **Um time de agentes de código num quadro infinito — e você desenha quem fala com quem.**
 
-![versão](https://img.shields.io/badge/vers%C3%A3o-1.0.4-4060e8)
+![versão](https://img.shields.io/badge/vers%C3%A3o-1.0.5-4060e8)
 ![plataforma](https://img.shields.io/badge/plataforma-Windows%2011%20x64-4060e8)
 
 [English](README.md) · Português
@@ -55,7 +55,7 @@ Três ideias seguram o resto:
 
 **[Baixar o instalador →](https://github.com/luisgcazeredo/orkester/releases/latest)**
 
-Um arquivo só, `Orkester-Instalador-1.0.4.exe` (119 MB). É só rodar: ele instala para o teu usuário — sem pedir
+Um arquivo só, `Orkester-Instalador-1.0.5.exe` (119 MB). É só rodar: ele instala para o teu usuário — sem pedir
 administrador — e põe o atalho **Orkester** na área de trabalho e no menu Iniciar. Precisa de **Windows 11
 x64** e de mais nada.
 
@@ -125,7 +125,7 @@ docs/              a referência do `ork`
 
 ## Estado
 
-Versão **1.0.4**, lançada em 09/11/2026 e em uso diário no Windows. Só Windows 11 x64 — nada no código
+Versão **1.0.5**, lançada em 09/11/2026 e em uso diário no Windows. Só Windows 11 x64 — nada no código
 impede outro sistema de propósito, mas nada foi testado fora dele.
 
 ## Licença

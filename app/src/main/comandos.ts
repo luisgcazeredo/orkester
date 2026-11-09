@@ -121,6 +121,44 @@ function instalarComando(): void {
     // e a skill com o nome antigo sai: duas skills ensinando comandos diferentes confundiriam os agentes
     rmSync(join(pasta, 'skills', 'maestri-proprio'), { recursive: true, force: true })
   }
+  liberarOrkNoCodex()
+}
+
+/**
+ * Deixa o `ork` rodar no Codex sem pedir aprovação e sem o sandbox no caminho.
+ *
+ * Sem isto o agente simplesmente **não conversa**: o Codex roda cada comando num sandbox e, na política de
+ * aprovação granular, recusa sair dele — o `ork pedir` morria com "Acesso negado" enquanto o `ork quem`,
+ * que o Codex julga inofensivo, passava (visto em 09/11/2026, com dois Codex no mesmo quadro).
+ *
+ * O jeito documentado de resolver isso é uma regra de execpolicy, que o Codex lê de `rules/*.rules` na
+ * abertura. A regra aqui é a mais estreita possível: **só o programa `ork`**, que é o nosso, e nada mais.
+ * Ela não afrouxa o sandbox para o resto — um `rm` encadeado depois do `ork` continua sendo julgado
+ * sozinho. O que ela diz é: este comando é do app que abriu este terminal, e falar com o app é o trabalho.
+ */
+function liberarOrkNoCodex(): void {
+  const casa = process.env.CODEX_HOME || join(homedir(), '.codex')
+  if (!existsSync(casa)) return
+  const regra = [
+    '# Escrito pelo Orkester. Deixa o agente usar o `ork` — o comando com que ele fala com o app que o',
+    '# abriu. Sem esta regra o Codex recusa o comando dentro do sandbox e o agente fica mudo.',
+    '# Vale só para o `ork`: qualquer outro comando continua passando pelas suas regras de sempre.',
+    'prefix_rule(',
+    '    pattern = ["ork"],',
+    '    decision = "allow",',
+    '    justification = "ork: o comando do Orkester, o app que abriu este terminal",',
+    '    match = ["ork quem", "ork quadro"],',
+    '    not_match = ["git ork"],',
+    ')',
+    ''
+  ].join('\n')
+  try {
+    const pasta = join(casa, 'rules')
+    mkdirSync(pasta, { recursive: true })
+    gravarSeMudou(join(pasta, 'orkester.rules'), regra)
+  } catch {
+    // sem permissão de escrever na casa do Codex: o agente vai pedir aprovação, que é o de antes
+  }
 }
 
 // ---------- pedidos que mexem no quadro: vão para a janela dona do espaço ----------

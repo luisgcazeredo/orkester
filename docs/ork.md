@@ -19,7 +19,11 @@ The command itself is in Portuguese, like the rest of the app's interface.
 
 ### If the agent runs in a sandbox
 
-Nothing to do: `ork` works the same. The detail, for whoever is curious — the command talks to the app
+Nothing to do: `ork` works the same. Codex is the case that needs help, and the app sets it up on its own:
+Codex runs every command in a sandbox and refuses to leave it, so the app writes an execpolicy rule to
+`~/.codex/rules/orkester.rules` allowing the `ork` program — Codex's own documented mechanism for this.
+Without it a Codex agent can read the canvas and never speak on it. The rule widens Codex's sandbox for that
+one command; the file says who wrote it and why, and deleting it puts the asking back. The detail, for whoever is curious — the command talks to the app
 through a named pipe, and some sandboxes refuse to open one (Codex on Windows answers `EPERM`). When that
 happens `ork` leaves the same request as a file in a private folder the app watches, and reads the answer
 from there. Same verbs, same answers, same exit codes; the difference is a few milliseconds. The folder sits
