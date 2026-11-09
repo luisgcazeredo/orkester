@@ -42,17 +42,23 @@ function criarDriver(janela: BrowserWindow, pastaSaida: string) {
   const centroDe = (seletor: string): Promise<{ x: number; y: number } | null> =>
     js(`(() => { const r = document.querySelector(${JSON.stringify(seletor)})?.getBoundingClientRect();
       return r ? { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) } : null })()`)
+  // Um arrasto de gente leva uns 300 ms e dezenas de eventos. Com 8 passos de 16 ms, a máquina ocupada
+  // engolia os últimos e o cartão andava um pedaço só — foi assim que esta checagem caiu na rodada com
+  // agentes de verdade. Mais passos, mais tempo entre eles, e uma pausa antes de soltar o botão: o
+  // renderer precisa ter processado o último movimento antes do mouseUp, senão o arrasto termina onde parou.
   const arrastar = async (de: { x: number; y: number }, ate: { x: number; y: number }): Promise<void> => {
     tela.sendInputEvent({ type: 'mouseMove', x: de.x, y: de.y })
     tela.sendInputEvent({ type: 'mouseDown', x: de.x, y: de.y, button: 'left', clickCount: 1 })
-    for (let i = 1; i <= 8; i++) {
-      const x = Math.round(de.x + ((ate.x - de.x) * i) / 8)
-      const y = Math.round(de.y + ((ate.y - de.y) * i) / 8)
+    const passos = 12
+    for (let i = 1; i <= passos; i++) {
+      const x = Math.round(de.x + ((ate.x - de.x) * i) / passos)
+      const y = Math.round(de.y + ((ate.y - de.y) * i) / passos)
       tela.sendInputEvent({ type: 'mouseMove', x, y, button: 'left', modifiers: ['leftbuttondown'] })
-      await esperar(16)
+      await esperar(25)
     }
+    await esperar(90)
     tela.sendInputEvent({ type: 'mouseUp', x: ate.x, y: ate.y, button: 'left', clickCount: 1 })
-    await esperar(200)
+    await esperar(250)
   }
   const tecla = async (letra: string): Promise<void> => {
     tela.sendInputEvent({ type: 'keyDown', keyCode: letra, modifiers: ['control'] })
@@ -159,17 +165,23 @@ export async function rodarAutoteste(
   const centroDe = (seletor: string): Promise<{ x: number; y: number } | null> =>
     js(`(() => { const r = document.querySelector(${JSON.stringify(seletor)})?.getBoundingClientRect();
       return r ? { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) } : null })()`)
+  // Um arrasto de gente leva uns 300 ms e dezenas de eventos. Com 8 passos de 16 ms, a máquina ocupada
+  // engolia os últimos e o cartão andava um pedaço só — foi assim que esta checagem caiu na rodada com
+  // agentes de verdade. Mais passos, mais tempo entre eles, e uma pausa antes de soltar o botão: o
+  // renderer precisa ter processado o último movimento antes do mouseUp, senão o arrasto termina onde parou.
   const arrastar = async (de: { x: number; y: number }, ate: { x: number; y: number }): Promise<void> => {
     tela.sendInputEvent({ type: 'mouseMove', x: de.x, y: de.y })
     tela.sendInputEvent({ type: 'mouseDown', x: de.x, y: de.y, button: 'left', clickCount: 1 })
-    for (let i = 1; i <= 8; i++) {
-      const x = Math.round(de.x + ((ate.x - de.x) * i) / 8)
-      const y = Math.round(de.y + ((ate.y - de.y) * i) / 8)
+    const passos = 12
+    for (let i = 1; i <= passos; i++) {
+      const x = Math.round(de.x + ((ate.x - de.x) * i) / passos)
+      const y = Math.round(de.y + ((ate.y - de.y) * i) / passos)
       tela.sendInputEvent({ type: 'mouseMove', x, y, button: 'left', modifiers: ['leftbuttondown'] })
-      await esperar(16)
+      await esperar(25)
     }
+    await esperar(90)
     tela.sendInputEvent({ type: 'mouseUp', x: ate.x, y: ate.y, button: 'left', clickCount: 1 })
-    await esperar(200)
+    await esperar(250)
   }
   void legadoTela
   void legadoEsperar
@@ -1693,7 +1705,10 @@ export async function rodarAutoteste(
       await aguardar(async () => String((await rotina()).vezes), String(i), 25_000)
     }
     const tresVezes = await rotina()
-    const tela = await telaNoApp(cartao)
+    // A rotina conta assim que digita; o eco só aparece quando o shell responde, e isso atrasa quando a
+    // máquina está ocupada (na rodada com agentes de verdade chegaram 2 dos 3 a tempo). Espera o terceiro
+    // em vez de fotografar a tela no instante seguinte ao disparo.
+    const tela = await aguardar(() => telaNoApp(cartao), /^ROTINA-RODOU[\s\S]*?^ROTINA-RODOU[\s\S]*?^ROTINA-RODOU/m, 30_000)
     conferir(
       'o relógio digita no cartão: três disparos, três vezes contadas e o eco na tela',
       tresVezes.vezes === 3 && tresVezes.resultado === 'rodou' && (tela.match(/^ROTINA-RODOU/gm) ?? []).length >= 3,
