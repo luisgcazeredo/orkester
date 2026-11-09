@@ -8,7 +8,7 @@ of whoever it is linked to, rearranges the canvas and assembles its own team.
 Two rules apply to everything below:
 
 - **It only runs inside a terminal on the canvas.** Outside the app the command refuses — it talks to the
-  window through a named pipe that exists only there.
+  window through a named pipe (or, in a sandbox that forbids pipes, a file mailbox) that exists only there.
 - **The link is the permission.** An agent reaches whoever it is wired to (or whoever shares its band), and
   nobody else. Cards are addressed by name.
 
@@ -16,6 +16,17 @@ The app writes this manual as an `orkester` skill into `~/.claude/skills` and `~
 learns the command by itself the first time it needs it.
 
 The command itself is in Portuguese, like the rest of the app's interface.
+
+### If the agent runs in a sandbox
+
+Nothing to do: `ork` works the same. The detail, for whoever is curious — the command talks to the app
+through a named pipe, and some sandboxes refuse to open one (Codex on Windows answers `EPERM`). When that
+happens `ork` leaves the same request as a file in a private folder the app watches, and reads the answer
+from there. Same verbs, same answers, same exit codes; the difference is a few milliseconds. The folder sits
+under the system temp directory, holds nothing but requests in flight, and is deleted when the app closes.
+
+It is not a way around the sandbox: the mailbox carries the same verbs the pipe carries, and the link is
+still the permission.
 
 ---
 

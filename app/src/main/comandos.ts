@@ -9,6 +9,7 @@ import type { Agente, ResultadoDaRotina } from '../shared/modelo'
 import type { PedidoNoQuadro } from '../shared/quadro/agente'
 import { criarEspacoDoAgente, PASTA_DADOS, resumosDosEspacos } from './dados'
 import { abrirJanela, donoDe } from './janelas'
+import { abrirCorreio, pastaDoCorreio } from './correio'
 import { AJUDA, SKILL } from './manual'
 import { extrairLeituraDeContexto, extrairLeituraDoRodape } from './contexto'
 import { validarChamada, type NomeDeVerbo } from './verbos'
@@ -69,7 +70,7 @@ function caminhoDoCli(): string {
 export function ambienteDoComando(s: Sessao): { pastaBin: string; variaveis: Record<string, string> } {
   return {
     pastaBin: PASTA_BIN,
-    variaveis: { ORK_PIPE: PIPE, ORK_CRACHA: s.cracha, ORK_TERMINAL: s.espec.nome, ORK_NODE: process.execPath, ORK_CLI: caminhoDoCli() }
+    variaveis: { ORK_PIPE: PIPE, ORK_CORREIO: pastaDoCorreio(), ORK_CRACHA: s.cracha, ORK_TERMINAL: s.espec.nome, ORK_NODE: process.execPath, ORK_CLI: caminhoDoCli() }
   }
 }
 
@@ -314,9 +315,35 @@ async function digitarPedido(s: Sessao, texto: string): Promise<void> {
   } else {
     escreverNoProcesso(s, s.espec.agente === 'shell' ? limpo.replace(/\n/g, '\r') : limpo.replace(/\n/g, ' '))
   }
-  // o Enter separado da colagem: junto, alguns agentes o tomam como parte do texto
-  await esperar(250)
-  escreverNoProcesso(s, '\r')
+  // O Enter vai separado da colagem: junto, alguns agentes o tomam como parte do texto.
+  //
+  // Antes esta espera era de 250 ms fixos, e era um chute. Num agente recém-nascido, com a máquina
+  // ocupada, 250 ms não bastam: o Enter chega antes de o compositor ter o texto e é engolido — o pedido
+  // fica escrito na tela, sem enviar, até alguém apertar Enter à mão (visto com Codex em 09/11/2026).
+  // Agora espera-se a evidência de que a colagem chegou, e depois confirma-se que o pedido saiu.
+  const antesDaColagem = await telaDe(s, 12)
+  await esperar(120)
+  await esperarMudanca(s, antesDaColagem, 1500)
+
+  for (let tentativa = 1; tentativa <= 3; tentativa++) {
+    const antesDoEnter = await telaDe(s, 12)
+    escreverNoProcesso(s, '\r')
+    // enviado é uma de duas coisas: o agente começou a trabalhar (ou a perguntar), ou a tela mudou — o
+    // shell, que responde na hora, cai no segundo caso antes de dar tempo de ficar "trabalhando"
+    for (const limite = Date.now() + 2000; Date.now() < limite; await esperar(100)) {
+      const agora = await situacao(s)
+      if (agora === 'trabalhando' || agora === 'pergunta') return
+      if ((await telaDe(s, 12)) !== antesDoEnter) return
+    }
+  }
+}
+
+/** Espera a tela mudar (a colagem aparecendo, por exemplo). Falso se nada mudou no prazo. */
+async function esperarMudanca(s: Sessao, antes: string, ms: number): Promise<boolean> {
+  for (const limite = Date.now() + ms; Date.now() < limite; await esperar(100)) {
+    if ((await telaDe(s, 12)) !== antes) return true
+  }
+  return false
 }
 
 /**
@@ -919,22 +946,33 @@ async function executar(eu: Sessao, pedido: Pedido, cancelado: () => boolean): P
   return HANDLERS[chamada.verbo.nome as NomeDeVerbo]({ eu, pos: chamada.posicionais, opcoes: chamada.opcoes, texto, cancelado })
 }
 
-async function atender(linha: string, socket: Socket, fechado: () => boolean): Promise<void> {
-  let resposta: { ok: boolean; saida?: string; erro?: string }
+/**
+ * Um pedido, venha pelo pipe ou pelo correio: decodifica, acha de quem é pelo crachá, executa e devolve o
+ * que responder. **Os dois canais passam por aqui** — se cada um tivesse o seu caminho, um dia iam divergir
+ * e o correio (que só o Codex usa) seria o que ninguém notaria apodrecendo.
+ */
+export async function responderAoPedido(
+  linha: string,
+  fechado: () => boolean
+): Promise<{ resposta: { ok: boolean; saida?: string; erro?: string }; sair?: Sessao[] }> {
   try {
     const pedido = JSON.parse(linha) as Pedido
     const eu = sessaoPorCracha(pedido.cracha)
     if (!eu) throw new Error('este terminal não é do Orkester (ou o app foi reaberto: feche e abra o terminal)')
     const resultado = await executar(eu, pedido, fechado)
-    resposta = { ok: true, saida: resultado.saida }
-    if (resultado.sair) {
-      // O `ork` está no processo que vai morrer. Esperamos o flush do socket e mais um instante antes de matar
-      // o pty, para ele imprimir a confirmação; se a janela falhar, o cliente ainda jamais fica preso no pipe.
-      socket.end(`${JSON.stringify(resposta)}\n`, () => setTimeout(() => void fecharCartoesDepoisDaResposta(resultado.sair!), 120))
-      return
-    }
+    return { resposta: { ok: true, saida: resultado.saida }, sair: resultado.sair }
   } catch (erro) {
-    resposta = { ok: false, erro: erro instanceof Error ? erro.message : String(erro) }
+    return { resposta: { ok: false, erro: erro instanceof Error ? erro.message : String(erro) } }
+  }
+}
+
+async function atender(linha: string, socket: Socket, fechado: () => boolean): Promise<void> {
+  const { resposta, sair } = await responderAoPedido(linha, fechado)
+  if (sair) {
+    // O `ork` está no processo que vai morrer. Esperamos o flush do socket e mais um instante antes de matar
+    // o pty, para ele imprimir a confirmação; se a janela falhar, o cliente ainda jamais fica preso no pipe.
+    socket.end(`${JSON.stringify(resposta)}\n`, () => setTimeout(() => void fecharCartoesDepoisDaResposta(sair), 120))
+    return
   }
   if (!socket.destroyed) socket.end(`${JSON.stringify(resposta)}\n`)
 }
@@ -1009,6 +1047,12 @@ export function registrarComandos(): void {
     }
     socket.on('data', aoReceber)
   })
+  // O correio: o mesmo atendente do pipe, por arquivo, para o agente cujo sandbox recusa pipe (o Codex).
+  abrirCorreio(async (linha) => {
+    const { resposta, sair } = await responderAoPedido(linha, () => false)
+    return { resposta, depois: sair ? () => fecharCartoesDepoisDaResposta(sair) : undefined }
+  })
+
   servidor.maxConnections = MAX_CONEXOES
   servidor.on('error', (erro) => console.error('ork: o pipe não abriu', erro))
   servidor.listen(PIPE)

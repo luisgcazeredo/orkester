@@ -6,10 +6,21 @@ import { createServer } from 'node:http'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { extrairContextoRestante } from './comandos'
+import { pastaDoCorreio } from './correio'
 import { lerSessaoDeJanelas, PASTA_DADOS } from './dados'
+import { ehRecado } from '../shared/correio'
 import { janelasParaAbrir } from '../shared/janelas'
 import { encerrarNavegador, janelasNaBarra } from './navegador'
 import { encerrarTodos, linhaDeComando, sessaoPorId, telaDe, terminaisVivos, tetoDeTerminaisNoTeste } from './terminais'
+
+/** Recados que sobraram na pasta do correio. Zero é o esperado: quem lê apaga. */
+function recadosNoCorreio(): number {
+  try {
+    return readdirSync(pastaDoCorreio()).filter((n) => ehRecado(n)).length
+  } catch {
+    return 0
+  }
+}
 
 type Resultado = [nome: string, ok: boolean, detalhe: string]
 
@@ -1766,6 +1777,54 @@ export async function rodarAutoteste(
       if (L.acharNo('${cartao}')) { L.selecionar({ tipo: 'no', id: '${cartao}' }); L.apagarSelecao() }
       L.selecionar(null) })()`)
     await esperar(400)
+      },
+    },
+    {
+      // O correio: o segundo canal do `ork`, por arquivo, para o agente cujo sandbox recusa pipe.
+      //
+      // Medido em 09/11/2026: o sandbox do Codex no Windows recusa pipe (`connect EPERM`) em read-only e em
+      // workspace-write, mas deixa ler e escrever na pasta temporária — que é a mesma que o app vê. Sem este
+      // canal, o Codex recebe pedidos mas não usa o `ork`: metade do app não existe para ele.
+      //
+      // O cenário força o correio com ORK_SEM_PIPE=1 em vez de esperar um Codex de verdade aparecer. Um
+      // canal que só um agente usa, e que ninguém testa, é um canal que apodrece em silêncio — e a nossa
+      // suíte roda com shell, onde o pipe sempre funciona.
+      nome: 'ork-correio',
+      depende: 'ork',
+      rodar: async (d) => {
+        const { js, conferir, aguardar, comando, comandoAte, telaNoApp, ultimas } = d
+
+    // o mesmo verbo pelos dois canais tem de dar a mesma resposta: é o que faz do correio um canal, e não
+    // um caminho paralelo com regras próprias
+    await comando(chefe, 'ork quem')
+    const peloPipe = await aguardar(() => telaNoApp(chefe), 'Você é "PowerShell"')
+    const correio = await comandoAte(
+      chefe,
+      '$env:ORK_SEM_PIPE=1; ork quem; Remove-Item Env:\\ORK_SEM_PIPE',
+      'Você é "PowerShell"',
+      30_000
+    )
+    conferir(
+      'ork pelo correio responde o mesmo que pelo pipe',
+      correio.includes('Você é "PowerShell"') && peloPipe.includes('Você é "PowerShell"'),
+      ultimas(correio, 2)
+    )
+
+    // e um verbo que mexe no quadro, não só um que lê: o correio atravessa até a janela como o pipe
+    await comandoAte(
+      chefe,
+      '$env:ORK_SEM_PIPE=1; ork anotar "RECADO-PELO-CORREIO"; Remove-Item Env:\\ORK_SEM_PIPE',
+      /Anotei|anotado/i,
+      30_000
+    )
+    const anotado = await js<boolean>(
+      `window.__teste.loja.planoAtual().nos.some((n) => n.tipo === 'texto' && n.texto.includes('RECADO-PELO-CORREIO'))`
+    )
+    conferir('verbo que mexe no quadro também vai pelo correio', anotado, anotado ? 'o texto apareceu no quadro' : 'nada no quadro')
+
+    // a pasta do correio não guarda conversa: pedido e resposta são apagados ao serem lidos
+    const naPasta = recadosNoCorreio()
+    conferir('o correio não deixa recado para trás', naPasta === 0, naPasta === 0 ? 'pasta limpa' : `${naPasta} recado(s) esquecido(s)`)
       },
     },
     {

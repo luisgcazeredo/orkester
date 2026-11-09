@@ -8,12 +8,23 @@ quem está ligado a ele, organiza o quadro e monta o próprio time.
 Duas regras valem para tudo o que está aqui:
 
 - **Só roda dentro de um terminal do app.** Fora dele o comando recusa — ele conversa com a janela por um
-  cano nomeado que só existe ali.
+  cano nomeado (ou, num sandbox que proíbe cano, um correio de arquivos) que só existe ali.
 - **A corda é a permissão.** Um agente alcança quem está ligado a ele pela corda (ou na mesma banda), e
   mais ninguém. Cartões se chamam pelo nome.
 
 O app grava este manual como skill `orkester` em `~/.claude/skills` e `~/.codex/skills`, então o agente
 aprende o comando sozinho na primeira vez que precisa dele.
+
+### Se o agente roda num sandbox
+
+Nada a fazer: o `ork` funciona igual. O detalhe, para quem tiver curiosidade — o comando conversa com o app
+por um cano nomeado, e alguns sandboxes recusam abrir um (o Codex no Windows responde `EPERM`). Quando isso
+acontece, o `ork` deixa o mesmo pedido como arquivo numa pasta própria que o app vigia, e lê a resposta de
+lá. Mesmos verbos, mesmas respostas, mesmos códigos de saída; a diferença são alguns milissegundos. A pasta
+fica na temporária do sistema, não guarda nada além dos pedidos em trânsito, e é apagada quando o app fecha.
+
+Não é um jeito de furar o sandbox: o correio leva os mesmos verbos que o cano leva, e a corda continua sendo
+a permissão.
 
 ---
 

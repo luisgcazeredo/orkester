@@ -7,6 +7,7 @@ import { pararRotinas, registrarRotinas } from './rotinas'
 import { registrarArea, registrarEsquemaImagem, servirImagens } from './area'
 import { registrarCodigo } from './codigo'
 import { registrarComandos } from './comandos'
+import { fecharCorreio } from './correio'
 import { gravarSessaoDeJanelas, idsDosEspacos, lerSessaoDeJanelas, quandoApagarEspaco, registrarDados } from './dados'
 import { encerrarNavegador, registrarNavegador, soltarAbasDaJanela } from './navegador'
 import { acompanharJanela, configurarJanelas, gravarSessaoAgora, lembrarInicial, reabrirJanelas, registrarJanelas, soltarJanela } from './janelas'
@@ -257,6 +258,8 @@ if (!autoteste && !medindo && !app.requestSingleInstanceLock()) {
 // Sair: a sessão de janelas vai para o disco sem esperar o adiamento de meio segundo.
 app.on('before-quit', () => {
   if (!autoteste && !medindo) gravarSessaoAgora()
+  // nada do que os agentes conversaram pelo correio fica no disco depois que o app sai
+  fecharCorreio()
 })
 
 app.on('window-all-closed', () => {
