@@ -1,53 +1,103 @@
-/* Tokens de cor (ver VISUAL.md): escuro medido da janela de referência; claro do print oficial. */
+/* ------------------------------------------------------------------ identidade
+ *
+ * Visual próprio do Orkester (06/11/2026). Quem manda aqui é a marca: o azul das peças do símbolo
+ * (#4060e8) é o destaque do app, e o azul claro do núcleo (#98a8f8) é o realce. O escuro é grafite —
+ * quase preto com um fio de azul —, não cinza neutro: num app que fica aberto o dia inteiro, cinza puro
+ * cansa e some com o contraste dos cartões.
+ *
+ * Três camadas de profundidade, e só três: o **quadro** (o fundo de tudo), o **painel** (cartão, menu,
+ * diálogo, barra lateral) e o **painel alto** (cabeçalho de cartão, pílula, campo). Cada uma se separa da
+ * de baixo por uma borda fina, não por sombra forte — sombra aqui serve para dizer "isto flutua sobre o
+ * quadro", e nada mais.
+ *
+ * Nada neste arquivo é medido de outro produto.
+ */
 .tema-escuro {
-  --quadro-fundo: #1e1e1e;
-  --grade: #262626;
-  --lateral-fundo: #3a3a3b;
-  --lateral-borda: #2c2c2d;
-  --lateral-filtro: #4a4a4b;
-  --lateral-ativo: rgba(255, 255, 255, 0.11);
-  --hover: rgba(255, 255, 255, 0.07);
-  --texto: #f2f2f2;
-  --texto-suave: #a0a0a4;
-  --pilula-fundo: #2b2b2d;
-  --pilula-borda: #3a3a3c;
-  --terminal-cabecalho: #38383a;
-  --terminal-corpo: #1a1a1e;
-  --terminal-borda: #2a2a2d;
-  --terminal-texto: #d8d8dc;
-  --corda: #5f5f5f;
-  --cartao: #2b2b2d;
-  --sombra: 0 10px 34px rgba(0, 0, 0, 0.38);
-  --sombra-leve: 0 4px 16px rgba(0, 0, 0, 0.3);
+  --quadro-fundo: #141519;
+  --grade: #262a36;
+  --painel: #1b1d23;
+  --painel-alto: #212531;
+  --borda: #2a2e38;
+  --borda-suave: #23262f;
+  --lateral-fundo: #16181d;
+  --lateral-borda: #22252d;
+  --lateral-filtro: #1e212a;
+  --lateral-ativo: rgba(64, 96, 232, 0.18);
+  --hover: rgba(255, 255, 255, 0.055);
+  --texto: #e7e9f0;
+  --texto-suave: #878e9f;
+  --pilula-fundo: #1b1d23;
+  --pilula-borda: #2a2e38;
+  --terminal-cabecalho: #212531;
+  --terminal-corpo: #16181d;
+  --terminal-borda: #2a2e38;
+  --terminal-texto: #d6d9e3;
+  --corda: #3d4252;
+  --cartao: #1b1d23;
+  --sombra: 0 18px 46px rgba(0, 0, 0, 0.55);
+  --sombra-leve: 0 6px 18px rgba(0, 0, 0, 0.4);
   color-scheme: dark;
 }
 
 .tema-claro {
-  --quadro-fundo: #fafafa;
-  --grade: #ededef;
-  --lateral-fundo: #f1f1f3;
-  --lateral-borda: #e3e3e6;
-  --lateral-filtro: #e4e4e7;
-  --lateral-ativo: rgba(0, 0, 0, 0.07);
-  --hover: rgba(0, 0, 0, 0.05);
-  --texto: #1d1d1f;
-  --texto-suave: #6e6e73;
+  --quadro-fundo: #f6f7fa;
+  --grade: #dde0ea;
+  --painel: #ffffff;
+  --painel-alto: #f2f3f8;
+  --borda: #e3e6ef;
+  --borda-suave: #edeff5;
+  --lateral-fundo: #f1f2f7;
+  --lateral-borda: #e3e6ef;
+  --lateral-filtro: #ffffff;
+  --lateral-ativo: rgba(64, 96, 232, 0.12);
+  --hover: rgba(18, 24, 44, 0.05);
+  --texto: #171a21;
+  --texto-suave: #6a7183;
   --pilula-fundo: #ffffff;
-  --pilula-borda: #e3e3e6;
-  --terminal-cabecalho: #eeeeee;
+  --pilula-borda: #e3e6ef;
+  --terminal-cabecalho: #f2f3f8;
   --terminal-corpo: #ffffff;
-  --terminal-borda: #dcdcdf;
-  --terminal-texto: #2a2a2e;
-  --corda: #a3a3a8;
+  --terminal-borda: #e3e6ef;
+  --terminal-texto: #23262e;
+  --corda: #a9afc0;
   --cartao: #ffffff;
-  --sombra: 0 10px 34px rgba(0, 0, 0, 0.1);
-  --sombra-leve: 0 3px 12px rgba(0, 0, 0, 0.08);
+  --sombra: 0 16px 40px rgba(20, 25, 45, 0.13);
+  --sombra-leve: 0 4px 14px rgba(20, 25, 45, 0.08);
   color-scheme: light;
 }
 
 :root {
-  --destaque: #007aff;
-  --fonte-interface: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --destaque: #4060e8;
+  --destaque-claro: #98a8f8;
+  --destaque-forte: #3250d8;
+  /* o agente está vivo; é a única cor "de estado" que aparece o tempo todo, então é discreta */
+  --vivo: #35c46b;
+  --perigo: #ff453a;
+  --atencao: #f0a33a;
+  /* o post-it é papel: a cor dele não muda com o tema, e o texto nele é sempre escuro */
+  --postit-texto: #2a2a2a;
+  --postit-mini: #fff3a0;
+  /* pasta no explorador e nas árvores */
+  --pasta: #5ea0ff;
+  /* diff: entrou e saiu */
+  --entrou: #35c46b;
+  --saiu: #ff453a;
+
+  /* raios: quatro degraus e a pílula. Fora daqui, nenhum número solto. */
+  --raio-micro: 4px;
+  --raio-pequeno: 7px;
+  --raio: 10px;
+  --raio-grande: 14px;
+  --raio-pilula: 999px;
+
+  /* espaçamento em múltiplos de 4: o ritmo do app inteiro */
+  --espaco-1: 4px;
+  --espaco-2: 8px;
+  --espaco-3: 12px;
+  --espaco-4: 16px;
+  --espaco-5: 24px;
+
+  --fonte-interface: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
   --fonte-mono: 'Cascadia Mono', Consolas, 'DejaVu Sans Mono', monospace;
 }
 
@@ -89,15 +139,31 @@ button {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding: 12px 10px;
+  padding: var(--espaco-3) var(--espaco-2);
   background: var(--lateral-fundo);
   border-right: 1px solid var(--lateral-borda);
+}
+
+/* a marca abre a barra: o símbolo na cor do app e o nome, sem caixa e sem fundo */
+.marca {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: var(--espaco-1) var(--espaco-2) var(--espaco-4);
+  color: var(--destaque);
+}
+
+.marca span {
+  color: var(--texto);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
 }
 
 .lateral-topo {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--espaco-2);
 }
 
 .filtro {
@@ -105,11 +171,16 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 36px;
-  padding: 0 12px;
-  border-radius: 999px;
+  height: 34px;
+  padding: 0 var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio);
   background: var(--lateral-filtro);
   color: var(--texto-suave);
+}
+
+.filtro:focus-within {
+  border-color: var(--destaque);
 }
 
 .filtro input {
@@ -120,7 +191,7 @@ button {
   background: transparent;
   color: var(--texto);
   font: inherit;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .botao-icone {
@@ -129,7 +200,7 @@ button {
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--raio-pequeno);
   background: transparent;
 }
 
@@ -159,7 +230,7 @@ button {
   gap: 10px;
   height: 36px;
   padding: 0 10px;
-  border-radius: 8px;
+  border-radius: var(--raio-pequeno);
   font-size: 15px;
   cursor: default;
 }
@@ -183,7 +254,7 @@ button {
   flex: 1;
   min-width: 0;
   border: 1px solid var(--destaque);
-  border-radius: 5px;
+  border-radius: var(--raio-pequeno);
   background: var(--quadro-fundo);
   color: var(--texto);
   font: inherit;
@@ -213,8 +284,8 @@ button {
   inset: 0;
   overflow: hidden;
   background-color: var(--quadro-fundo);
-  background-image: linear-gradient(var(--grade) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grade) 1px, transparent 1px);
+  /* pontinhos, não linhas: a grade orienta sem desenhar uma malha por cima do trabalho */
+  background-image: radial-gradient(circle at 1px 1px, var(--grade) 1.2px, transparent 1.3px);
   touch-action: none;
 }
 
@@ -270,8 +341,9 @@ button {
   content: '';
   position: absolute;
   inset: calc(-4px / var(--zoom, 1));
-  border: calc(1.5px / var(--zoom, 1)) dashed var(--destaque);
-  border-radius: calc(12px / var(--zoom, 1));
+  border: calc(1.5px / var(--zoom, 1)) solid var(--destaque);
+  border-radius: calc(17px / var(--zoom, 1));
+  box-shadow: 0 0 0 calc(3px / var(--zoom, 1)) color-mix(in srgb, var(--destaque) 22%, transparent);
   pointer-events: none;
 }
 
@@ -293,7 +365,7 @@ button {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--terminal-borda);
-  border-radius: 10px;
+  border-radius: var(--raio-grande);
   background: var(--terminal-corpo);
   box-shadow: var(--sombra);
 }
@@ -310,16 +382,17 @@ button {
 }
 
 .terminal-cabecalho {
-  height: 24px;
-  border-radius: 9px 9px 0 0;
+  height: 28px;
+  border-radius: 13px 13px 0 0;
+  border-bottom: 1px solid var(--borda-suave);
   font-size: 11.5px;
   font-weight: 600;
 }
 
 .terminal-indice {
   margin-left: 2px;
-  padding: 0 4px;
-  border-radius: 3px;
+  padding: 0 5px;
+  border-radius: var(--raio-micro);
   background: var(--hover);
   color: var(--texto-suave);
   font-size: 10px;
@@ -327,8 +400,9 @@ button {
 }
 
 .terminal-rodape {
-  height: 20px;
-  border-radius: 0 0 9px 9px;
+  height: 22px;
+  border-radius: 0 0 13px 13px;
+  border-top: 1px solid var(--borda-suave);
   font-size: 11px;
   color: var(--texto-suave);
 }
@@ -388,7 +462,7 @@ button {
   align-items: center;
   gap: 10px;
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: var(--raio-pequeno);
   background: var(--terminal-cabecalho);
   color: var(--texto);
   font-family: var(--fonte-interface);
@@ -399,7 +473,7 @@ button {
   margin-left: auto;
   padding: 3px 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--raio-pequeno);
   background: var(--destaque);
   color: #fff;
   font: inherit;
@@ -408,7 +482,7 @@ button {
 
 .terminal-selo {
   padding: 0 5px;
-  border-radius: 3px;
+  border-radius: var(--raio-micro);
   background: var(--hover);
   color: var(--texto-suave);
   font-size: 9.5px;
@@ -466,7 +540,7 @@ button {
   gap: 6px;
   padding: 8px 10px;
   border: 1px solid var(--pilula-borda);
-  border-radius: 8px;
+  border-radius: var(--raio-pequeno);
   background: var(--pilula-fundo);
 }
 
@@ -498,7 +572,7 @@ button {
   gap: 8px;
   padding: 10px;
   border: 1px solid var(--pilula-borda);
-  border-radius: 8px;
+  border-radius: var(--raio-pequeno);
 }
 
 .rotina-campos {
@@ -598,8 +672,8 @@ button {
 .postit {
   height: 100%;
   padding: 12px 14px;
-  border-radius: 4px;
-  color: #2a2a2a;
+  border-radius: var(--raio-micro);
+  color: var(--postit-texto);
   font-size: 13.5px;
   line-height: 1.45;
   box-shadow: var(--sombra-leve);
@@ -649,7 +723,7 @@ button {
 
 .postit-tarefa input {
   margin: 0;
-  accent-color: #6b6b6b;
+  accent-color: var(--texto-suave);
 }
 
 .postit-campo {
@@ -680,7 +754,7 @@ button {
 
 .texto-campo {
   border: 1px dashed var(--destaque);
-  border-radius: 4px;
+  border-radius: var(--raio-micro);
   outline: 0;
   resize: none;
   background: transparent;
@@ -698,7 +772,7 @@ button {
   gap: 10px;
   padding: 12px;
   border: 1px solid var(--pilula-borda);
-  border-radius: 12px;
+  border-radius: var(--raio-grande);
   background: var(--cartao);
   box-shadow: var(--sombra-leve);
   color: var(--texto-suave);
@@ -721,7 +795,7 @@ button {
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--terminal-borda);
-  border-radius: 10px;
+  border-radius: var(--raio-grande);
   background: var(--cartao);
   box-shadow: var(--sombra);
 }
@@ -732,7 +806,8 @@ button {
   align-items: center;
   gap: 6px;
   height: 28px;
-  padding: 0 8px;
+  padding: 0 var(--espaco-2);
+  border-bottom: 1px solid var(--borda-suave);
   background: var(--terminal-cabecalho);
   font-size: 11.5px;
   font-weight: 600;
@@ -753,7 +828,7 @@ button {
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--raio-pequeno);
   background: transparent;
   color: var(--texto-suave);
 }
@@ -810,7 +885,7 @@ button {
 
 .arvore-pasta {
   flex-shrink: 0;
-  color: #5ea0ff;
+  color: var(--pasta);
 }
 
 .arvore-aviso {
@@ -825,7 +900,7 @@ button {
   height: 20px;
   padding: 0 8px;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--raio-pilula);
   background: var(--quadro-fundo);
   color: var(--texto);
   font: inherit;
@@ -864,7 +939,7 @@ body.em-gesto webview {
 
 .portal-escudo span {
   padding: 5px 12px;
-  border-radius: 999px;
+  border-radius: var(--raio-pilula);
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
   font-size: 12px;
@@ -942,7 +1017,7 @@ body.em-gesto webview {
   display: flex;
   align-items: center;
   border: 1px solid var(--pilula-borda);
-  border-radius: 999px;
+  border-radius: var(--raio-pilula);
   background: var(--pilula-fundo);
   box-shadow: var(--sombra-leve);
 }
@@ -994,16 +1069,23 @@ body.em-gesto webview {
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--raio);
   background: transparent;
+  color: var(--texto-suave);
 }
 
 .ferramenta:hover:not(:disabled) {
   background: var(--hover);
 }
 
+/* a ferramenta em uso é a única coisa preenchida com a cor da marca: não há dúvida de onde você está */
 .ferramenta.ativa {
-  color: var(--destaque);
+  background: var(--destaque);
+  color: #fff;
+}
+
+.ferramenta:hover:not(:disabled):not(.ativa) {
+  color: var(--texto);
 }
 
 .ferramenta:disabled {
@@ -1027,7 +1109,7 @@ body.em-gesto webview {
   gap: 7px;
   padding: 6px 12px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--raio-pilula);
   background: transparent;
   font-size: 13px;
 }
@@ -1065,7 +1147,7 @@ body.em-gesto webview {
   min-width: 0;
   padding: 0 8px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--raio-pequeno);
   background: var(--lateral-filtro);
   color: var(--texto);
   font: inherit;
@@ -1089,7 +1171,7 @@ body.em-gesto webview {
   justify-content: center;
   gap: 6px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--raio-pequeno);
   background: transparent;
   color: var(--texto-suave);
   cursor: pointer;
@@ -1179,7 +1261,7 @@ body.em-gesto webview {
   overflow: auto;
   padding: 8px;
   border: 1px solid var(--pilula-borda);
-  border-radius: 12px;
+  border-radius: var(--raio-grande);
   background: var(--pilula-fundo);
   color: var(--texto);
   box-shadow: var(--sombra);
@@ -1200,7 +1282,7 @@ body.em-gesto webview {
   gap: 7px;
   padding: 7px 6px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--raio-pequeno);
   background: transparent;
   color: inherit;
   text-align: left;
@@ -1239,7 +1321,7 @@ body.em-gesto webview {
   grid-column: 2 / -1;
   height: 3px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--raio-pilula);
   background: var(--lateral-filtro);
 }
 
@@ -1267,7 +1349,7 @@ body.em-gesto webview {
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--raio-pilula);
   background: transparent;
 }
 
@@ -1283,7 +1365,7 @@ body.em-gesto webview {
 
 .mini-mapa {
   border: 1px solid var(--pilula-borda);
-  border-radius: 12px;
+  border-radius: var(--raio-grande);
   background: var(--pilula-fundo);
   box-shadow: var(--sombra-leve);
   cursor: pointer;
@@ -1295,7 +1377,7 @@ body.em-gesto webview {
 }
 
 .mini-postit {
-  fill: #fff3a0;
+  fill: var(--postit-mini);
   opacity: 0.9;
 }
 
@@ -1324,7 +1406,7 @@ body.em-gesto webview {
   height: 30px;
   margin-left: 22px;
   padding: 0 10px;
-  border-radius: 7px;
+  border-radius: var(--raio-pequeno);
   font-size: 13.5px;
   color: var(--texto-suave);
   cursor: default;
@@ -1351,11 +1433,14 @@ body.em-gesto webview {
   opacity: 0.7;
 }
 
+/* A cor vem de `color` (e não de `background`) para o halo poder nascer dela com `currentColor`. */
 .ponto-estado {
   width: 7px;
   height: 7px;
   flex-shrink: 0;
   border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent);
 }
 
 /* ---------- cor e trava nos cartões ---------- */
@@ -1417,10 +1502,10 @@ body.em-gesto webview {
   position: fixed;
   z-index: 200;
   min-width: 210px;
-  padding: 5px;
-  border: 1px solid var(--pilula-borda);
-  border-radius: 10px;
-  background: var(--pilula-fundo);
+  padding: var(--espaco-1);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--painel);
   box-shadow: var(--sombra);
   color: var(--texto);
 }
@@ -1433,7 +1518,7 @@ body.em-gesto webview {
   height: 30px;
   padding: 0 10px 0 6px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--raio-pequeno);
   background: transparent;
   font-size: 13px;
   text-align: left;
@@ -1451,11 +1536,11 @@ body.em-gesto webview {
 }
 
 .menu-item.perigo {
-  color: #ff453a;
+  color: var(--perigo);
 }
 
 .menu-item.perigo:hover:not(:disabled) {
-  background: #ff3b30;
+  background: var(--perigo);
   color: #fff;
 }
 
@@ -1501,7 +1586,7 @@ body.em-gesto webview {
 }
 
 .menu-amostra.sem-cor {
-  background: linear-gradient(135deg, transparent 45%, #ff3b30 45%, #ff3b30 55%, transparent 55%), var(--pilula-fundo);
+  background: linear-gradient(135deg, transparent 45%, var(--perigo) 45%, var(--perigo) 55%, transparent 55%), var(--pilula-fundo);
 }
 
 .menu-amostra.ativa {
@@ -1532,7 +1617,7 @@ body.em-gesto webview {
   padding: 0 5px;
   display: grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: var(--raio-pilula);
   background: var(--destaque);
   color: #fff;
   font-size: 11px;
@@ -1565,7 +1650,7 @@ body.em-gesto webview {
   min-width: 110px;
   padding: 7px 16px;
   border: 1px solid var(--pilula-borda);
-  border-radius: 999px;
+  border-radius: var(--raio-pilula);
   background: var(--pilula-fundo);
   box-shadow: var(--sombra-leve);
   font-size: 13px;
@@ -1657,7 +1742,7 @@ body.em-gesto webview {
   left: 0;
   top: 0;
   border: 1px solid color-mix(in srgb, var(--texto) 18%, transparent);
-  border-radius: 14px;
+  border-radius: var(--raio-grande);
   background: color-mix(in srgb, var(--pilula-fundo) 72%, transparent);
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
   cursor: pointer;
@@ -1717,7 +1802,7 @@ body.em-gesto webview {
   overflow: auto;
   margin: 0 0 12px;
   padding: 8px 12px 8px 26px;
-  border-radius: 8px;
+  border-radius: var(--raio-pequeno);
   background: var(--lateral-filtro);
   font-family: var(--fonte-mono);
   font-size: 12px;
@@ -1737,8 +1822,8 @@ body.em-gesto webview {
 }
 
 .dialogo-acoes .perigo {
-  border-color: #ff3b30;
-  background: #ff3b30;
+  border-color: var(--perigo);
+  background: var(--perigo);
   color: #fff;
 }
 
@@ -1746,9 +1831,9 @@ body.em-gesto webview {
   position: absolute;
   left: 14px;
   bottom: 14px;
-  padding: 8px 14px;
-  border-color: #ff3b30;
-  color: #ff3b30;
+  padding: var(--espaco-2) var(--espaco-4);
+  border-color: var(--perigo);
+  color: var(--perigo);
   font-size: 12.5px;
 }
 
@@ -1759,16 +1844,16 @@ body.em-gesto webview {
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(8, 9, 12, 0.55);
   z-index: 100;
 }
 
 .dialogo {
   width: 440px;
-  padding: 20px;
-  border: 1px solid var(--pilula-borda);
-  border-radius: 14px;
-  background: var(--pilula-fundo);
+  padding: var(--espaco-5);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-grande);
+  background: var(--painel);
   color: var(--texto);
   box-shadow: var(--sombra);
 }
@@ -1789,10 +1874,10 @@ body.em-gesto webview {
 
 .campo input,
 .botao-pasta {
-  height: 34px;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: 8px;
+  height: 36px;
+  padding: 0 var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
   background: var(--lateral-filtro);
   color: var(--texto);
   font: inherit;
@@ -1825,16 +1910,25 @@ body.em-gesto webview {
 }
 
 .dialogo-acoes button {
-  padding: 7px 16px;
-  border: 1px solid var(--pilula-borda);
-  border-radius: 8px;
+  padding: 8px var(--espaco-4);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
   background: transparent;
+}
+
+.dialogo-acoes button:hover {
+  background: var(--hover);
 }
 
 .dialogo-acoes .primario {
   border-color: var(--destaque);
   background: var(--destaque);
   color: #fff;
+  font-weight: 600;
+}
+
+.dialogo-acoes .primario:hover:not(:disabled) {
+  background: var(--destaque-forte);
 }
 
 .dialogo-acoes .primario:disabled {
@@ -1869,7 +1963,7 @@ body.em-gesto webview {
 }
 
 .guia {
-  stroke: #ff2d55;
+  stroke: var(--perigo);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
@@ -1897,7 +1991,7 @@ body.em-gesto .barra-selecao {
 }
 
 .ferramenta.perigo:hover {
-  color: #ff453a;
+  color: var(--perigo);
 }
 
 .barra-selecao-conta {
@@ -1907,7 +2001,7 @@ body.em-gesto .barra-selecao {
   padding: 0 6px;
   display: grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: var(--raio-pilula);
   background: var(--destaque);
   color: #fff;
   font-size: 11px;
@@ -1948,7 +2042,7 @@ body.em-gesto .barra-selecao {
 kbd {
   padding: 2px 7px;
   border: 1px solid var(--pilula-borda);
-  border-radius: 5px;
+  border-radius: var(--raio-pequeno);
   background: var(--lateral-filtro);
   font-family: var(--fonte-mono);
   font-size: 11.5px;
@@ -1973,7 +2067,7 @@ kbd {
   height: 100%;
   display: block;
   object-fit: fill;
-  border-radius: 6px;
+  border-radius: var(--raio-pequeno);
   box-shadow: var(--sombra-leve);
   pointer-events: none;
 }
@@ -1985,7 +2079,7 @@ kbd {
   justify-items: center;
   gap: 6px;
   border: 1px dashed var(--pilula-borda);
-  border-radius: 6px;
+  border-radius: var(--raio-pequeno);
   color: var(--texto-suave);
   font-size: 12px;
 }
@@ -2001,7 +2095,7 @@ kbd {
 .paleta {
   width: min(620px, calc(100vw - 32px));
   border: 1px solid var(--pilula-borda);
-  border-radius: 14px;
+  border-radius: var(--raio-grande);
   background: var(--pilula-fundo);
   color: var(--texto);
   box-shadow: var(--sombra);
@@ -2035,7 +2129,7 @@ kbd {
   height: 36px;
   padding: 0 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--raio-pequeno);
   background: transparent;
   text-align: left;
   font-size: 13.5px;
@@ -2113,8 +2207,8 @@ kbd {
   display: grid;
   place-content: center;
   justify-items: center;
-  gap: 10px;
-  color: #6e6e73;
+  gap: var(--espaco-3);
+  color: var(--texto-suave);
   font-size: 13px;
   text-align: center;
 }
@@ -2126,9 +2220,9 @@ kbd {
 }
 
 .portal-aviso button {
-  padding: 6px 14px;
+  padding: var(--espaco-2) var(--espaco-4);
   border: 1px solid var(--destaque);
-  border-radius: 8px;
+  border-radius: var(--raio-pequeno);
   background: var(--destaque);
   color: #fff;
 }
@@ -2144,7 +2238,7 @@ kbd {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding: 12px 0 8px;
+  padding: var(--espaco-3) 0 var(--espaco-2);
   background: var(--lateral-fundo);
   border-left: 1px solid var(--lateral-borda);
 }
@@ -2247,12 +2341,12 @@ kbd {
 }
 
 .codigo-linha.mais .codigo-numero {
-  color: #34c759;
+  color: var(--entrou);
   opacity: 1;
 }
 
 .codigo-linha.menos .codigo-numero {
-  color: #ff3b30;
+  color: var(--saiu);
   opacity: 1;
 }
 
@@ -2262,13 +2356,13 @@ kbd {
 
 /* o verde e o vermelho do diff, fundo discreto para não brigar com o texto */
 .codigo-linha.mais {
-  background: rgba(52, 199, 89, 0.16);
-  box-shadow: inset 2px 0 0 #34c759;
+  background: color-mix(in srgb, var(--entrou) 16%, transparent);
+  box-shadow: inset 2px 0 0 var(--entrou);
 }
 
 .codigo-linha.menos {
   background: rgba(255, 59, 48, 0.14);
-  box-shadow: inset 2px 0 0 #ff3b30;
+  box-shadow: inset 2px 0 0 var(--saiu);
 }
 
 .codigo-linha.trecho {
@@ -2312,7 +2406,7 @@ kbd {
 }
 
 .mini-codigo {
-  fill: #5ea0ff;
+  fill: var(--pasta);
   opacity: 0.5;
 }
 
@@ -2375,7 +2469,7 @@ kbd {
   gap: 6px;
   padding: 8px;
   border: 1px solid var(--pilula-borda);
-  border-radius: 8px;
+  border-radius: var(--raio-pequeno);
   background: var(--pilula-fundo);
 }
 
@@ -2431,7 +2525,7 @@ kbd {
   gap: 8px;
   padding: 8px 10px;
   border: 1px solid var(--pilula-borda);
-  border-radius: 8px;
+  border-radius: var(--raio-pequeno);
   background: var(--pilula-fundo);
 }
 
@@ -2585,11 +2679,62 @@ kbd {
 }
 
 .no-codigo.recolhido .cartao-ferramenta {
-  border-radius: 8px;
+  border-radius: var(--raio-pequeno);
 }
 
 .no-codigo.recolhido .cartao-ferramenta-titulo {
   font-weight: 500;
   font-family: var(--fonte-mono);
   font-size: 11px;
+}
+
+/* ---------- acabamento ---------- */
+
+/* Barra de rolagem no tom do app: a do sistema é clara e larga, e num escuro assim ela grita. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--borda) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: var(--raio-pilula);
+  background-color: var(--borda);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--corda);
+}
+
+/* Quem anda pelo teclado precisa ver onde está — e na cor da marca, como todo o resto. */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 2px;
+}
+
+/* os botões soltos sobre o quadro seguem o raio do app, em vez de serem círculos */
+.botao-redondo {
+  border-radius: var(--raio);
+}
+
+/* o número de terminais do espaço é informação secundária: fica numa pílula discreta */
+.selo {
+  padding: 1px var(--espaco-2);
+  border-radius: var(--raio-pilula);
+  background: var(--hover);
+  font-size: 11.5px;
 }

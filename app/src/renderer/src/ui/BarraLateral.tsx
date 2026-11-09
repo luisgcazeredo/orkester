@@ -4,6 +4,7 @@ import type { ResumoEspaco } from '../../../shared/modelo'
 import { abrirEspaco, abrirNovaJanela, criarEspaco, lerEstado, renomearEspaco, usarLoja } from '../estado/loja'
 import { COR_ESTADO } from './Andares'
 import { Dialogo } from './Dialogo'
+import { Marca } from './Marca'
 import { abrirMenu } from './MenuContexto'
 import { itensDoAndar, itensDoEspaco } from './menus'
 
@@ -62,6 +63,7 @@ export function BarraLateral() {
 
   return (
     <aside className="lateral">
+      <Marca />
       <div className="lateral-topo">
         <div className="filtro">
           <Search size={15} />
@@ -138,7 +140,7 @@ Aberto em outra janela: clique para ir até ela` : e.pasta}
                       <Layers size={13} />
                       <span className="andar-nome">{a.nome}</span>
                       {a.ramo && <GitBranch size={11} className="andar-git" />}
-                      {a.estado && <span className="ponto-estado" style={{ background: COR_ESTADO[a.estado] }} />}
+                      {a.estado && <span className="ponto-estado" style={{ color: COR_ESTADO[a.estado] }} />}
                     </li>
                   ))}
                 </ul>

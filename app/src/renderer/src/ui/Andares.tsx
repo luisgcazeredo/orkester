@@ -10,10 +10,10 @@ import { itensDoAndar } from './menus'
 import { avisar } from './Perguntas'
 
 export const COR_ESTADO: Record<EstadoAndar, string> = {
-  trabalhando: '#007AFF',
-  travado: '#FF9500',
-  revisao: '#AF52DE',
-  pronto: '#34C759'
+  trabalhando: '#4060e8',
+  travado: '#f0a33a',
+  revisao: '#a06ae8',
+  pronto: '#35c46b'
 }
 
 /** Térreo + andares, de baixo para cima, no formato que a pilha desenha. */
@@ -246,7 +246,7 @@ export function BotaoAndares() {
               <span className="pilula-andar-nome">
                 {nivel.id === null && <Home size={12} />}
                 {nivel.andar?.status && (
-                  <span className="ponto-estado" style={{ background: COR_ESTADO[nivel.andar.status.estado] }} />
+                  <span className="ponto-estado" style={{ color: COR_ESTADO[nivel.andar.status.estado] }} />
                 )}
                 {nivel.nome}
               </span>
@@ -296,7 +296,7 @@ export function IndicadorAndar() {
         </span>
       )}
       <NumerosAndar andar={andar} />
-      {andar.status && <span className="ponto-estado" style={{ background: COR_ESTADO[andar.status.estado] }} />}
+      {andar.status && <span className="ponto-estado" style={{ color: COR_ESTADO[andar.status.estado] }} />}
     </button>
   )
 }
