@@ -94,6 +94,13 @@ function conversaDoClaudeExiste(sessao: string): boolean {
  * A linha digitada no shell: o comando do preset, retomando a conversa do agente quando há uma.
  * Claude: o id é nosso desde o começo (`--session-id`), e volta com `--resume` depois que a conversa existe.
  * Codex: não deixa escolher o id; ele é descoberto pelo arquivo da conversa e volta com `codex resume`.
+ *
+ * **O Codex vai sempre com `--no-daemon`.** Sem isso ele entrega o trabalho a um servidor compartilhado que
+ * já esteja rodando — e esse servidor guarda o ambiente de quando *ele* nasceu. Medido em 09/11/2026: dois
+ * `codex app-server` das 10:51 atendendo cartões abertos às 15:07, e por isso o `ork` do cartão falava com o
+ * cano de um app que já tinha morrido (`ENOENT`) e não enxergava o correio, que nem existia àquela hora.
+ * Pior que a variável velha: o crachá também é do ambiente, então **todos os cartões seriam o primeiro
+ * agente**. Cada cartão é um agente com identidade própria; servidor compartilhado apaga isso.
  */
 export function linhaDeComando(espec: EspecTerminal): string {
   const comando = espec.comando.trim()
@@ -101,7 +108,10 @@ export function linhaDeComando(espec: EspecTerminal): string {
   if (espec.agente === 'claude' && sessao && /^claude(\s|$)/i.test(comando)) {
     return `${comando} ${conversaDoClaudeExiste(sessao) ? '--resume' : '--session-id'} ${sessao}`
   }
-  if (espec.agente === 'codex' && sessao && /^codex(\s|$)/i.test(comando)) return comando.replace(/^codex/i, `codex resume ${sessao}`)
+  if (espec.agente === 'codex' && /^codex(\s|$)/i.test(comando)) {
+    const linha = sessao ? comando.replace(/^codex/i, `codex resume ${sessao}`) : comando
+    return /--no-daemon\b/.test(linha) ? linha : `${linha} --no-daemon`
+  }
   return comando
 }
 

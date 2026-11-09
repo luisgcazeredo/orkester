@@ -2271,6 +2271,9 @@ export async function rodarAutoteste(
     writeFileSync(join(pastaClaudeTeste, 'projects', 'qualquer', `${conversa}.jsonl`), '{}\n')
     const retomada = linhaDeComando(especClaude)
     const codex = linhaDeComando({ ...especClaude, agente: 'codex', comando: 'codex --no-daemon' })
+    // o preset do usuário é só `codex`: o `--no-daemon` entra sozinho, senão o cartão fala com um servidor
+    // compartilhado que guarda o ambiente (e o crachá) de quando nasceu
+    const codexSimples = linhaDeComando({ ...especClaude, agente: 'codex', comando: 'codex', sessao: undefined })
     delete process.env.CLAUDE_CONFIG_DIR
     const claudeNovo = await js<string>(`(() => { const L = window.__teste.loja
       const id = L.adicionarNo({ tipo: 'terminal', preset: L.lerEstado().preferencias.presets.find((p) => p.agente === 'claude') }, 1600, 300)
@@ -2280,8 +2283,9 @@ export async function rodarAutoteste(
       inicial === `claude --model opus --session-id ${conversa}` &&
         retomada === `claude --model opus --resume ${conversa}` &&
         codex === `codex resume ${conversa} --no-daemon` &&
+        codexSimples === 'codex --no-daemon' &&
         /^[0-9a-f-]{36}$/.test(claudeNovo),
-      `${inicial} · ${retomada} · ${codex} · cartão novo: ${claudeNovo ? 'com id' : 'sem id'}`
+      `${inicial} · ${retomada} · ${codex} · ${codexSimples} · cartão novo: ${claudeNovo ? 'com id' : 'sem id'}`
     )
 
     // o leitor de contexto por fora: prova os formatos conhecidos sem gastar conta de agente. O rodapé de verdade
