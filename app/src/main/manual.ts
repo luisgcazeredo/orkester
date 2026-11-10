@@ -84,11 +84,18 @@ ork arvore                          # as suas árvores e qual está em uso
 ork arvore nova "Backend"           # cria e passa a usar: os próximos arquivos nascem nela
 ork arvore usar "principal"         # volta a usar outra
 ork arvore mostrar src/api.ts src/db.ts --arvore "Backend"
+ork arvore dar "Revisor" src/api.ts # entrega o cartão desse arquivo a outro agente do quadro
 ork arvore desfazer "Backend"       # os arquivos dela voltam para a principal
 \`\`\`
 
 Use antes de começar uma frente nova, para o usuário enxergar o trabalho separado. Arquivo com cara de segredo
 (\`.env\`, chave, credencial) nunca vira cartão, e o \`mostrar\` só aceita arquivo de uma pasta que está no quadro.
+
+**Num time que divide a mesma pasta, o dono do cartão é um palpite.** O app vigia a pasta, não o processo:
+ele dá o arquivo novo a quem estiver trabalhando naquele instante, e com dois gravando ao mesmo tempo pode
+errar. Se um arquivo seu foi parar na coluna de outro, ou o contrário, acerte com \`ork arvore dar\` — e se você
+é o maestro, entregue os cartões de quem você fechou ao próximo que for mexer naquilo. O cartão nunca some: é
+o histórico do trabalho, e o usuário lê quando quiser.
 
 ## Organizar o quadro você mesmo
 

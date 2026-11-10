@@ -98,7 +98,7 @@ export type PedidoDoAgente =
       tipo: 'arvore'
       espacoId: string
       id: string
-      acao: 'lista' | 'nova' | 'usar' | 'mostrar' | 'desfazer'
+      acao: 'lista' | 'nova' | 'usar' | 'mostrar' | 'dar' | 'desfazer'
       nome?: string
       arquivos?: string[]
     }

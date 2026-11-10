@@ -120,6 +120,7 @@ own, with the git diff.
 | `ork arvore nova "Name"` | creates a tree and starts using it for the next files |
 | `ork arvore usar "Name"` | switches to a tree that already exists |
 | `ork arvore mostrar <file>…` | opens those files as cards; `--arvore "Name"` picks where |
+| `ork arvore dar "Agent" <file>…` | hands those code cards to another agent on the canvas |
 | `ork arvore desfazer "Name"` | undoes the tree; its files go back to the main one |
 
 ---

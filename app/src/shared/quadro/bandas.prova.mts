@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 // Node executa provas TypeScript diretamente e precisa da extensão; o bundler resolve a fonte normalmente.
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
-import { bandasDoNo, cordasEfetivas, criarBanda, dentroDaBanda, membrosDaBanda } from './bandas.ts'
+import { bandasDoNo, cordasEfetivas, criarBanda, dentroDaBanda, manterBandas, membrosDaBanda } from './bandas.ts'
 import type { No, NoBanda, Plano } from '../modelo'
 
 const instante = '2026-11-06T10:00:00.000Z'
@@ -137,4 +137,38 @@ test('criar banda não apaga nem move nada', () => {
   const feito = criarBanda(antes, 'Dupla', ['a', 'r'], { x: 0, y: 0 }, ambiente()) as { plano: Plano }
   assert.equal(feito.plano.nos.length, antes.nos.length + 1)
   for (const velho of antes.nos) assert.deepEqual(feito.plano.nos.find((n) => n.id === velho.id), velho)
+})
+
+test('o app empurrando cartão não desmancha banda: a moldura acompanha quem estava dentro', () => {
+  const antes = plano([banda('b', 'Time', 0, 0, 600, 400), agente('a', 'Um', 50, 50), agente('c', 'Dois', 300, 50)])
+  assert.equal(membrosDaBanda(antes, 'b').length, 2)
+  // a coluna de código de alguém cresceu e empurrou os dois para baixo, para fora da moldura
+  const depois = plano([banda('b', 'Time', 0, 0, 600, 400), agente('a', 'Um', 50, 900), agente('c', 'Dois', 300, 900)])
+  assert.equal(membrosDaBanda(depois, 'b').length, 0, 'sem o conserto, a banda esvazia')
+  const mantido = manterBandas(antes, depois)
+  assert.equal(membrosDaBanda(mantido, 'b').length, 2)
+})
+
+test('manter banda só cresce a moldura: nunca encolhe nem move quem está no quadro', () => {
+  const antes = plano([banda('b', 'Time', 0, 0, 600, 400), agente('a', 'Um', 50, 50)])
+  const depois = plano([banda('b', 'Time', 0, 0, 600, 400), agente('a', 'Um', 50, 900)])
+  const mantido = manterBandas(antes, depois)
+  const m = mantido.nos.find((n) => n.id === 'b') as NoBanda
+  assert.equal(m.x, 0)
+  assert.equal(m.y, 0)
+  assert.ok(m.altura > 400, 'a moldura desceu junto')
+  const ag = mantido.nos.find((n) => n.id === 'a')!
+  assert.equal(ag.y, 900, 'o agente fica onde o app o pôs')
+})
+
+test('banda que já estava vazia continua como está: não há time para preservar', () => {
+  const antes = plano([banda('b', 'Time', 0, 0, 600, 400), agente('a', 'Um', 5000, 5000)])
+  const depois = plano([banda('b', 'Time', 0, 0, 600, 400), agente('a', 'Um', 5000, 9000)])
+  assert.equal(manterBandas(antes, depois), depois)
+})
+
+test('membro que saiu do quadro não segura a moldura', () => {
+  const antes = plano([banda('b', 'Time', 0, 0, 600, 400), agente('a', 'Um', 50, 50)])
+  const depois = plano([banda('b', 'Time', 0, 0, 600, 400)])
+  assert.equal(manterBandas(antes, depois), depois)
 })

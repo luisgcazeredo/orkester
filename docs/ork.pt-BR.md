@@ -118,6 +118,7 @@ grava nascem sozinhos ali, com o diff do git.
 | `ork arvore nova "Nome"` | cria uma árvore e passa a usá-la para os próximos arquivos |
 | `ork arvore usar "Nome"` | passa a usar uma árvore que já existe |
 | `ork arvore mostrar <arquivo>…` | abre esses arquivos como cartões; `--arvore "Nome"` escolhe onde |
+| `ork arvore dar "Agente" <arquivo>…` | entrega esses cartões de código a outro agente do quadro |
 | `ork arvore desfazer "Nome"` | desfaz a árvore; os arquivos dela voltam para a principal |
 
 ---

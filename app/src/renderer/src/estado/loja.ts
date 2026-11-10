@@ -32,7 +32,7 @@ import { empurrarParaBaixo } from '../../../shared/quadro/empurrar'
 import { abrir, fechar, passar } from '../../../shared/quadro/transformacoes'
 import { acharAlvos, mexerNoQuadro } from '../../../shared/quadro/agente'
 import { MAX_PARTITURAS, aplicarPartitura, partituraDe, resumoDaPartitura } from '../../../shared/quadro/partituras'
-import { bandasDoNo, bandasDoPlano, cordasDaBanda, cordasEfetivas, criarBanda, membrosDaBanda } from '../../../shared/quadro/bandas'
+import { bandasDoNo, bandasDoPlano, cordasDaBanda, cordasEfetivas, criarBanda, manterBandas, membrosDaBanda } from '../../../shared/quadro/bandas'
 import { trocarAgente } from '../../../shared/quadro/trocar'
 import { MAX_ROTINAS, novaRotina, proximaDe } from '../../../shared/rotinas'
 import { caixaDoDesenho, caixaDoNo, distanciaAoDesenho, enquadrar, lerViewport, uniao, type Caixa } from '../quadro/geometria'
@@ -1693,17 +1693,23 @@ async function aoGravaremNaPasta(pasta: string, caminho: string): Promise<void> 
   if (!candidatos.length) return
   criandoCodigo = true
   try {
-    // os arquivos de uma pasta ficam na mesma coluna: o dono é quem já tem cartão ali. No primeiro cartão,
-    // decide a situação da sessão — vigiar a pasta não diz qual dos agentes gravou.
-    let dono = candidatos.find((n) => cartoes.some((c) => c.terminal === n.id))
+    // De quem é o arquivo novo? Vigiar a pasta não diz quem gravou, então o melhor palpite é **quem está
+    // trabalhando agora**, arquivo a arquivo.
+    //
+    // Até 10/11/2026 o dono era "quem já tem cartão nesta pasta", e o primeiro cartão decidia para sempre.
+    // Com um time inteiro na mesma pasta isso ruiu: o maestro gravou o CONTRATO.md primeiro e **todos** os
+    // arquivos dos outros três foram parar na coluna dele — a coluna cresceu, empurrou os colegas para
+    // fora da banda e o quadro deixou de contar quem mexeu em quê. Com vários trabalhando ao mesmo tempo o
+    // palpite ainda pode errar; para isso existe o `ork arvore dar`, que corrige com certeza.
+    const situacoes = await window.ork.terminal.contextos(e.id).catch(() => [])
+    const como = new Map(situacoes.map((s) => [s.id, s.situacao]))
+    let dono = candidatos.find((n) => como.get(n.id) === 'trabalhando')
     if (!dono) {
-      const situacoes = await window.ork.terminal.contextos(e.id).catch(() => [])
-      const como = new Map(situacoes.map((s) => [s.id, s.situacao]))
-      dono =
-        candidatos.find((n) => como.get(n.id) === 'trabalhando') ??
-        candidatos.find((n) => como.get(n.id) !== 'encerrado') ??
-        candidatos[0]
+      // ninguém trabalhando: fica com quem já tem coluna nesta pasta, que é o de antes
+      dono = candidatos.find((n) => cartoes.some((c) => c.terminal === n.id))
     }
+    // nem trabalhando nem com coluna: o primeiro que ainda está vivo
+    dono ??= candidatos.find((n) => como.get(n.id) !== 'encerrado') ?? candidatos[0]
     // o quadro pode ter mudado enquanto a resposta vinha
     const agoraNo = acharNo(dono.id)
     if (agoraNo?.tipo === 'terminal') criarCodigoDoArquivo(agoraNo, caminho)
@@ -2114,7 +2120,9 @@ function arrumarColuna(plano: Plano, terminalId: string, arvoreId: string, chego
       .filter((n) => !sobrando.has(n.id))
       .map((n) => (ajustes.has(n.id) ? ({ ...n, ...ajustes.get(n.id) } as No) : n))
   }
-  return afastarDaColuna(arrumado, terminalId, new Set(ajustes.keys()))
+  // a coluna cresceu e empurrou os vizinhos: a moldura de uma banda acompanha quem já estava dentro dela,
+  // senão o app desmancha, sozinho, um time que o usuário montou
+  return manterBandas(plano, afastarDaColuna(arrumado, terminalId, new Set(ajustes.keys())))
 }
 
 /**
@@ -2278,6 +2286,36 @@ function atenderArvore(pedido: Extract<PedidoDoAgente, { tipo: 'arvore' }>): Res
     if (!achada) return { ok: false, erro: `você não tem a árvore "${nome}"; crie com: ork arvore nova "${nome}"` }
     usarArvore(terminal.id, achada.id)
     return { ok: true, texto: `Os próximos arquivos vão para a árvore "${achada.nome || 'principal'}".` }
+  }
+  /**
+   * Entregar um arquivo a outro agente: o cartão continua no quadro, com o histórico dele, e passa para a
+   * coluna de quem vai mexer agora. É o conserto certo para o palpite de dono — e é como o maestro repassa
+   * o trabalho de um agente que ele fechou, em vez de deixar cartão pendurado em quem já foi.
+   */
+  if (pedido.acao === 'dar') {
+    const plano = planoAtual()
+    if (!plano) return { ok: false, erro: 'nenhum espaço aberto nesta janela' }
+    const destino = plano.nos.find(
+      (n): n is NoTerminal => n.tipo === 'terminal' && n.nome.toLowerCase() === nome.toLowerCase()
+    )
+    if (!destino) return { ok: false, erro: `não achei o agente "${nome}" no andar à mostra. Veja \`ork quadro\`.` }
+    if (destino.id === terminal.id) return { ok: false, erro: 'esse arquivo já é seu' }
+    const pedidos = pedido.arquivos ?? []
+    const meus = plano.nos.filter(
+      (n): n is NoCodigo => n.tipo === 'codigo' && n.terminal === terminal.id && !!n.caminho && pedidos.includes(n.caminho)
+    )
+    if (!meus.length) return { ok: false, erro: 'nenhum desses arquivos está na sua árvore; só se entrega cartão seu' }
+    const ids = new Set(meus.map((n) => n.id))
+    registrarHistorico()
+    mudarPlano((p) => {
+      const comDono: Plano = {
+        ...p,
+        // o cartão entra na árvore principal de quem recebe: a árvore de quem deu não existe para ele
+        nos: p.nos.map((n) => (ids.has(n.id) ? ({ ...n, terminal: destino.id, arvore: undefined, automatico: true } as No) : n))
+      }
+      return arrumarArvores(arrumarArvores(comDono, terminal.id), destino.id)
+    }, false)
+    return { ok: true, texto: `Entreguei ${meus.length} cartão(ões) para "${destino.nome}".` }
   }
   if (pedido.acao === 'desfazer') {
     const achada = porNome()

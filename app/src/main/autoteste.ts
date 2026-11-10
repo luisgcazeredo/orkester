@@ -2792,6 +2792,26 @@ export async function rodarAutoteste(
           doSexto.length === 1 && !!doSexto[0].arvore,
           doSexto.map((c) => `${c.caminho} (${c.arvore || 'principal'})`).join(' | ') || 'nenhum cartão'
         )
+        // Entregar um cartão de código a outro agente: o cartão fica no quadro e troca de coluna. É o
+        // conserto para o dono ter sido palpitado errado — num time na mesma pasta, o app não sabe quem
+        // gravou, e em 10/11/2026 todos os arquivos de quatro agentes foram parar na coluna de um só.
+        // o nome do cartão vem do preset (o `adicionarNo` não aceita nome), então o teste pergunta qual é
+        const vizinho = await js<{ id: string; nome: string }>(`(() => { const L = window.__teste.loja
+          const presets = L.lerEstado().preferencias.presets
+          const id = L.adicionarNo({ tipo: 'terminal', preset: presets.find((p) => p.agente === 'shell') }, 3000, 1400)
+          return { id, nome: L.acharNo(id).nome } })()`)
+        await esperar(400)
+        const entrega = await comandoAte(chefe, `cls; ork arvore dar "${vizinho.nome}" sexto.ts`, /Entreguei|não|ork:/, 15_000)
+        await esperar(600)
+        const donoDoSexto = await js<string>(
+          `(window.__teste.loja.planoAtual().nos.find((n) => n.tipo === 'codigo' && (n.caminho ?? '').endsWith('sexto.ts'))?.terminal ?? '')`
+        )
+        conferir(
+          'ork arvore dar passa o cartão de código para outro agente, sem apagá-lo',
+          donoDoSexto === vizinho.id && /Entreguei/.test(entrega),
+          `para "${vizinho.nome}" · dono agora: ${donoDoSexto === vizinho.id ? 'ele' : donoDoSexto || 'nenhum cartão'} · ${ultimas(entrega, 3)}`
+        )
+
         // a pasta do usuário não é vigiada (senão vira cartão de tudo que o PC grava); a do projeto é
         const podeProjeto = await js<boolean>(`window.ork.codigo.vigiavel(${JSON.stringify(pastaTerminais)})`)
         const podeCasa = await js<boolean>(

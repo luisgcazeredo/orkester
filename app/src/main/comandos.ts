@@ -106,6 +106,22 @@ function nodeDoSistema(): string | null {
   }
 }
 
+/**
+ * A pasta que o agente pediu em `--pasta`, resolvida **a partir da pasta dele**.
+ *
+ * Antes era usada como veio, e um `--pasta mural` era procurado na pasta do app — não na do agente. Ele
+ * recusou quatro vezes com "a pasta não existe: mural", com a pasta existindo ao lado de quem pediu
+ * (visto em 10/11/2026). O agente trabalha dentro de uma pasta; caminho relativo dele é relativo a ela.
+ */
+function pastaPedida(eu: Sessao, pedida: unknown): string | undefined {
+  if (typeof pedida !== 'string' || !pedida.trim()) return undefined
+  const caminho = resolve(eu.espec.pasta, pedida.trim())
+  if (!existsSync(caminho) || !statSync(caminho).isDirectory()) {
+    throw new Error(`a pasta não existe: ${pedida} (procurei em ${caminho})`)
+  }
+  return caminho
+}
+
 /** Variáveis que cada terminal ganha para o `ork` funcionar. */
 export function ambienteDoComando(s: Sessao): { pastaBin: string; variaveis: Record<string, string> } {
   return {
@@ -714,7 +730,7 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
     if (opcoes.novo) {
       const nome = typeof opcoes.novo === 'string' ? opcoes.novo.trim() : ''
       if (!nome) throw new Error('diga o nome: ork janela --novo "Nome" [--pasta P]')
-      const pasta = typeof opcoes.pasta === 'string' ? opcoes.pasta : eu.espec.pasta
+      const pasta = pastaPedida(eu, opcoes.pasta) ?? eu.espec.pasta
       if (!(existsSync(pasta) && statSync(pasta).isDirectory())) throw new Error(`a pasta não existe: ${pasta}`)
       const espaco = criarEspacoDoAgente(nome, pasta)
       await abrirJanelaPronta(espaco.id)
@@ -761,8 +777,7 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
     if (filhos >= MAX_SESSOES_POR_AGENTE) {
       throw new Error(`você já abriu ${contaSessoes(filhos)} (o limite é ${MAX_SESSOES_POR_AGENTE}); feche uma com \`ork fechar\``)
     }
-    const pasta = typeof opcoes.pasta === 'string' ? opcoes.pasta : undefined
-    if (pasta && !(existsSync(pasta) && statSync(pasta).isDirectory())) throw new Error(`a pasta não existe: ${pasta}`)
+    const pasta = pastaPedida(eu, opcoes.pasta)
     const nome = typeof opcoes.nome === 'string' ? opcoes.nome.trim().slice(0, 80) || undefined : undefined
     const funcao = typeof opcoes.funcao === 'string' ? opcoes.funcao.trim() || undefined : undefined
     // o primeiro pedido pode vir do --pedido, da função, ou dos dois
@@ -976,12 +991,29 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
    * e depois falar delas pelo nome ("leia os arquivos da árvore Backend").
    */
   arvore: async ({ eu, pos, opcoes }) => {
-    const acoes = ['lista', 'nova', 'usar', 'mostrar', 'desfazer'] as const
+    const acoes = ['lista', 'nova', 'usar', 'mostrar', 'dar', 'desfazer'] as const
     const pedida = (pos[0] ?? 'lista').toLowerCase()
     const acao = acoes.find((a) => a === pedida)
     if (!acao) throw new Error(`não conheço \`ork arvore ${pos[0]}\`. Use: ${acoes.join(', ')}.`)
     const resto = pos.slice(1).filter(Boolean)
     const daOpcao = typeof opcoes.arvore === 'string' ? opcoes.arvore.trim() : ''
+    // `dar` leva o nome de um agente, não de uma árvore: `ork arvore dar "Agente" <arquivo>...`
+    if (acao === 'dar') {
+      const paraQuem = (resto[0] ?? '').trim()
+      const quais = resto.slice(1)
+      if (!paraQuem || !quais.length) throw new Error('diga para quem e o quê: ork arvore dar "Agente" <arquivo>...')
+      await abrirJanelaPronta(eu.espacoId)
+      const entrega = await pedirAJanela({
+        tipo: 'arvore',
+        espacoId: eu.espacoId,
+        id: eu.id,
+        acao,
+        nome: paraQuem,
+        arquivos: quais.map((a) => resolve(eu.espec.pasta, a))
+      })
+      if (!entrega.ok) throw new Error(entrega.erro)
+      return { saida: entrega.texto ?? 'Pronto.' }
+    }
     const nome = acao === 'mostrar' ? daOpcao : resto.join(' ').trim() || daOpcao
     if ((acao === 'nova' || acao === 'usar' || acao === 'desfazer') && !nome) {
       throw new Error(`diga o nome: ork arvore ${acao} "Nome"`)

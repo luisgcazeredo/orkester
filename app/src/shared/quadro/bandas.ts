@@ -161,3 +161,41 @@ export function criarBanda(
 export function cordasDaBanda(plano: Plano, bandaId: string): Corda[] {
   return plano.cordas.filter((corda) => corda.de === bandaId || corda.para === bandaId)
 }
+
+/**
+ * Depois de o **app** mexer no quadro sozinho, devolve a moldura de cada banda em volta de quem estava
+ * dentro dela antes.
+ *
+ * Pertencer a uma banda é geométrico — é a moldura que diz, não uma lista guardada —, e isso é bom: você
+ * arrasta um agente para dentro e ele entrou. O problema é quando quem move não é você. Em 10/11/2026 um
+ * time de quatro foi posto numa banda e, minutos depois, ela estava vazia: a coluna de código de um dos
+ * agentes cresceu, empurrou os outros três para baixo e eles saíram da moldura sem ninguém notar. A banda
+ * dizia "4 agentes" na criação e "vazia" na conferência seguinte.
+ *
+ * A regra que sai daqui: **o que você faz com a mão vale; o que o app faz sozinho não desmancha time.**
+ * Sair de uma banda continua sendo arrastar para fora.
+ */
+export function manterBandas(antes: Plano, depois: Plano): Plano {
+  const caixaDoNo = (no: No): Caixa => ({ x: no.x, y: no.y, largura: no.largura, altura: no.altura })
+  const porId = new Map(depois.nos.map((no) => [no.id, no]))
+  let mudou = false
+  const nos = depois.nos.map((no) => {
+    if (no.tipo !== 'banda') return no
+    const eram = membrosDaBanda(antes, no.id)
+    if (!eram.length) return no
+    // só os que ainda existem, e na posição de agora
+    const agora = eram.map((m) => porId.get(m.id)).filter((m): m is No => !!m)
+    if (!agora.length) return no
+    const cabe = caixaDaBandaPara(agora.map(caixaDoNo))
+    const nova = {
+      x: Math.min(no.x, cabe.x),
+      y: Math.min(no.y, cabe.y),
+      largura: Math.max(no.x + no.largura, cabe.x + cabe.largura) - Math.min(no.x, cabe.x),
+      altura: Math.max(no.y + no.altura, cabe.y + cabe.altura) - Math.min(no.y, cabe.y)
+    }
+    if (nova.x === no.x && nova.y === no.y && nova.largura === no.largura && nova.altura === no.altura) return no
+    mudou = true
+    return { ...no, ...nova }
+  })
+  return mudou ? { ...depois, nos } : depois
+}

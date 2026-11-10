@@ -1,5 +1,5 @@
 import type { PedidoDoAgente, RespostaAoAgente } from '../api'
-import type { Corda, Espaco, Funcao, NoTerminal, Plano, PresetAgente } from '../modelo'
+import type { Corda, Espaco, Funcao, No, NoTerminal, Plano, PresetAgente } from '../modelo'
 // Node executa as provas TypeScript diretamente e precisa da extensão neste único import de execução.
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
 import { caixaDoNo, proximoZ, tocam, type Caixa } from './geometria.ts'
@@ -102,9 +102,23 @@ export function abrir(
 export function fechar(espaco: Espaco, pedido: PedidoFechar): ResultadoTransformacaoDoQuadro {
   const plano = planosDe(espaco).find((atual) => atual.nos.some((no) => no.id === pedido.id))
   if (!plano) return { espaco, resposta: { ok: false, erro: 'esse cartão não está mais no quadro' } }
+  // Quem abriu o cartão herda os cartões de código dele — é a mesma regra das sessões, que já passam ao
+  // sucessor no `ork fechar`. Antes eles ficavam apontando para um agente que não existe mais: não sumiam
+  // (o trabalho continua no quadro, para ser lido), mas ninguém mais os arrumava nem conseguia entregá-los,
+  // e o `ork quadro` os anunciava como "na árvore de alguém". Agora param na mão de quem fechou, e o `ork
+  // arvore dar` repassa ao próximo que for mexer naquilo.
+  const fechado = plano.nos.find((no) => no.id === pedido.id)
+  const herdeiro = fechado?.tipo === 'terminal' ? fechado.criadoPor : undefined
+  const temHerdeiro = !!herdeiro && plano.nos.some((no) => no.id === herdeiro && no.tipo === 'terminal')
   const proximo = mudarPlano(espaco, plano, (atual) => ({
     ...atual,
-    nos: atual.nos.filter((no) => no.id !== pedido.id),
+    nos: atual.nos
+      .filter((no) => no.id !== pedido.id)
+      .map((no) =>
+        temHerdeiro && no.tipo === 'codigo' && no.terminal === pedido.id
+          ? ({ ...no, terminal: herdeiro, arvore: undefined } as No)
+          : no
+      ),
     cordas: atual.cordas.filter((corda) => corda.de !== pedido.id && corda.para !== pedido.id)
   }))
   return { espaco: proximo, resposta: { ok: true } }
