@@ -199,3 +199,32 @@ export function manterBandas(antes: Plano, depois: Plano): Plano {
   })
   return mudou ? { ...depois, nos } : depois
 }
+
+/**
+ * Quem este agente alcança: ele mesmo, quem ele abriu, e quem está ligado a ele — pela corda desenhada ou
+ * por estarem na mesma banda. Mora aqui, ao lado de `cordasEfetivas`, porque é a mesma regra vista do
+ * outro lado: lá, quem fala com quem; aqui, quem eu posso mexer.
+ *
+ * Existe porque **a corda precisava valer de verdade**. O app repete que "a corda é a permissão", mas o
+ * `ork ligar` não conferia quem pedia: um agente rodava `ork ligar "eu" "Fulano"` e passava a ler a tela e
+ * a mandar pedido para alguém com quem não tinha relação nenhuma — inclusive um cartão de shell, onde o
+ * comando roda sem sandbox. Achado pelo Codex na revisão de 10/11/2026 e confirmado no código: era uma
+ * preferência que o próprio agente mudava, não um limite.
+ */
+export function alcancaveisPor(plano: Plano, euId: string): Set<string> {
+  const alcance = new Set<string>([euId])
+  for (const [a, b] of cordasEfetivas(plano)) {
+    if (a === euId) alcance.add(b)
+    if (b === euId) alcance.add(a)
+  }
+  for (const no of plano.nos) if (no.tipo === 'terminal' && no.criadoPor === euId) alcance.add(no.id)
+  return alcance
+}
+
+/** O cartão está ao alcance? Banda vale quando todos os agentes de dentro dela estão. */
+export function alcanca(plano: Plano, euId: string, no: No): boolean {
+  const alcance = alcancaveisPor(plano, euId)
+  if (no.tipo !== 'banda') return alcance.has(no.id)
+  const dentro = membrosDaBanda(plano, no.id)
+  return dentro.length > 0 && dentro.every((n) => alcance.has(n.id))
+}

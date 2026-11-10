@@ -1,4 +1,5 @@
 import { ipcMain, webContents, type IpcMainEvent, type IpcMainInvokeEvent, type WebContents } from 'electron'
+import { execFileSync } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { closeSync, existsSync, openSync, readdirSync, readSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -522,7 +523,36 @@ export function quantosTerminais(): number {
 }
 
 export function encerrarTodos(): void {
+  // os pids antes de encerrar: depois do `encerrar` a sessão já não tem processo para perguntar
+  const pids = [...sessoes.values()].flatMap((s) => (s.processo?.pid ? [s.processo.pid] : []))
   for (const id of [...sessoes.keys()]) encerrar(id)
+  matarArvores(pids)
+}
+
+/**
+ * Mata a árvore de processos de cada terminal, de verdade e agora.
+ *
+ * O `kill()` do node-pty no Windows **não é síncrono**: o que de fato encerra o shell acontece depois de um
+ * `fork` interno, e ninguém espera por isso. Na saída do app — ainda mais com o prazo duro de 5 s em
+ * `index.ts` — o processo principal morre antes, e o que fica rodando é o que mais importa: as árvores de
+ * Node do `claude`/`codex` e os servidores MCP que elas abriram. O próprio node-pty documenta o sintoma
+ * ("node servers in particular seem to become detached and remain running"). Encontrado na revisão de
+ * 10/11/2026.
+ *
+ * `taskkill /T` resolve pela raiz: mata o shell e tudo o que desceu dele. Só Windows, que é onde o app roda;
+ * em outro sistema o kill do node-pty basta.
+ */
+function matarArvores(pids: number[]): void {
+  if (process.platform !== 'win32' || !pids.length) return
+  try {
+    execFileSync('taskkill', ['/F', '/T', ...pids.flatMap((pid) => ['/PID', String(pid)])], {
+      timeout: 4000,
+      windowsHide: true,
+      stdio: 'ignore'
+    })
+  } catch {
+    // processo que já saiu faz o taskkill devolver erro: é o resultado que queríamos
+  }
 }
 
 /**

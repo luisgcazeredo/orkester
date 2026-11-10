@@ -18,7 +18,6 @@
  * outros pedidos do `ork` (abrir, fechar, passar), que são estado operacional e ficam fora do histórico.
  */
 import type { Corda, Desenho, No, Plano } from '../modelo'
-
 export type AcaoNoQuadro = 'ler' | 'ler-cartao' | 'apagar' | 'mover' | 'arrumar' | 'nome' | 'ligar' | 'desligar' | 'anotar' | 'juntar'
 
 export interface PedidoNoQuadro {
@@ -44,6 +43,8 @@ export interface PedidoNoQuadro {
 export interface AmbienteDoQuadroDoAgente {
   novoId: () => string
   agora: () => string
+  /** O cartão está ao alcance de quem pediu? Vem de fora (bandas.ts) para a regra da corda ter uma fonte só. */
+  alcanca: (plano: Plano, euId: string, no: No) => boolean
 }
 
 export interface MudancaNoQuadro {
@@ -379,6 +380,11 @@ export function mexerNoQuadro(plano: Plano, pedido: PedidoNoQuadro, amb: Ambient
     const alvo = alvos[0]
     if (alvo.tipo !== 'terminal') return { erro: `só cartão de agente tem nome; "${rotuloDoNo(alvo)}" é ${COMO_CHAMAR[alvo.tipo]}` }
     if (alvo.travado) return { erro: `"${alvo.nome}" está travado` }
+    // o nome é como todo mundo chama aquele cartão: trocar o de um agente que não é seu quebra o endereço
+    // dele para os outros (e para o usuário). Só renomeia quem você alcança.
+    if (!amb.alcanca(plano, pedido.eu, alvo)) {
+      return { erro: `"${alvo.nome}" não está ao seu alcance: você só renomeia quem abriu ou quem está ligado a você` }
+    }
     const repetido = plano.nos.some((n) => n.tipo === 'terminal' && n.id !== alvo.id && n.nome.toLowerCase() === novo.toLowerCase())
     if (repetido) return { erro: `já existe um cartão chamado "${novo}"` }
     const antigo = alvo.nome
@@ -398,6 +404,17 @@ export function mexerNoQuadro(plano: Plano, pedido: PedidoNoQuadro, amb: Ambient
     // a corda liga agentes, e também uma banda (aí ela vale para cada agente de dentro da moldura)
     const naoAgente = alvos.find((n) => n.tipo !== 'terminal' && n.tipo !== 'banda')
     if (naoAgente) return { erro: `a corda liga agentes (ou uma banda); "${rotuloDoNo(naoAgente)}" é ${COMO_CHAMAR[naoAgente.tipo]}` }
+    // **A corda não se dá a si mesmo.** Para ligar (ou desligar) dois cartões, você precisa alcançar os
+    // dois: ter aberto, ou já estar ligado. Sem isto, qualquer agente se ligava a qualquer um e ganhava a
+    // tela e o teclado dele. Ligar dois que você abriu — o caso do maestro — continua valendo.
+    const longe = alvos.find((n) => !amb.alcanca(plano, pedido.eu, n))
+    if (longe) {
+      return {
+        erro:
+          `"${rotuloDoNo(longe)}" não está ao seu alcance: a corda é a permissão, e você só liga ou desliga ` +
+          `quem você abriu ou quem já está ligado a você. Peça ao usuário, ou a quem abriu esse cartão.`
+      }
+    }
     const achada = plano.cordas.find((c) => (c.de === a.id && c.para === b.id) || (c.de === b.id && c.para === a.id))
     if (pedido.acao === 'desligar') {
       if (!achada) return { erro: `"${rotuloDoNo(a)}" e "${rotuloDoNo(b)}" não estão ligados` }

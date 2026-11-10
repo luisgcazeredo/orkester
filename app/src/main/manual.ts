@@ -110,7 +110,7 @@ ork mover "Revisor" --dx 0 --dy 600   # ou anda com ele de onde está
 ork arrumar --colunas 3               # tudo o que está solto, em grade, no mesmo canto
 ork arrumar "Revisor" "Testes"        # ou só esses
 ork nome "Claude Code 2" "Revisor"    # renomeia: é o nome que o ork passa a usar
-ork ligar "Revisor" "Testes"          # a corda: os dois passam a poder se falar
+ork ligar "Revisor" "Testes"          # a corda: os dois passam a poder se falar (os dois ao seu alcance)
 ork desligar "Revisor" "Testes"
 ork anotar "Falta o teste do empurrão"   # um texto no quadro, abaixo do seu cartão
 ork ler "Falta o teste"               # o cartão inteiro (a lista corta o texto em 60 letras)
@@ -126,6 +126,9 @@ O que isto **não** faz, de propósito:
 - **Não mexe em cartão travado** nem em **cartão de código**: a árvore de arquivos é arrumada pelo app, e o
   cartão que o usuário tirou dela ficou onde ele quis. O \`ork\` diz quando deixou algo como estava.
 - **Só alcança o andar à mostra** da janela daquele espaço, e só pelo nome — você não conhece id de nada.
+- **Você não se dá permissão.** Ligar, desligar, renomear e entregar cartão valem para quem você **abriu**
+  ou para quem **já está ligado** a você. Precisa falar com outro agente? Peça ao usuário, ou a quem abriu
+  aquele cartão — a corda é a permissão, e ela não se estende sozinha.
 
 Tudo o que você fizer aqui entra no **desfazer do usuário**: um Ctrl+Z volta o quadro inteiro. Mesmo assim,
 arrumar o quadro é coisa que se faz com parcimônia — o lugar onde o usuário deixou um cartão costuma querer

@@ -9,7 +9,8 @@ Duas regras valem para tudo o que está aqui:
 
 - **Só roda dentro de um terminal do app.** Fora dele o comando recusa — ele conversa com a janela por um
   cano nomeado (ou, num sandbox que proíbe cano, um correio de arquivos) que só existe ali.
-- **A corda é a permissão.** Um agente alcança quem está ligado a ele pela corda (ou na mesma banda), e
+- **A corda é a permissão**, e o agente não se dá permissão: ele só liga, desliga, renomeia ou entrega
+  cartão de quem **abriu** ou de quem **já está ligado** a ele. Um agente alcança quem está ligado a ele pela corda (ou na mesma banda), e
   mais ninguém. Cartões se chamam pelo nome.
 
 O app grava este manual como skill `orkester` em `~/.claude/skills` e `~/.codex/skills`, então o agente
@@ -92,7 +93,7 @@ Opções do `ork abrir`:
 | `ork mover <cartão>… --x N --y N` | põe cartões num lugar; com `--dx/--dy`, anda com eles de onde estão |
 | `ork arrumar [cartão]… --colunas N` | põe os cartões em grade, a partir do canto onde já estavam |
 | `ork nome <cartão> "Nome novo"` | renomeia um cartão de agente |
-| `ork ligar <cartão> <cartão>` | desenha a corda: os dois passam a poder se falar |
+| `ork ligar <cartão> <cartão>` | desenha a corda: os dois passam a poder se falar (só entre cartões ao seu alcance) |
 | `ork desligar <cartão> <cartão>` | tira a corda |
 | `ork anotar "texto"` | escreve um texto no quadro, abaixo do seu cartão |
 | `ork juntar <cartão>… [--soltar]` | agrupa cartões para andarem juntos |

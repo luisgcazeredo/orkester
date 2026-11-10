@@ -272,11 +272,20 @@ app.on('before-quit', () => {
  * abaixo, que mata o processo mesmo que algo novo trave aqui amanhã.
  */
 app.on('window-all-closed', () => {
+  // O prazo duro é a **primeira** coisa: armá-lo depois de `encerrarTodos()` deixava de fora justamente o
+  // que pode travar (o kill do node-pty no Windows tem caso documentado de deadlock). Achado na revisão de
+  // 10/11/2026 — a rede de segurança estava pendurada abaixo do buraco.
+  //
+  // E o caminho à força apaga o correio antes de sair: `app.exit` não dispara o `before-quit`, então sem
+  // isto a pasta com os recados dos agentes ficaria em `%TEMP%` exatamente no caso em que prometemos que
+  // ela não fica.
+  const forca = setTimeout(() => {
+    fecharCorreio()
+    app.exit(0)
+  }, 5000)
+  forca.unref()
   pararRotinas()
   encerrarTodos()
-  // morre de qualquer jeito: se em 5 s o encerramento limpo não terminou, o processo sai à força
-  const forca = setTimeout(() => app.exit(0), 5000)
-  forca.unref()
   // o Chrome do app fecha direito antes (sem o aviso de "não foi fechado corretamente" na próxima vez)
   void encerrarNavegador().finally(() => app.quit())
 })

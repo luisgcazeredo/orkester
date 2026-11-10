@@ -32,7 +32,7 @@ import { empurrarParaBaixo } from '../../../shared/quadro/empurrar'
 import { abrir, fechar, passar } from '../../../shared/quadro/transformacoes'
 import { acharAlvos, mexerNoQuadro } from '../../../shared/quadro/agente'
 import { MAX_PARTITURAS, aplicarPartitura, partituraDe, resumoDaPartitura } from '../../../shared/quadro/partituras'
-import { bandasDoNo, bandasDoPlano, cordasDaBanda, cordasEfetivas, criarBanda, manterBandas, membrosDaBanda } from '../../../shared/quadro/bandas'
+import { alcanca, alcancaveisPor, bandasDoNo, bandasDoPlano, cordasDaBanda, cordasEfetivas, criarBanda, manterBandas, membrosDaBanda } from '../../../shared/quadro/bandas'
 import { trocarAgente } from '../../../shared/quadro/trocar'
 import { MAX_ROTINAS, novaRotina, proximaDe } from '../../../shared/rotinas'
 import { caixaDoDesenho, caixaDoNo, distanciaAoDesenho, enquadrar, lerViewport, uniao, type Caixa } from '../quadro/geometria'
@@ -2300,6 +2300,10 @@ function atenderArvore(pedido: Extract<PedidoDoAgente, { tipo: 'arvore' }>): Res
     )
     if (!destino) return { ok: false, erro: `não achei o agente "${nome}" no andar à mostra. Veja \`ork quadro\`.` }
     if (destino.id === terminal.id) return { ok: false, erro: 'esse arquivo já é seu' }
+    // entregar põe o cartão na coluna do outro e mexe no quadro dele: vale a mesma regra da corda
+    if (!alcancaveisPor(plano, terminal.id).has(destino.id)) {
+      return { ok: false, erro: `"${destino.nome}" não está ao seu alcance: entregue a quem você abriu ou a quem está ligado a você` }
+    }
     const pedidos = pedido.arquivos ?? []
     const meus = plano.nos.filter(
       (n): n is NoCodigo => n.tipo === 'codigo' && n.terminal === terminal.id && !!n.caminho && pedidos.includes(n.caminho)
@@ -2450,7 +2454,7 @@ function atenderQuadroDoAgente(pedido: Extract<PedidoDoAgente, { tipo: 'quadro' 
   if (eu?.tipo !== 'terminal') return { ok: false, erro: 'o seu cartão não está no andar à mostra desta janela' }
   const andar = andarAtual()
   const onde = `Espaço "${espaco.nome}" · ${andar ? `andar "${andar.nome}"` : 'térreo'}`
-  const feito = mexerNoQuadro(plano, { ...pedido.pedido, eu: pedido.id, onde }, { novoId, agora })
+  const feito = mexerNoQuadro(plano, { ...pedido.pedido, eu: pedido.id, onde }, { novoId, agora, alcanca })
   if ('erro' in feito) return { ok: false, erro: feito.erro }
   if (feito.plano !== plano) {
     registrarHistorico()

@@ -9,7 +9,8 @@ Two rules apply to everything below:
 
 - **It only runs inside a terminal on the canvas.** Outside the app the command refuses — it talks to the
   window through a named pipe (or, in a sandbox that forbids pipes, a file mailbox) that exists only there.
-- **The link is the permission.** An agent reaches whoever it is wired to (or whoever shares its band), and
+- **The link is the permission**, and an agent cannot grant itself one: it links, unlinks, renames or hands
+  a card only to what it **opened** or what is **already linked** to it. An agent reaches whoever it is wired to (or whoever shares its band), and
   nobody else. Cards are addressed by name.
 
 The app writes this manual as an `orkester` skill into `~/.claude/skills` and `~/.codex/skills`, so the agent
@@ -94,7 +95,7 @@ Options for `ork abrir`:
 | `ork mover <card>… --x N --y N` | places cards; with `--dx/--dy`, moves them from where they are |
 | `ork arrumar [card]… --colunas N` | lays cards out in a grid, starting from the corner they were in |
 | `ork nome <card> "New name"` | renames an agent card |
-| `ork ligar <card> <card>` | draws the link: the two can now talk |
+| `ork ligar <card> <card>` | draws the link: the two can now talk (only between cards you can reach) |
 | `ork desligar <card> <card>` | removes the link |
 | `ork anotar "text"` | writes a note on the canvas, below your card |
 | `ork juntar <card>… [--soltar]` | groups cards so they move together |
