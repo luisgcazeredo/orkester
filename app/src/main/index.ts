@@ -262,9 +262,21 @@ app.on('before-quit', () => {
   fecharCorreio()
 })
 
+/**
+ * Última janela fechada: o app sai. **E sai mesmo** — nada no caminho da saída pode segurá-lo.
+ *
+ * Em 10/11/2026 o Luís fechou a janela e o processo ficou vivo, sem janela e sem ícone em lugar nenhum: a
+ * única saída era o Gerenciador de Tarefas, e a atualização não instalava porque o app "estava aberto". A
+ * causa foi um await sem prazo no fechamento do Chrome do portal (consertado em `navegador.ts`), mas a
+ * lição é mais geral: **sair não pode depender de todo o resto ter corrido bem.** Por isso o prazo duro
+ * abaixo, que mata o processo mesmo que algo novo trave aqui amanhã.
+ */
 app.on('window-all-closed', () => {
   pararRotinas()
   encerrarTodos()
+  // morre de qualquer jeito: se em 5 s o encerramento limpo não terminou, o processo sai à força
+  const forca = setTimeout(() => app.exit(0), 5000)
+  forca.unref()
   // o Chrome do app fecha direito antes (sem o aviso de "não foi fechado corretamente" na próxima vez)
   void encerrarNavegador().finally(() => app.quit())
 })

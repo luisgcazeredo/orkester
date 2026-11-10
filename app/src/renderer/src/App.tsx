@@ -110,9 +110,12 @@ export function App() {
   const erroAoSalvar = usarLoja((e) => e.erroAoSalvar)
   const nomeDoEspaco = usarLoja((e) => e.espaco?.nome)
 
-  // com várias janelas, a barra de tarefas e o Alt+Tab mostram qual espaço está em cada uma
+  // Com várias janelas, a barra de tarefas e o Alt+Tab mostram qual espaço está em cada uma — e a versão
+  // vai junto, porque depois de instalar uma atualização a primeira pergunta é "pegou?" (pedido do Luís,
+  // 10/11/2026). O número vem do package.json pelo bundler, não escrito à mão.
   useEffect(() => {
-    document.title = nomeDoEspaco ? `${nomeDoEspaco} — Orkester` : 'Orkester'
+    const app = `Orkester ${__VERSAO__}`
+    document.title = nomeDoEspaco ? `${nomeDoEspaco} — ${app}` : app
   }, [nomeDoEspaco])
 
   useEffect(() => {

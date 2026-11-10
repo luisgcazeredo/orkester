@@ -582,11 +582,24 @@ export function soltarAbasDaJanela(dono: number): void {
 }
 
 /** Ao sair do app: fecha o Chrome do app direito (sem o aviso de "não foi fechado corretamente"). */
+/**
+ * Fecha o Chrome do portal. **Nada aqui espera para sempre:** isto roda no caminho da saída do app, e um
+ * await sem prazo aqui é o app que não morre.
+ *
+ * Era assim até 10/11/2026: o `await conexao` não tinha prazo (só a mensagem depois dele tinha). Com o
+ * Chrome iniciado e nunca conectado, a promessa ficava pendurada, o `.finally(app.quit())` de quem chamou
+ * nunca rodava, e o app continuava vivo sem janela nenhuma — sem jeito de fechar a não ser pelo Gerenciador
+ * de Tarefas, e sem conseguir instalar atualização, que é como o Luís topou com isso.
+ */
 export async function encerrarNavegador(): Promise<void> {
   ajudante?.kill()
   if (!conexao || !processo) return
   try {
-    const c = await conexao
+    const c = await Promise.race([conexao, esperar(1500).then(() => null)])
+    if (!c) {
+      processo?.kill()
+      return
+    }
     await Promise.race([c.enviar('Browser.close'), esperar(1500)])
   } catch {
     processo?.kill()

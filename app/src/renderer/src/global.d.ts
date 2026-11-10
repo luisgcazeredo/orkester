@@ -10,3 +10,8 @@ declare global {
 }
 
 export {}
+
+declare global {
+  /** A versão do app, posta pelo bundler a partir do package.json (ver electron.vite.config.ts). */
+  const __VERSAO__: string
+}
