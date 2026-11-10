@@ -5,7 +5,11 @@
  * provas rodarem sem Electron). Três regras valem para todas as ações, e é por elas que dar esse poder ao
  * agente não dá medo:
  *
- * - **Nada é apagado.** O agente move, nomeia, liga e anota; cartão nenhum sai do quadro por aqui.
+ * - **Só sai do quadro o que não tem vida própria.** O agente apaga anotação, post-it, imagem, portal,
+ *   banda — e nunca um terminal (esse é `ork fechar`, e só o que ele mesmo abriu), nem cartão de código,
+ *   nem cartão travado. Até 10/11/2026 ele não apagava nada; a regra caiu porque o agente conseguia encher
+ *   o quadro de anotações e não conseguia limpar nenhuma, e quem pagava era o usuário, à mão. O que segura
+ *   isso não é a proibição, é o desfazer: tudo o que ele faz aqui volta inteiro com um Ctrl+Z.
  * - **Cartão travado é intocável** e **cartão de código também**: a coluna de arquivos é arrumada pelo app, e
  *   o cartão que o usuário tirou dela ficou onde ele quis.
  * - **Só pelo nome**, no andar à mostra. O agente não conhece id de nada, então não alcança o que não vê.
@@ -15,7 +19,7 @@
  */
 import type { Corda, Desenho, No, Plano } from '../modelo'
 
-export type AcaoNoQuadro = 'ler' | 'mover' | 'arrumar' | 'nome' | 'ligar' | 'desligar' | 'anotar' | 'juntar'
+export type AcaoNoQuadro = 'ler' | 'ler-cartao' | 'apagar' | 'mover' | 'arrumar' | 'nome' | 'ligar' | 'desligar' | 'anotar' | 'juntar'
 
 export interface PedidoNoQuadro {
   acao: AcaoNoQuadro
@@ -218,7 +222,7 @@ export function lerQuadro(plano: Plano, pedido: PedidoNoQuadro): string {
     cabecalho,
     ...(linhas.length ? linhas : ['  (quadro vazio)']),
     ...(cordas.length ? ['Cordas:', ...cordas] : []),
-    'Mexa com: ork mover, arrumar, nome, ligar, desligar, anotar, juntar (sempre pelo nome ou pelo #número).'
+    'Mexa com: ork mover, arrumar, nome, ligar, desligar, anotar, juntar, ler, apagar (sempre pelo nome ou pelo #número).'
   ].join('\n')
 }
 
@@ -229,6 +233,51 @@ export function mexerNoQuadro(plano: Plano, pedido: PedidoNoQuadro, amb: Ambient
   const alvosPedidos = (pedido.alvos ?? []).filter((a) => a.trim())
 
   if (pedido.acao === 'ler') return { plano, terminais: [], texto: lerQuadro(plano, pedido) }
+
+  // Ler um cartão inteiro. A leitura do quadro corta o texto em 60 caracteres para caber na lista, e era só
+  // isso que o agente conseguia ver: ele escrevia um relatório com `ork anotar` e não conseguia lê-lo de
+  // volta (queixa do Maestro em 09/11/2026). Escrever sem poder ler é meio canal.
+  if (pedido.acao === 'ler-cartao') {
+    if (alvosPedidos.length !== 1) return { erro: 'diga um cartão: ork ler <cartão>' }
+    const alvo = acharAlvos(plano, alvosPedidos)
+    if (typeof alvo === 'string') return { erro: alvo }
+    const no = alvo[0]
+    const conteudo =
+      no.tipo === 'texto'
+        ? no.texto
+        : no.tipo === 'postit'
+          ? `post-it: o texto está no arquivo "${no.arquivo}", na pasta de notas deste espaço`
+          : no.tipo === 'portal'
+            ? no.url
+            : no.tipo === 'codigo' || no.tipo === 'arquivo' || no.tipo === 'pasta'
+              ? no.caminho
+              : no.tipo === 'terminal'
+                ? `é um agente; a tela dele se lê com \`ork ver "${no.nome}"\``
+                : `cartão do tipo ${COMO_CHAMAR[no.tipo]}: não tem texto para ler`
+    return { plano, terminais: [], texto: `"${rotuloDoNo(no)}" (${COMO_CHAMAR[no.tipo]}):\n${conteudo}` }
+  }
+
+  if (pedido.acao === 'apagar') {
+    if (!alvosPedidos.length) return { erro: 'diga o que apagar: ork apagar <cartão>...' }
+    const alvos = acharAlvos(plano, alvosPedidos)
+    if (typeof alvos === 'string') return { erro: alvos }
+    for (const no of alvos) {
+      // o terminal é o único cartão com processo vivo atrás: apagá-lo seria matar o trabalho de alguém
+      if (no.tipo === 'terminal') {
+        return { erro: `"${rotuloDoNo(no)}" é um agente: feche com \`ork fechar "${no.nome}"\` (e só se você o abriu)` }
+      }
+      const motivo = motivoImovel(no)
+      if (motivo) return { erro: `"${rotuloDoNo(no)}" não se apaga por aqui: ${motivo}` }
+    }
+    const ids = new Set(alvos.map((n) => n.id))
+    const plano2: Plano = {
+      ...plano,
+      nos: plano.nos.filter((n) => !ids.has(n.id)),
+      // corda que sobra apontando para cartão que não existe mais vira lixo invisível no arquivo do espaço
+      cordas: plano.cordas.filter((c) => !ids.has(c.de) && !ids.has(c.para))
+    }
+    return { plano: plano2, terminais: [], texto: `Apaguei ${alvos.length} cartão(ões): ${listar(alvos)}. Um Ctrl+Z traz de volta.` }
+  }
 
   if (pedido.acao === 'anotar') {
     const texto = (pedido.texto ?? '').trim()

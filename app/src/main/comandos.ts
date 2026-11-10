@@ -51,7 +51,7 @@ const OCUPADO = /esc to interrupt|esc para interromper/i
  * sim/não). Olhando só o fim da tela: o texto da conversa pode citar essas palavras.
  */
 const DIALOGO =
-  /enter to confirm|esc to cancel|esc to reject|enter continue|press enter to continue|update now|trust this folder|do you trust|do you want to proceed|\(y\/n\)|\[y\/n\]/i
+  /enter to confirm|esc to cancel|esc to reject|enter continue|press enter to continue|update now|update available|new version available|atualiza[çc][ãa]o dispon[íi]vel|trust this folder|do you trust|do you want to proceed|\(y\/n\)|\[y\/n\]/i
 /** Agente desenhado e esperando o primeiro pedido (Claude Code e Codex). */
 const PRONTO = /for shortcuts|context left|ask codex|try "write a test for <filepath>"|auto mode on \(shift\+tab to cycle\)/i
 /** A última linha é o prompt do PowerShell: o agente nem abriu, ou já saiu. */
@@ -322,7 +322,11 @@ async function aguardarFim(s: Sessao, ms: number, cancelado: () => boolean): Pro
 }
 
 /** Sessão recém-aberta: espera o agente desenhar a tela dele e sossegar, ou parar numa pergunta. */
-async function aguardarPronto(s: Sessao, ms: number, cancelado: () => boolean): Promise<'pronto' | 'confirmar' | 'tempo' | 'encerrado'> {
+async function aguardarPronto(
+  s: Sessao,
+  ms: number,
+  cancelado: () => boolean
+): Promise<'pronto' | 'confirmar' | 'desconhecido' | 'tempo' | 'encerrado'> {
   for (const limite = Date.now() + ms; Date.now() < limite && !cancelado(); await esperar(300)) {
     if (!s.processo) return 'encerrado'
     const quieto = Date.now() - s.ultimaSaida
@@ -331,8 +335,13 @@ async function aguardarPronto(s: Sessao, ms: number, cancelado: () => boolean): 
     const tela = await telaDe(s, 40)
     if (DIALOGO.test(ultimasLinhasComTexto(tela))) return 'confirmar'
     if (PRONTO.test(tela)) return 'pronto'
-    // sem a marca de pronto (outra versão do agente?): quieto há 6 s, sem diálogo e sem o prompt do shell no fim
-    if (quieto > 6000 && tela.trim() && !PROMPT_DO_SHELL.test(tela.split('\n').pop() ?? '')) return 'pronto'
+    // Quieto, sem a marca de pronto e sem diálogo conhecido: uma tela que eu não sei ler.
+    //
+    // Isto já devolveu 'pronto', e foi assim que o aviso de atualização do Codex comeu dois pedidos em
+    // 09/11/2026: o app digitou em cima de um menu que não entendia. Reconhecer mais frases ajuda, mas
+    // nunca vai acabar — cada versão de cada agente inventa uma tela nova. A regra que não envelhece é
+    // outra: **não se digita numa tela que não foi reconhecida**, e quem pediu fica sabendo.
+    if (quieto > 6000 && tela.trim() && !PROMPT_DO_SHELL.test(tela.split('\n').pop() ?? '')) return 'desconhecido'
   }
   return 'tempo'
 }
@@ -738,6 +747,8 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
       const motivo = {
         confirmar:
           'Ele parou numa pergunta (confiar na pasta? servidores MCP? atualização?). O pedido NÃO foi enviado: responda com `ork teclas` se for seguro, ou pergunte ao usuário, e depois use `ork pedir`.',
+        desconhecido:
+          'Ele parou numa tela que eu não sei ler (um aviso, um menu, uma versão nova do agente). O pedido NÃO foi enviado, de propósito: digitar em cima do que não reconheço já perdeu pedido antes. Veja com `ork ver`, resolva com `ork teclas` se for seguro, e mande com `ork pedir`.',
         tempo: 'Ele não ficou pronto em 90 s; o pedido NÃO foi enviado. Veja com `ork ver` e use `ork pedir` depois.',
         encerrado: 'O processo terminou antes de ficar pronto; o pedido NÃO foi enviado.'
       }[pronto]
@@ -751,7 +762,7 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
           `\`ork teclas\` e mande de novo com \`ork pedir\`.\nTela agora:\n${await telaDe(novo, 30)}`
       }
     }
-    if (!opcoes.esperar) return { saida: `${aberto} Pedido enviado. Acompanhe com \`ork esperar "${novo.espec.nome}"\` ou \`ork ver\`.` }
+    if (!opcoes.esperar || opcoes['sem-esperar']) return { saida: `${aberto} Pedido enviado. Acompanhe com \`ork esperar "${novo.espec.nome}"\` ou \`ork ver\`.` }
     return { saida: `${aberto}\n${await resultado(novo, tempoDe(opcoes), cancelado)}` }
   },
 
@@ -838,6 +849,10 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
 
   arrumar: async ({ eu, pos, opcoes }) =>
     mexerNoQuadro(eu, { acao: 'arrumar', alvos: pos, colunas: comoNumero(opcoes.colunas), vao: comoNumero(opcoes.vao) }),
+
+  ler: async ({ eu, pos }) => mexerNoQuadro(eu, { acao: 'ler-cartao', alvos: [pos.join(' ')] }),
+
+  apagar: async ({ eu, pos }) => mexerNoQuadro(eu, { acao: 'apagar', alvos: pos }),
 
   nome: async ({ eu, pos }) => mexerNoQuadro(eu, { acao: 'nome', alvos: pos.slice(0, 1), texto: pos.slice(1).join(' ') }),
 

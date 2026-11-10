@@ -43,7 +43,9 @@ export const VERBOS = [
   },
   {
     nome: 'abrir', aliases: [], posicionais: [obrigatorio('claude|codex|shell')],
-    opcoes: [texto('espaco'), texto('nome'), texto('pasta'), texto('funcao'), texto('pedido'), texto('arquivo'), bandeira('esperar'), numero('tempo', 1, 3600)],
+    // `--sem-esperar` é o normal aqui (o `abrir` só espera com `--esperar`), mas existe porque é assim que
+    // se diz no `ork pedir`: o agente que aprendeu lá escreve igual aqui, e recusar por isso é pedantismo
+    opcoes: [texto('espaco'), texto('nome'), texto('pasta'), texto('funcao'), texto('pedido'), texto('arquivo'), bandeira('esperar'), bandeira('sem-esperar'), numero('tempo', 1, 3600)],
     descricao: 'abre uma sessão nova; em outro espaço, você continua sendo o dono',
     ajuda: '  ork abrir <claude|codex|shell> [--espaco "Nome"] [--nome N] [--pasta P] [--funcao "Papel"] [--pedido "texto" | --arquivo pedido.md] [--esperar] [--tempo S]\n                                       abre uma sessão nova; em outro espaço, você continua sendo o dono'
   },
@@ -63,6 +65,8 @@ export const VERBOS = [
     ajuda: '  ork arvore                         lista as árvores de código do seu cartão (e qual está em uso)\n  ork arvore nova "Nome"             cria uma árvore e passa a usá-la para os próximos arquivos\n  ork arvore usar "Nome"             passa a usar uma árvore que já existe\n  ork arvore mostrar <arquivo>... [--arvore "Nome"]\n                                      abre esses arquivos como cartões na árvore\n  ork arvore desfazer "Nome"         desfaz a árvore; os arquivos dela voltam para a principal'
   },
   { nome: 'quadro', aliases: [], posicionais: [], opcoes: [], descricao: 'lê o quadro: cada cartão com número, nome, lugar e tamanho, e as cordas', ajuda: '  ork quadro                         lê o quadro: cada cartão com número, nome, lugar e tamanho, e as cordas' },
+  { nome: 'ler', aliases: [], posicionais: [{ nome: 'cartão', obrigatorio: true, resto: true }], opcoes: [], descricao: 'lê um cartão inteiro (a anotação que o quadro mostra cortada)', ajuda: '  ork ler <cartão>                   lê um cartão inteiro: a anotação que o `ork quadro` mostra cortada' },
+  { nome: 'apagar', aliases: [], posicionais: [{ nome: 'cartão', obrigatorio: true, resto: true }], opcoes: [], descricao: 'apaga cartões sem processo (anotação, post-it, banda…); Ctrl+Z desfaz', ajuda: '  ork apagar <cartão>...             apaga cartões sem processo (anotação, post-it, banda…); agente é `ork fechar`' },
   {
     nome: 'mover', aliases: [], posicionais: [{ nome: 'cartão', obrigatorio: true, resto: true }],
     opcoes: [lugar('x'), lugar('y'), lugar('dx'), lugar('dy')],

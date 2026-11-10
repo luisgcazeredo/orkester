@@ -98,6 +98,8 @@ Options for `ork abrir`:
 | `ork desligar <card> <card>` | removes the link |
 | `ork anotar "text"` | writes a note on the canvas, below your card |
 | `ork juntar <card>… [--soltar]` | groups cards so they move together |
+| `ork ler <card>` | reads one card in full (the list cuts text at 60 characters) |
+| `ork apagar <card>…` | removes cards with no process behind them; an agent is `ork fechar`. Ctrl+Z undoes it |
 | `ork janela "Workspace"` | opens a workspace in a window; `--novo "Name"` creates it first |
 
 Everything the agent does to the canvas:

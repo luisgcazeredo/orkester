@@ -96,6 +96,8 @@ Opções do `ork abrir`:
 | `ork desligar <cartão> <cartão>` | tira a corda |
 | `ork anotar "texto"` | escreve um texto no quadro, abaixo do seu cartão |
 | `ork juntar <cartão>… [--soltar]` | agrupa cartões para andarem juntos |
+| `ork ler <cartão>` | lê um cartão inteiro (a lista corta o texto em 60 letras) |
+| `ork apagar <cartão>…` | tira do quadro o que não tem processo atrás; agente é `ork fechar`. Ctrl+Z desfaz |
 | `ork janela "Espaço"` | abre um espaço numa janela; `--novo "Nome"` cria o espaço antes |
 
 Tudo o que o agente faz no quadro:

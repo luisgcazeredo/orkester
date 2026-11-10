@@ -13,7 +13,7 @@ ${tabelaDeComandos()}
 
 export const SKILL = `---
 name: orkester
-description: Use dentro de um terminal do Orkester (a variável de ambiente ORK_PIPE existe) para fazer engenharia de contexto — abrir uma sessão nova de agente (Claude, Codex ou shell) com um contexto limpo e focado, delegar uma parte do trabalho, conversar com os agentes ligados a você pela corda, ler a tela deles, zerar o contexto de uma sessão ou fechar as sessões que você abriu — e para organizar o quadro: ler o que há nele, mover, arrumar em grade, renomear, ligar dois agentes, anotar e agrupar cartões — para juntar agentes numa banda (grupo em que todos se falam), trocar o agente de um cartão que você abriu, e subir um time salvo (partitura) com as funções e as cordas dele, ou guardar o time que está no quadro. Comando: ork. Fora do app não funciona.
+description: Use dentro de um terminal do Orkester (a variável de ambiente ORK_PIPE existe) para fazer engenharia de contexto — abrir uma sessão nova de agente (Claude, Codex ou shell) com um contexto limpo e focado, delegar uma parte do trabalho, conversar com os agentes ligados a você pela corda, ler a tela deles, zerar o contexto de uma sessão ou fechar as sessões que você abriu — e para organizar o quadro: ler o que há nele, ler um cartão inteiro, mover, arrumar em grade, renomear, ligar dois agentes, anotar, apagar o que não tem processo e agrupar cartões — para juntar agentes numa banda (grupo em que todos se falam), trocar o agente de um cartão que você abriu, e subir um time salvo (partitura) com as funções e as cordas dele, ou guardar o time que está no quadro. Comando: ork. Fora do app não funciona.
 ---
 
 # Orkester: o comando \`ork\`
@@ -106,12 +106,16 @@ ork nome "Claude Code 2" "Revisor"    # renomeia: é o nome que o ork passa a us
 ork ligar "Revisor" "Testes"          # a corda: os dois passam a poder se falar
 ork desligar "Revisor" "Testes"
 ork anotar "Falta o teste do empurrão"   # um texto no quadro, abaixo do seu cartão
+ork ler "Falta o teste"               # o cartão inteiro (a lista corta o texto em 60 letras)
+ork apagar "Falta o teste"            # tira do quadro o que não tem processo (Ctrl+Z desfaz)
 ork juntar "Revisor" "Testes"         # andam juntos daqui para frente (--soltar desfaz)
 \`\`\`
 
 O que isto **não** faz, de propósito:
 
-- **Não apaga nada.** Não há verbo para apagar cartão; para fechar uma sessão que você abriu, use \`ork fechar\`.
+- **Não apaga agente.** O \`ork apagar\` tira do quadro o que não tem processo atrás (anotação, post-it,
+  banda, imagem, portal); um terminal, não — para fechar uma sessão que você abriu, use \`ork fechar\`.
+  Apague o que é seu: a sua anotação velha, a banda que você criou. O que é do usuário é dele.
 - **Não mexe em cartão travado** nem em **cartão de código**: a árvore de arquivos é arrumada pelo app, e o
   cartão que o usuário tirou dela ficou onde ele quis. O \`ork\` diz quando deixou algo como estava.
 - **Só alcança o andar à mostra** da janela daquele espaço, e só pelo nome — você não conhece id de nada.

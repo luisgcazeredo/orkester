@@ -161,3 +161,39 @@ test('nenhuma ação apaga cartão: o quadro nunca encolhe', () => {
   ]
   for (const acao of acoes) assert.ok(mudou(mexer(p, acao)).plano.nos.length >= p.nos.length, `${acao.acao} encolheu o quadro`)
 })
+
+test('ler devolve o texto inteiro da anotação, não o começo que a lista mostra', () => {
+  const longo = 'RELATÓRIO: '.padEnd(200, 'x')
+  const r = mexer(plano([agente('a', 'Chefe', 0, 0), texto('t', longo, 0, 300)]), { acao: 'ler-cartao', alvos: ['RELAT'] }) as MudancaNoQuadro
+  assert.ok(r.texto.includes(longo), 'o texto inteiro tem de vir')
+})
+
+test('ler um agente manda usar o ork ver, que é quem lê tela', () => {
+  const r = mexer(plano([agente('a', 'Chefe', 0, 0), agente('b', 'Revisor', 300, 0)]), { acao: 'ler-cartao', alvos: ['Revisor'] }) as MudancaNoQuadro
+  assert.match(r.texto, /ork ver "Revisor"/)
+})
+
+test('apagar tira o cartão e as cordas que sobrariam soltas', () => {
+  const p = plano([agente('a', 'Chefe', 0, 0), texto('t', 'nota velha', 0, 300)], [], [{ de: 'a', para: 't' }] as Plano['cordas'])
+  const r = mexer(p, { acao: 'apagar', alvos: ['nota velha'] }) as MudancaNoQuadro
+  assert.deepEqual(r.plano.nos.map((n) => n.id), ['a'])
+  assert.equal(r.plano.cordas.length, 0)
+  assert.match(r.texto, /Ctrl\+Z/)
+})
+
+test('apagar recusa agente: isso é ork fechar, e só o que ele abriu', () => {
+  const r = mexer(plano([agente('a', 'Chefe', 0, 0), agente('b', 'Revisor', 300, 0)]), { acao: 'apagar', alvos: ['Revisor'] })
+  assert.match((r as { erro: string }).erro, /ork fechar "Revisor"/)
+})
+
+test('apagar recusa cartão de código e cartão travado, como o mover', () => {
+  const comCodigo = mexer(plano([agente('a', 'Chefe', 0, 0), codigo('c', 'src/fila.mjs', 300, 0)]), { acao: 'apagar', alvos: ['fila.mjs'] })
+  assert.match((comCodigo as { erro: string }).erro, /cartão de código/)
+  const travado = mexer(plano([agente('a', 'Chefe', 0, 0), texto('t', 'presa', 0, 300, { travado: true })]), { acao: 'apagar', alvos: ['presa'] })
+  assert.match((travado as { erro: string }).erro, /travado/)
+})
+
+test('apagar nada não apaga nada: sem alvo, é queixa', () => {
+  const r = mexer(plano([agente('a', 'Chefe', 0, 0)]), { acao: 'apagar', alvos: [] })
+  assert.match((r as { erro: string }).erro, /diga o que apagar/)
+})

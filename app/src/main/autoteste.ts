@@ -1379,6 +1379,25 @@ export async function rodarAutoteste(
       return { achou: !!nova, abaixo: !!nova && nova.y > chefe.y + chefe.altura - 1 && nova.x === chefe.x } })()`)
     conferir('ork anotar escreve no quadro, abaixo do cartão de quem anotou', anotacao.achou && anotacao.abaixo, `achou:${anotacao.achou} · abaixo:${anotacao.abaixo}`)
 
+    // Ler de volta o que ele mesmo anotou. A lista do `ork quadro` corta em 60 letras, então a anotação
+    // longa é justamente o caso: o agente escrevia um relatório e não conseguia relê-lo.
+    const longa = `RELATORIO-LONGO-${'x'.repeat(90)}-FIM`
+    await comandoAte(chefe, `cls; ork anotar "${longa}"`, /Anotei no quadro/, 15_000)
+    const lido = await comandoAte(chefe, 'cls; ork ler "RELATORIO-LONGO"', /RELATORIO-LONGO/, 15_000)
+    conferir('ork ler devolve a anotação inteira, não o começo que a lista mostra', lido.includes('-FIM'), ultimas(lido, 2))
+
+    // e apagar o que ele criou, com a corda indo junto
+    const apagou = await comandoAte(chefe, 'cls; ork apagar "RELATORIO-LONGO"', /Apaguei|não/, 15_000)
+    const sumiu = await js<boolean>(
+      `!window.__teste.loja.planoAtual().nos.some((n) => n.tipo === 'texto' && n.texto.includes('RELATORIO-LONGO'))`
+    )
+    conferir('ork apagar tira o cartão do quadro', sumiu && /Apaguei/.test(apagou), sumiu ? 'saiu do quadro' : 'continua lá')
+
+    // e não apaga agente nenhum: isso é `ork fechar`, e só o que ele abriu
+    const recusaDeApagar = await comandoAte(chefe, `cls; ork apagar "PowerShell"`, /ork fechar|não/, 15_000)
+    const chefeVivo = await js<boolean>(`!!window.__teste.loja.acharNo('${chefe}')`)
+    conferir('ork apagar recusa agente e manda usar o ork fechar', chefeVivo && /ork fechar/.test(recusaDeApagar), ultimas(recusaDeApagar, 2))
+
     // o quadro volta ao que era para os cenários seguintes: as notas e a anotação deste teste saem
     await js(`(() => { const L = window.__teste.loja
       const anotacao = L.planoAtual().nos.find((n) => n.tipo === 'texto' && n.texto === 'Falta o teste do empurrao')
