@@ -1,11 +1,13 @@
 import { ipcMain, webContents } from 'electron'
+import { execFileSync } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
-import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createServer, type Socket } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
-import { join, resolve, sep } from 'node:path'
+import { dirname, join, resolve, sep } from 'node:path'
 import { CANAIS, CANAIS_AGENTES, MAX_SESSOES_POR_AGENTE, type PedidoDoAgente, type RespostaAoAgente, type ResumoContextoTerminal } from '../shared/api'
 import type { Agente, ResultadoDaRotina } from '../shared/modelo'
+import { nodeServe } from '../shared/node-do-sistema'
 import type { PedidoNoQuadro } from '../shared/quadro/agente'
 import { criarEspacoDoAgente, PASTA_DADOS, resumosDosEspacos } from './dados'
 import { abrirJanela, donoDe } from './janelas'
@@ -61,9 +63,47 @@ const PROMPT_LIVRE = /(^PS .*>|[>$#])\s*$/
 
 const esperar = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
-/** O cli.js fica fora do app.asar (asarUnpack): o Electron em modo Node roda de lá. */
-function caminhoDoCli(): string {
+/** O cli.js como o app o tem: fora do app.asar (asarUnpack), dentro da pasta de instalação. */
+function cliDoApp(): string {
   return join(__dirname, 'cli.js').replace(`app.asar${sep}`, `app.asar.unpacked${sep}`)
+}
+
+/** Onde o `ork` lê o CLI: a cópia que mora junto dos dados. Ver `shared/node-do-sistema.ts` para o porquê. */
+function caminhoDoCli(): string {
+  return join(PASTA_BIN, 'cli', 'cli.js')
+}
+
+/**
+ * Copia o CLI (e os `chunks/` que o bundler separa) da pasta de instalação para `~/.orkester/bin/cli`.
+ *
+ * O sandbox do Codex nega a pasta de instalação inteira, e a pasta de dados não. São uns 30 KB; copiar a
+ * cada abertura mantém a cópia casada com a versão do app, o que importa porque o CLI e o app conversam
+ * por um protocolo que muda junto.
+ */
+function copiarCli(): void {
+  try {
+    const destino = join(PASTA_BIN, 'cli')
+    mkdirSync(destino, { recursive: true })
+    cpSync(cliDoApp(), join(destino, 'cli.js'))
+    const chunks = join(dirname(cliDoApp()), 'chunks')
+    if (existsSync(chunks)) cpSync(chunks, join(destino, 'chunks'), { recursive: true })
+  } catch (erro) {
+    console.error('não consegui copiar o ork para a pasta de dados', erro)
+  }
+}
+
+/**
+ * O Node do sistema, se houver e se servir — é com ele que o `ork` roda, para o agente sandboxed
+ * conseguir usá-lo. Sem Node, volta para o Electron do app, que funciona para quem não está num sandbox.
+ */
+function nodeDoSistema(): string | null {
+  try {
+    const versao = execFileSync('node', ['-v'], { encoding: 'utf8', timeout: 5000, windowsHide: true }).trim()
+    if (!nodeServe(versao)) return null
+    return execFileSync('node', ['-p', 'process.execPath'], { encoding: 'utf8', timeout: 5000, windowsHide: true }).trim()
+  } catch {
+    return null
+  }
 }
 
 /** Variáveis que cada terminal ganha para o `ork` funcionar. */
@@ -86,6 +126,10 @@ function gravarSeMudou(caminho: string, conteudo: string): void {
 /** O `ork` no PATH dos terminais: um .cmd (PowerShell e cmd) e um script sh (o Git Bash do Claude Code). */
 function instalarComando(): void {
   mkdirSync(PASTA_BIN, { recursive: true })
+  copiarCli()
+  // o Node do sistema é escolhido aqui, uma vez, e gravado no atalho: decidir isso dentro de um .cmd
+  // seria frágil, e o atalho tem de ser burro
+  const node = nodeDoSistema()
   gravarSeMudou(
     join(PASTA_BIN, 'ork.cmd'),
     [
@@ -94,7 +138,7 @@ function instalarComando(): void {
       'if not defined ORK_PIPE (echo ork: so funciona dentro de um terminal do Orkester 1>&2 & exit /b 2)',
       'setlocal',
       'set ELECTRON_RUN_AS_NODE=1',
-      '"%ORK_NODE%" "%ORK_CLI%" %*',
+      node ? `"${node}" "%ORK_CLI%" %*` : '"%ORK_NODE%" "%ORK_CLI%" %*',
       'exit /b %ERRORLEVEL%',
       ''
     ].join('\r\n')
@@ -105,7 +149,7 @@ function instalarComando(): void {
       '#!/bin/sh',
       '# Orkester: o comando dos agentes (so funciona dentro de um terminal do app)',
       'if [ -z "$ORK_PIPE" ]; then echo "ork: so funciona dentro de um terminal do Orkester" >&2; exit 2; fi',
-      'ELECTRON_RUN_AS_NODE=1 exec "$ORK_NODE" "$ORK_CLI" "$@"',
+      node ? `exec "${node}" "$ORK_CLI" "$@"` : 'ELECTRON_RUN_AS_NODE=1 exec "$ORK_NODE" "$ORK_CLI" "$@"',
       ''
     ].join('\n')
   )
@@ -125,16 +169,17 @@ function instalarComando(): void {
 }
 
 /**
- * Deixa o `ork` rodar no Codex sem pedir aprovação e sem o sandbox no caminho.
+ * Poupa o agente de pedir aprovação a cada `ork`, pela regra de execpolicy que o próprio Codex documenta.
  *
- * Sem isto o agente simplesmente **não conversa**: o Codex roda cada comando num sandbox e, na política de
- * aprovação granular, recusa sair dele — o `ork pedir` morria com "Acesso negado" enquanto o `ork quem`,
- * que o Codex julga inofensivo, passava (visto em 09/11/2026, com dois Codex no mesmo quadro).
+ * **O que ela não é:** o que faz o `ork` funcionar. Escrevi isto em 09/11/2026 achando que era — o `ork`
+ * morria com "Acesso negado" e eu li aquilo como recusa de aprovação. Era outra coisa: o sandbox nega a
+ * pasta de instalação inteira, e o `ork` rodava o Electron de lá (ver `shared/node-do-sistema.ts`). Com o
+ * CLI morando na pasta de dados, medi de novo em 10/11/2026: **funciona com e sem esta regra.**
  *
- * O jeito documentado de resolver isso é uma regra de execpolicy, que o Codex lê de `rules/*.rules` na
- * abertura. A regra aqui é a mais estreita possível: **só o programa `ork`**, que é o nosso, e nada mais.
- * Ela não afrouxa o sandbox para o resto — um `rm` encadeado depois do `ork` continua sendo julgado
- * sozinho. O que ela diz é: este comando é do app que abriu este terminal, e falar com o app é o trabalho.
+ * O que sobra para ela é o atrito: sem ela, cada `ork` do agente pára pedindo aprovação na tela, e um
+ * quadro trabalhando sozinho trava. Em troca, os comandos `ork` rodam fora do sandbox — e o `ork` alcança
+ * outros cartões, inclusive um shell. É uma escolha de conveniência contra isolamento, do dono do app;
+ * apagar o arquivo devolve as perguntas e não quebra nada. A regra é só para o programa `ork`.
  */
 function liberarOrkNoCodex(): void {
   const casa = process.env.CODEX_HOME || join(homedir(), '.codex')
