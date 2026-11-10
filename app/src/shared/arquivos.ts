@@ -139,3 +139,30 @@ export function pastaVigiavel(pasta: string, casa: string): boolean {
   const sistema = ['c:/windows', 'c:/program files', 'c:/program files (x86)', 'c:/programdata']
   return !sistema.includes(alvo.split(/[/\u005C]/).join('/'))
 }
+
+/** Uma janela pedindo aviso de uma pasta. O rótulo é o caminho como a janela escreveu. */
+export interface AssinaturaDeVigia {
+  rotulo: string
+  janela: number
+}
+
+/**
+ * Para quem o aviso de gravação vai, **uma vez só por janela e rótulo**.
+ *
+ * A lista de assinaturas é de propósito um multiconjunto: dois cartões na mesma pasta precisam de duas
+ * entradas, senão o primeiro a fechar cegaria o segundo. Mas o preload mantém um ouvinte por canal e
+ * reparte por rótulo, então mandar o mesmo aviso duas vezes para a mesma janela faz *cada* assinante
+ * daquela pasta rodar duas vezes — inclusive o que abre cartão de código. Era por aí que nascia cartão
+ * duplicado depois de recarregar a página (achado na revisão de 10/11/2026).
+ */
+export function destinosDoAviso(assinaturas: readonly AssinaturaDeVigia[]): AssinaturaDeVigia[] {
+  const vistos = new Set<string>()
+  const destinos: AssinaturaDeVigia[] = []
+  for (const { rotulo, janela } of assinaturas) {
+    const chave = `${janela}\u0000${rotulo}`
+    if (vistos.has(chave)) continue
+    vistos.add(chave)
+    destinos.push({ rotulo, janela })
+  }
+  return destinos
+}

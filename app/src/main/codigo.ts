@@ -10,7 +10,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { ipcMain, webContents } from 'electron'
 import { CANAIS_CODIGO, type DiffArquivo, type MudancaArquivo, type TextoArquivo } from '../shared/api'
-import { PASTAS_IGNORADAS, pastaVigiavel, temCaraDeSegredo, valeSeguir } from '../shared/arquivos'
+import { PASTAS_IGNORADAS, destinosDoAviso, pastaVigiavel, temCaraDeSegredo, valeSeguir } from '../shared/arquivos'
 import { dentroDeUmaRaiz, raizesDoQuadro } from './dados'
 
 /** Uma gravação costuma chegar em rajada (temporário, troca de nome, arquivo final): espera e junta. */
@@ -41,6 +41,8 @@ interface Vigia {
 }
 
 const vigias = new Map<string, Vigia>()
+/** Janelas cuja limpeza já está ligada. Ver `atarJanela`. */
+const janelasAtadas = new Set<number>()
 
 const chaveDa = (pasta: string): string => resolve(pasta).toLowerCase()
 
@@ -56,7 +58,7 @@ function anotar(vigia: Vigia, caminho: string): void {
 }
 
 function entregar(vigia: Vigia, mudanca: MudancaArquivo): void {
-  for (const { rotulo, janela } of vigia.assinaturas) {
+  for (const { rotulo, janela } of destinosDoAviso(vigia.assinaturas)) {
     webContents.fromId(janela)?.send(CANAIS_CODIGO.aviso, rotulo, { ...mudanca, pasta: rotulo })
   }
 }
@@ -127,7 +129,24 @@ function vigiar(janela: number, pasta: string): void {
     abrirObservador(vigia)
   }
   vigia.assinaturas.push({ rotulo: pasta, janela })
-  webContents.fromId(janela)?.once('destroyed', () => soltarJanela(janela))
+  atarJanela(janela)
+}
+
+/**
+ * Liga a limpeza da janela **uma vez**, não a cada pasta vigiada.
+ *
+ * Antes era um `once('destroyed')` por chamada de `vigiar`: dez cartões de código na mesma janela
+ * empilhavam dez ouvintes, todos chamando a mesma limpeza.
+ */
+function atarJanela(janela: number): void {
+  if (janelasAtadas.has(janela)) return
+  const conteudo = webContents.fromId(janela)
+  if (!conteudo) return
+  janelasAtadas.add(janela)
+  conteudo.once('destroyed', () => {
+    janelasAtadas.delete(janela)
+    soltarJanela(janela)
+  })
 }
 
 function pararDeVigiar(janela: number, pasta: string): void {
@@ -253,6 +272,11 @@ async function diff(caminho: string): Promise<DiffArquivo> {
 }
 
 export function registrarCodigo(): void {
+  // Página recarregada: o `webContents` sobrevive com o mesmo id, e as assinaturas da página velha
+  // continuam no mapa — página trocada não roda limpeza nenhuma. O preload avisa no primeiro instante de
+  // cada carga, antes de qualquer cartão pedir vigia, e aqui a gente solta o que era da página anterior.
+  ipcMain.on(CANAIS_CODIGO.paginaNova, (evento) => soltarJanela(evento.sender.id))
+
   ipcMain.on(CANAIS_CODIGO.vigiar, (evento, pasta: string) => vigiar(evento.sender.id, pasta))
   ipcMain.on(CANAIS_CODIGO.pararDeVigiar, (evento, pasta: string) => pararDeVigiar(evento.sender.id, pasta))
   ipcMain.handle(CANAIS_CODIGO.vigiavel, (_e, pasta: string): boolean =>

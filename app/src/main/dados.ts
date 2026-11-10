@@ -27,6 +27,7 @@ import {
   type ResumoEspaco
 } from '../shared/modelo'
 import { CANAIS_DADOS } from '../shared/api'
+import { juntarPreferencias, type PreferenciasParciais } from '../shared/preferencias'
 import { SESSAO_VAZIA, sessaoValida, type Sessao } from '../shared/janelas'
 import { MAX_NOME_DA_PARTITURA, MAX_PARTITURAS, MAX_PECAS, MAX_TEXTO_DA_PECA } from '../shared/quadro/partituras'
 import { MAX_ROTINAS, rotinaValida } from '../shared/rotinas'
@@ -391,6 +392,14 @@ function partiturasValidas(partituras: unknown): boolean {
 }
 
 /** Presets: o comando é digitado no PowerShell quando o terminal abre, então é uma linha só e curta. */
+/** As preferências de fábrica: valem na primeira vez e quando o arquivo não dá para ler. */
+const PREFERENCIAS_PADRAO: Preferencias = { versao: 1, tema: 'escuro', presets: PRESETS_PADRAO, corPostItPadrao: 'amarelo' }
+
+/** O que está gravado agora — a base com que a gravação de cada janela é juntada. */
+function lerPreferencias(): Preferencias {
+  return lerJson<Preferencias>(join(RAIZ, 'preferencias.json'), PREFERENCIAS_PADRAO)
+}
+
 function preferenciasValidas(p: Preferencias): boolean {
   return (
     p?.versao === 1 &&
@@ -510,18 +519,14 @@ export function registrarDados(): void {
     return novo
   })
 
-  ipcMain.handle(CANAIS_DADOS.carregarPreferencias, (): Preferencias =>
-    lerJson<Preferencias>(join(RAIZ, 'preferencias.json'), {
-      versao: 1,
-      tema: 'escuro',
-      presets: PRESETS_PADRAO,
-      corPostItPadrao: 'amarelo'
-    })
-  )
+  ipcMain.handle(CANAIS_DADOS.carregarPreferencias, (): Preferencias => lerPreferencias())
 
-  ipcMain.handle(CANAIS_DADOS.salvarPreferencias, (evento, preferencias: Preferencias) => {
-    if (!preferenciasValidas(preferencias)) throw new Error('preferências inválidas: nada foi gravado')
-    gravarJson(join(RAIZ, 'preferencias.json'), preferencias)
+  // A janela manda só o que mexeu, e a junção é aqui, com o disco na mão: duas janelas abertas não
+  // se apagam mais uma à outra (ver shared/preferencias.ts).
+  ipcMain.handle(CANAIS_DADOS.salvarPreferencias, (evento, parcial: PreferenciasParciais) => {
+    const juntas = juntarPreferencias(lerPreferencias(), parcial ?? {})
+    if (!preferenciasValidas(juntas)) throw new Error('preferências inválidas: nada foi gravado')
+    gravarJson(join(RAIZ, 'preferencias.json'), juntas)
     avisarTodas({ tipo: 'preferencias' }, evento.sender)
   })
 

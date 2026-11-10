@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 // Node executa provas TypeScript diretamente e precisa da extensão; o bundler resolve a fonte normalmente.
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
-import { caminhoRelativo, pastaVigiavel, temCaraDeSegredo, textoDoAnexo, textoDosAnexos, valeSeguir } from './arquivos.ts'
+import { caminhoRelativo, destinosDoAviso, pastaVigiavel, temCaraDeSegredo, textoDoAnexo, textoDosAnexos, valeSeguir } from './arquivos.ts'
 
 // Caminhos crus (String.raw) porque é assim que o Windows entrega, com barra invertida e espaço no meio.
 const PASTA = String.raw`C:\Users\ana\Meus Projetos\orkester\app`
@@ -70,4 +70,29 @@ test('pastaVigiavel recusa casa, raiz e pastas de sistema, e aceita projeto', ()
   // uma pasta dentro de uma recusada continua valendo: o projeto é que manda
   assert.equal(pastaVigiavel(casa + '\u005CDownloads\u005Cprojeto', casa), true)
   assert.equal(pastaVigiavel(casa + '\u005CAppData\u005CLocal\u005CTemp\u005Cteste-123', casa), true)
+})
+
+test('destino do aviso: uma vez por janela e rótulo, mesmo com assinatura repetida', () => {
+  // recarregar a página deixa as assinaturas da página velha com o mesmo id de janela; a nova se soma
+  const assinaturas = [
+    { rotulo: 'C:/projeto', janela: 1 },
+    { rotulo: 'C:/projeto', janela: 1 },
+    { rotulo: 'C:/projeto', janela: 2 },
+    { rotulo: 'C:/outro', janela: 1 }
+  ]
+  assert.deepEqual(destinosDoAviso(assinaturas), [
+    { rotulo: 'C:/projeto', janela: 1 },
+    { rotulo: 'C:/projeto', janela: 2 },
+    { rotulo: 'C:/outro', janela: 1 }
+  ])
+})
+
+test('destino do aviso: rótulos diferentes da mesma pasta são destinos diferentes', () => {
+  // a janela pode ter escrito o caminho de dois jeitos; o rótulo é a chave com que o preload entrega
+  const assinaturas = [
+    { rotulo: 'C:/projeto', janela: 1 },
+    { rotulo: 'C:\u005Cprojeto', janela: 1 }
+  ]
+  assert.equal(destinosDoAviso(assinaturas).length, 2)
+  assert.deepEqual(destinosDoAviso([]), [])
 })

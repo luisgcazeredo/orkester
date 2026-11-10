@@ -13,6 +13,7 @@ import type {
   SituacaoAndar
 } from './modelo'
 import type { PedidoNoQuadro } from './quadro/agente'
+import type { PreferenciasParciais } from './preferencias'
 
 /** O que o processo principal precisa para manter o processo de um cartão de terminal. */
 export interface EspecTerminal {
@@ -162,7 +163,11 @@ export interface ApiDados {
   salvarEspaco(carregado: EspacoCarregado): Promise<ResumoEspaco>
   criarEspaco(nome: string, pasta: string): Promise<ResumoEspaco>
   carregarPreferencias(): Promise<Preferencias>
-  salvarPreferencias(preferencias: Preferencias): Promise<void>
+  /**
+   * Grava **só os campos mexidos**. O principal junta com o disco (ver shared/preferencias.ts): mandar o
+   * objeto inteiro fazia uma janela com cópia velha apagar o que a outra acabou de pôr.
+   */
+  salvarPreferencias(parcial: PreferenciasParciais): Promise<void>
   carregarEstado(): Promise<EstadoJanela>
   salvarEstado(estado: EstadoJanela): Promise<void>
   escolherPasta(): Promise<string | null>
@@ -433,6 +438,8 @@ export const CANAIS_PORTAL = {
 } as const
 
 export const CANAIS_CODIGO = {
+  /** Primeiro aviso de cada carga de página: solta as vigias que eram da página anterior. */
+  paginaNova: 'codigo:pagina-nova',
   vigiar: 'codigo:vigiar',
   vigiavel: 'codigo:vigiavel',
   pararDeVigiar: 'codigo:parar-de-vigiar',

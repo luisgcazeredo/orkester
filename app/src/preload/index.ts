@@ -87,6 +87,12 @@ const portal: ApiPortal = {
 // Avisos de gravação chegam pela pasta vigiada, com a mesma distribuição dos terminais: cada cartão de
 // código só é acordado pela pasta dele.
 const avisosDeCodigo = distribuidor<MudancaArquivo>(CANAIS_CODIGO.aviso)
+
+// Página nova (primeira carga ou recarga): o preload roda de novo, mas o `webContents` é o mesmo lá no
+// principal, com as vigias da página anterior ainda presas a ele. Este aviso sai **antes** de qualquer
+// cartão pedir vigia, e é o que faz o principal soltar o que era da página velha. Sem isto, cada recarga
+// somava uma assinatura por pasta e o aviso de gravação chegava repetido.
+ipcRenderer.send(CANAIS_CODIGO.paginaNova)
 const codigo: ApiCodigo = {
   vigiar: (pasta, ouvinte) => {
     const sair = avisosDeCodigo(pasta, ouvinte)

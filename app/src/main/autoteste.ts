@@ -1347,28 +1347,58 @@ export async function rodarAutoteste(
     const devolta = await renomear('Maestro', 'PowerShell')
     conferir('ork nome renomeia o cartão de agente nos dois sentidos', batizado === 'Maestro' && devolta === 'PowerShell', `${batizado} → ${devolta}`)
 
-    const cordasDe = (): Promise<number> => js(`window.__teste.loja.planoAtual().cordas.filter((c) => c.de === '${chefe}' || c.para === '${chefe}').length`)
-    // não dá para supor que estes dois estão soltos (outros cenários já desenharam cordas): o teste parte de
-    // um estado conhecido e devolve no fim o que achou
-    const cordaJaExistia = await js<boolean>(`window.__teste.loja.planoAtual().cordas
-      .some((c) => [c.de, c.para].includes('${chefe}') && [c.de, c.para].includes('${solto}'))`)
-    if (cordaJaExistia) await comandoAte(chefe, 'ork desligar "PowerShell" "Solto"', /Desliguei/, 15_000)
-    // a tela é limpa entre as duas: "Desliguei" do passo acima ficaria no histórico, e a espera do desligar
-    // de verdade terminaria antes de o comando rodar (o `comandoAte` volta assim que vê o texto)
+    // A corda **é** a permissão, então ela não se dá a si mesma: o agente só liga ou desliga quem ele abriu
+    // ou quem já está ligado a ele (ver shared/quadro/agente.ts). Até a 1.0.10 este cenário ligava o chefe a
+    // um cartão do usuário e passava; a regra mudou na 1.0.10 e o cenário não — e ninguém o rodou depois,
+    // então a checagem vinha falhando calada desde então (visto em 10/11/2026). Agora cobre os dois lados.
+    const cordasEntre = (a: string, b: string): Promise<number> =>
+      js(`window.__teste.loja.planoAtual().cordas
+        .filter((c) => [c.de, c.para].includes('${a}') && [c.de, c.para].includes('${b}')).length`)
+
+    // o lado que pode: quem o chefe abriu fica ao alcance dele pela criação, não pela corda — então,
+    // depois de desligar, ele consegue religar
+    await comando(chefe, 'ork abrir shell --nome Vizinho')
+    // sem `comandoAte` aqui de propósito: ele repete o comando até casar, e repetir um `ork abrir` abriria
+    // mais de um cartão
+    await aguardar(() => telaNoApp(chefe), /Abri .Vizinho./, 40_000)
+    const vizinho = await js<string>(`(() => { const n = window.__teste.loja.planoAtual().nos
+      .find((x) => x.tipo === 'terminal' && x.nome === 'Vizinho'); return n ? n.id : '' })()`)
+    const nasceLigado = await cordasEntre(chefe, vizinho)
+    // a tela é limpa entre as medições: o "Desliguei" de um passo ficaria no histórico e a espera do passo
+    // seguinte terminaria antes de o comando rodar (o `comandoAte` volta assim que vê o texto)
     await comando(chefe, 'Clear-Host')
     await esperar(600)
-    const antesDaCorda = await cordasDe()
-    await comandoAte(chefe, 'ork ligar "PowerShell" "Solto"', /Liguei/, 15_000)
-    const comCorda = await cordasDe()
+    await comandoAte(chefe, 'ork desligar "PowerShell" "Vizinho"', /Desliguei/, 15_000)
+    const semVizinho = await cordasEntre(chefe, vizinho)
     await comando(chefe, 'Clear-Host')
     await esperar(600)
-    await comandoAte(chefe, 'ork desligar "PowerShell" "Solto"', /Desliguei/, 15_000)
-    const semCorda = await cordasDe()
-    if (cordaJaExistia) await js(`window.__teste.loja.ligar('${chefe}', '${solto}')`)
+    await comandoAte(chefe, 'ork ligar "PowerShell" "Vizinho"', /Liguei/, 15_000)
+    const religado = await cordasEntre(chefe, vizinho)
     conferir(
-      'ork ligar desenha a corda entre dois agentes e ork desligar a tira',
-      comCorda === antesDaCorda + 1 && semCorda === antesDaCorda,
-      `${antesDaCorda} → ${comCorda} → ${semCorda} cordas`
+      'ork desliga e religa quem ele mesmo abriu',
+      !!vizinho && nasceLigado === 1 && semVizinho === 0 && religado === 1,
+      `nasce:${nasceLigado} → desligado:${semVizinho} → religado:${religado}`
+    )
+    await comandoAte(chefe, 'ork fechar "Vizinho"', /Fechei/, 20_000)
+
+    // o lado recusado: o cartão que o usuário abriu não se alcança por conta própria. O "Solto" pode estar
+    // ligado ao chefe por causa de um cenário anterior; desliga (isso é permitido, a corda existe), tenta
+    // ligar de novo — e tem de ser recusado. No fim devolve o quadro como estava.
+    const cordaComOSolto = await cordasEntre(chefe, solto)
+    if (cordaComOSolto) {
+      await comando(chefe, 'Clear-Host')
+      await esperar(600)
+      await comandoAte(chefe, 'ork desligar "PowerShell" "Solto"', /Desliguei/, 15_000)
+    }
+    await comando(chefe, 'Clear-Host')
+    await esperar(600)
+    const tentou = await comandoAte(chefe, 'ork ligar "PowerShell" "Solto"', /alcance|Liguei/, 15_000)
+    const cordaDepois = await cordasEntre(chefe, solto)
+    if (cordaComOSolto) await js(`window.__teste.loja.ligar('${chefe}', '${solto}')`)
+    conferir(
+      'a corda não se dá a si mesma: ork ligar num cartão do usuário é recusado',
+      /não está ao seu alcance/.test(tentou) && cordaDepois === 0,
+      `${ultimas(tentou, 3)} · cordas com o Solto depois: ${cordaDepois}`
     )
 
     await comando(chefe, 'ork anotar "Falta o teste do empurrao"')

@@ -501,31 +501,30 @@ export function alternarLateral(): void {
   salvarJanela()
 }
 
+// Cada uma destas manda **só o campo que mexeu**: o principal junta com o disco. Mandar o objeto
+// inteiro fazia a janela com a cópia velha apagar o que a outra tinha acabado de gravar.
 export function definirTema(tema: Tema): void {
-  const preferencias = { ...estado.preferencias, tema }
-  definir({ preferencias })
-  void window.ork.dados.salvarPreferencias(preferencias)
+  definir({ preferencias: { ...estado.preferencias, tema } })
+  void window.ork.dados.salvarPreferencias({ tema })
 }
 
 /** Presets de agente (o botão de terminal): ficam nas preferências, valem para todas as janelas. */
 export function alternarLinhasDoCodigo(): void {
-  const atual = estado.preferencias.linhasDoCodigo !== false
-  definir({ preferencias: { ...estado.preferencias, linhasDoCodigo: !atual } })
-  void window.ork.dados.salvarPreferencias(estado.preferencias)
+  const linhasDoCodigo = estado.preferencias.linhasDoCodigo === false
+  definir({ preferencias: { ...estado.preferencias, linhasDoCodigo } })
+  void window.ork.dados.salvarPreferencias({ linhasDoCodigo })
 }
 
 /** As funções (papéis) ficam nas preferências, como os presets: valem em todos os espaços. */
 export function definirFuncoes(funcoes: Funcao[]): void {
-  const preferencias = { ...estado.preferencias, funcoes }
-  definir({ preferencias })
-  void window.ork.dados.salvarPreferencias(preferencias)
+  definir({ preferencias: { ...estado.preferencias, funcoes } })
+  void window.ork.dados.salvarPreferencias({ funcoes })
 }
 
 /** As partituras (times salvos) moram nas preferências, como as funções: valem em todos os espaços. */
 export function definirPartituras(partituras: Partitura[]): void {
-  const preferencias = { ...estado.preferencias, partituras }
-  definir({ preferencias })
-  void window.ork.dados.salvarPreferencias(preferencias)
+  definir({ preferencias: { ...estado.preferencias, partituras } })
+  void window.ork.dados.salvarPreferencias({ partituras })
 }
 
 /** Guarda como partitura os cartões escolhidos (ou todos os do andar, com `ids` nulo). */
@@ -699,9 +698,8 @@ export function trocarAgenteDoCartao(id: string, preset: PresetAgente, porAgente
 }
 
 export function definirPresets(presets: PresetAgente[]): void {
-  const preferencias = { ...estado.preferencias, presets }
-  definir({ preferencias })
-  void window.ork.dados.salvarPreferencias(preferencias)
+  definir({ preferencias: { ...estado.preferencias, presets } })
+  void window.ork.dados.salvarPreferencias({ presets })
 }
 
 // ---------- andares ----------
