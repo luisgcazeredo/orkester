@@ -13,6 +13,7 @@ import type {
   SituacaoAndar
 } from './modelo'
 import type { PedidoNoQuadro } from './quadro/agente'
+import type { FichaDeCatalogo } from './catalogo'
 import type { PreferenciasParciais } from './preferencias'
 
 /** O que o processo principal precisa para manter o processo de um cartão de terminal. */
@@ -88,9 +89,19 @@ export interface ResumoContextoTerminal {
 
 /** Pedidos que um agente faz pelo `ork` e que mexem no quadro (só a janela dona do espaço pode). */
 export type PedidoDoAgente =
-  | { tipo: 'abrir'; espacoId: string; criador: string; agente: Agente; nome?: string; pasta?: string; funcao?: string }
+  /**
+   * Abre uma sessão nova. `agente` é opcional desde a 1.2.5: sem ele, quem decide o motor é o preset da
+   * função pedida — é o que deixa `ork abrir --funcao "Revisor"` nascer em Codex forte sem o agente
+   * precisar saber que preset existe.
+   */
+  | { tipo: 'abrir'; espacoId: string; criador: string; agente?: Agente; preset?: string; nome?: string; pasta?: string; funcao?: string }
   /** As funções (papéis) guardadas nas preferências desta janela. */
   | { tipo: 'funcoes'; espacoId: string }
+  /**
+   * Fichas de time lidas de uma pasta, para virarem funções. O principal lê os arquivos; a janela é dona
+   * das preferências e faz a junção (ver `shared/catalogo.ts`).
+   */
+  | { tipo: 'catalogo'; espacoId: string; id: string; fichas: FichaDeCatalogo[] }
   | { tipo: 'fechar'; espacoId: string; id: string }
   /** Árvores de código do cartão do próprio agente: listar, criar, usar, mostrar arquivos e desfazer. */
   | {

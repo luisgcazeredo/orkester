@@ -1,7 +1,7 @@
 {
   "name": "orkester",
   "productName": "Orkester",
-  "version": "1.1.0",
+  "version": "1.2.5",
   "private": true,
   "description": "Quadro infinito para orquestrar agentes de código",
   "author": "Luís Azeredo",

@@ -42,12 +42,12 @@ export const VERBOS = [
     ajuda: '  ork janela <nome do espaço>        abre o espaço numa janela (ou traz a que já está aberta)\n  ork janela --novo "Nome" [--pasta P]\n                                       cria um espaço e abre uma janela nele'
   },
   {
-    nome: 'abrir', aliases: [], posicionais: [obrigatorio('claude|codex|shell')],
+    nome: 'abrir', aliases: [], posicionais: [{ nome: 'claude|codex|shell' }],
     // `--sem-esperar` é o normal aqui (o `abrir` só espera com `--esperar`), mas existe porque é assim que
     // se diz no `ork pedir`: o agente que aprendeu lá escreve igual aqui, e recusar por isso é pedantismo
-    opcoes: [texto('espaco'), texto('nome'), texto('pasta'), texto('funcao'), texto('pedido'), texto('arquivo'), bandeira('esperar'), bandeira('sem-esperar'), numero('tempo', 1, 3600)],
+    opcoes: [texto('espaco'), texto('nome'), texto('pasta'), texto('funcao'), texto('preset'), texto('pedido'), texto('arquivo'), bandeira('esperar'), bandeira('sem-esperar'), numero('tempo', 1, 3600)],
     descricao: 'abre uma sessão nova; em outro espaço, você continua sendo o dono',
-    ajuda: '  ork abrir <claude|codex|shell> [--espaco "Nome"] [--nome N] [--pasta P] [--funcao "Papel"] [--pedido "texto" | --arquivo pedido.md] [--esperar] [--tempo S]\n                                       abre uma sessão nova; em outro espaço, você continua sendo o dono'
+    ajuda: '  ork abrir [claude|codex|shell] [--espaco "Nome"] [--nome N] [--pasta P] [--funcao "Papel"] [--preset "Claude forte"] [--pedido "texto" | --arquivo pedido.md] [--esperar] [--tempo S]\n                                       abre uma sessão nova; com --funcao, o motor e o nível saem da função'
   },
   {
     nome: 'pedir', aliases: [], posicionais: [obrigatorio('nome'), { nome: 'texto', resto: true }],
@@ -112,6 +112,11 @@ export const VERBOS = [
     ajuda: '  ork partitura                      lista os times salvos (agentes, funções, cordas e recados)\n  ork partitura usar "Nome"          sobe esse time ao seu lado, ligado a você\n  ork partitura salvar "Nome" [cartão]...\n                                      guarda como partitura os cartões (ou o andar à mostra todo)'
   },
   { nome: 'funcoes', aliases: ['funcao'], posicionais: [], opcoes: [], descricao: 'lista as funções (papéis) que o usuário guardou', ajuda: '  ork funcoes                        lista as funções (papéis) guardadas, para usar em `ork abrir --funcao`' },
+  {
+    nome: 'catalogo', aliases: ['catálogo'], posicionais: [obrigatorio('importar'), { nome: 'pasta' }], opcoes: [],
+    descricao: 'transforma as fichas de um time (.md) em funções',
+    ajuda: '  ork catalogo importar <pasta>      lê as fichas .md da pasta (nome, motor, nível, pasta no cabeçalho)\n                                       e as transforma em funções, criando as novas e atualizando as que já existem'
+  },
   { nome: 'limpar', aliases: [], posicionais: [obrigatorio('nome')], opcoes: [], descricao: 'zera o contexto da sessão', ajuda: '  ork limpar <nome>                  zera o contexto da sessão (/clear no Claude, /new no Codex)' },
   { nome: 'fechar', aliases: [], posicionais: [obrigatorio('nome')], opcoes: [], descricao: 'fecha uma sessão que você abriu', ajuda: '  ork fechar <nome>                  fecha uma sessão que você abriu; o que ela abriu passa para você' },
   { nome: 'passar', aliases: [], posicionais: [obrigatorio('nome')], opcoes: [], descricao: 'passa ao sucessor vivo as sessões que você abriu', ajuda: '  ork passar <nome>                  passa ao sucessor vivo (aberto por você ou ligado) as outras sessões que abriu' },

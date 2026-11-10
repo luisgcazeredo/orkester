@@ -183,11 +183,41 @@ ork partitura salvar "Dupla" "Main" "Revisor"   # ou só esses cartões
   Ctrl+Z não mata agente no meio do trabalho. Quem fecha é você, com \`ork fechar\`. (Mover, arrumar, renomear
   e anotar continuam entrando no desfazer: aquilo é arrumação, isto é gente trabalhando.)
 
+## Instalar um time escrito em arquivos: catálogo
+
+Um time costuma ser escrito **fora do app** — à mão, por outra sessão de agente, ou copiado de outro projeto.
+Cada papel é um \`.md\` com cabeçalho e corpo; o corpo vira o prompt da função.
+
+\`\`\`
+---
+nome: Revisor
+motor: Codex
+nivel: forte
+---
+Você é o Revisor. Revisa o que os construtores escreveram...
+\`\`\`
+
+\`\`\`bash
+ork catalogo importar time     # lê as fichas .md da pasta e as transforma em funções
+ork funcoes                    # confere o que entrou
+ork abrir --funcao "Revisor"   # e o cartão nasce no motor e no nível da ficha
+\`\`\`
+
+- \`nome\` é obrigatório; \`motor\` (claude, codex ou shell), \`nivel\` (forte, médio, rápido) e \`pasta\` são opcionais.
+- **Motor e nível viram preset.** O casamento é pelo nome do preset ("Claude forte"), e o relatório avisa quando
+  não achou o nível pedido e caiu no primeiro daquele motor.
+- **"Codex e Claude" faz dois assentos** — duas funções, uma por motor, com o motor no nome. É assim que se
+  escreve um papel que existe duas vezes. Já "Shell com Claude" é descrição de um cartão só.
+- **Importar de novo atualiza**, achando a função pelo nome; nada é apagado, porque a pasta pode ser um pedaço do
+  time e não o time inteiro. Arquivo sem cabeçalho é pulado e aparece no relatório.
+- Ficha de \`shell\` não leva prompt: shell não é agente, e o que fosse digitado viraria comando.
+
 ## Regras de convívio
 
 - Só fala com quem está ligado a você por uma corda (o usuário desenha as cordas no quadro), ou com quem você mesmo
   abriu. Quem você abre no mesmo espaço já nasce ligado; em outro espaço não há corda, mas você continua falando com ele
-  por ser o dono. Você só fecha as sessões que você mesmo abriu, e abre no máximo 8 contando todos os espaços.
+  por ser o dono. Você só fecha as sessões que você mesmo abriu. Não há teto de quantas você abre: o freio é o do
+  quadro (400 cartões no andar), então abra o que a tarefa pede e feche o que não serve mais.
 - A corda é regra de convívio, não fronteira de segurança: todos os agentes rodam como o mesmo usuário do Windows.
 - Não reenvie um pedido que ainda não respondeu e não interrompa quem está trabalhando (\`ctrl-c\`, \`esc\`) sem motivo.
 - Dois agentes não editam o mesmo arquivo ao mesmo tempo: divida o trabalho por arquivo ou por pasta.

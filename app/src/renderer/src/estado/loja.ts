@@ -27,6 +27,7 @@ import {
   type Tema
 } from '../../../shared/modelo'
 import { type AvisoJanelas, type AvisoRotina, type EspecTerminal, type PedidoDoAgente, type RespostaAoAgente } from '../../../shared/api'
+import { juntarCatalogo, textoDoRelatorio } from '../../../shared/catalogo'
 import { proximoZ } from '../../../shared/quadro/geometria'
 import { empurrarParaBaixo } from '../../../shared/quadro/empurrar'
 import { abrir, fechar, passar } from '../../../shared/quadro/transformacoes'
@@ -2472,6 +2473,11 @@ function atenderAgente(pedido: PedidoDoAgente): RespostaAoAgente {
   if (pedido.tipo === 'partitura') return atenderPartitura(pedido)
   if (pedido.tipo === 'trocar') return atenderTroca(pedido)
   if (pedido.tipo === 'banda') return atenderBanda(pedido)
+  if (pedido.tipo === 'catalogo') {
+    const { funcoes, relatorio } = juntarCatalogo(estado.preferencias.funcoes ?? [], pedido.fichas, estado.preferencias.presets, novoId)
+    definirFuncoes(funcoes)
+    return { ok: true, texto: textoDoRelatorio(relatorio) }
+  }
   if (pedido.tipo === 'funcoes') {
     const lista = estado.preferencias.funcoes ?? []
     const linhas = lista.map((f) => `  "${f.nome}"${f.pasta ? ` · pasta ${f.pasta}` : ''} — ${primeiraLinha(f.prompt)}`)

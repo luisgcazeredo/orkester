@@ -8,7 +8,7 @@ test('registro declara os verbos operacionais, a ajuda, aliases e opções', () 
   assert.deepEqual(VERBOS.map((verbo) => verbo.nome), [
     'ajuda', 'quem', 'orcamento', 'espacos', 'janela', 'abrir', 'pedir', 'esperar', 'ver', 'teclas', 'arvore',
     'quadro', 'ler', 'apagar', 'mover', 'arrumar', 'nome', 'ligar', 'desligar', 'anotar', 'juntar',
-    'trocar', 'banda', 'partitura', 'funcoes', 'limpar', 'fechar', 'passar', 'sair'
+    'trocar', 'banda', 'partitura', 'funcoes', 'catalogo', 'limpar', 'fechar', 'passar', 'sair'
   ])
   assert.equal(verboPorNome('help')?.nome, 'ajuda')
   for (const verbo of VERBOS) {
@@ -34,5 +34,7 @@ test('parser preserva alias e opções tipadas', () => {
 test('a tabela de ajuda vem do registro', () => {
   const tabela = tabelaDeComandos()
   for (const verbo of VERBOS.filter((verbo) => verbo.ajuda)) assert.ok(tabela.includes(verbo.ajuda))
-  assert.match(tabela, /ork abrir <claude\|codex\|shell>/)
+  // o agente virou opcional na 1.2.5: com `--funcao`, o motor sai do preset da função
+  assert.match(tabela, /ork abrir \[claude\|codex\|shell\]/)
+  assert.match(tabela, /ork catalogo importar/)
 })

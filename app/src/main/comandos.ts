@@ -1,12 +1,13 @@
 import { ipcMain, webContents } from 'electron'
 import { execFileSync } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
-import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createServer, type Socket } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve, sep } from 'node:path'
 import { CANAIS, CANAIS_AGENTES, type PedidoDoAgente, type RespostaAoAgente, type ResumoContextoTerminal } from '../shared/api'
 import type { Agente, ResultadoDaRotina } from '../shared/modelo'
+import { MAX_FICHAS, lerFicha, type FichaDeCatalogo } from '../shared/catalogo'
 import { nodeServe } from '../shared/node-do-sistema'
 import type { PedidoNoQuadro } from '../shared/quadro/agente'
 import { criarEspacoDoAgente, PASTA_DADOS, resumosDosEspacos } from './dados'
@@ -768,10 +769,17 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
   orcamento: async ({ eu, cancelado }) => ({ saida: textoDoContexto(await contextoRestante(eu, true, cancelado)) }),
 
   abrir: async ({ eu, pos, opcoes, texto, cancelado }) => {
+    // o agente deixou de ser obrigatório na 1.2.5: com `--funcao`, quem diz o motor (e o nível) é o
+    // preset da função. Dito à toa, continua valendo e mandando.
     const agente = agenteDe(pos[0])
-    if (!agente) throw new Error('diga qual agente: ork abrir claude|codex|shell [--espaco "Nome"] [--nome N] [--pedido "texto"]')
+    const funcaoPedida = typeof opcoes.funcao === 'string' ? opcoes.funcao.trim() : ''
+    if (pos[0] && !agente) throw new Error(`não existe o agente "${pos[0]}"; use claude, codex ou shell`)
+    if (!agente && !funcaoPedida && !opcoes.preset) {
+      throw new Error('diga qual agente: ork abrir claude|codex|shell, ou use --funcao "Papel"')
+    }
     const pasta = pastaPedida(eu, opcoes.pasta)
     const nome = typeof opcoes.nome === 'string' ? opcoes.nome.trim().slice(0, 80) || undefined : undefined
+    const preset = typeof opcoes.preset === 'string' ? opcoes.preset.trim() || undefined : undefined
     const funcao = typeof opcoes.funcao === 'string' ? opcoes.funcao.trim() || undefined : undefined
     // o primeiro pedido pode vir do --pedido, da função, ou dos dois
     let pedidoInicial = texto
@@ -779,7 +787,7 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
     let novo: Sessao | undefined
     {
       await abrirJanelaPronta(espaco.id)
-      const r = await pedirAJanela({ tipo: 'abrir', espacoId: espaco.id, criador: eu.id, agente, nome, pasta, funcao })
+      const r = await pedirAJanela({ tipo: 'abrir', espacoId: espaco.id, criador: eu.id, agente: agente ?? undefined, preset, nome, pasta, funcao })
       if (!r.ok) throw new Error(r.erro)
       // o prompt da função é o primeiro pedido; com --pedido junto, a função vem antes e o pedido depois
       if (r.texto) pedidoInicial = [r.texto, pedidoInicial].filter(Boolean).join('\n\n')
@@ -969,6 +977,47 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
   },
 
   /** As funções (papéis) que o usuário guardou. Quem sabe quais existem é a janela, dona das preferências. */
+  /**
+   * Fichas de time (.md) viram funções. O time costuma ser escrito fora do app — à mão, por outra sessão
+   * de agente, ou copiado de outro projeto — e até a 1.2.5 instalar isso só dava mexendo no arquivo de
+   * preferências com o app fechado.
+   *
+   * Aqui só a leitura dos arquivos: a decisão do que cada ficha vira está em `shared/catalogo.ts`, e as
+   * preferências são da janela, que faz a junção.
+   */
+  catalogo: async ({ eu, pos }) => {
+    if (String(pos[0] ?? '').toLowerCase() !== 'importar') throw new Error('diga o que fazer: ork catalogo importar <pasta>')
+    const pasta = pastaPedida(eu, pos[1])
+    if (!pasta) throw new Error('diga a pasta das fichas: ork catalogo importar <pasta>')
+
+    const arquivos = readdirSync(pasta).filter((a) => a.toLowerCase().endsWith('.md')).sort()
+    if (!arquivos.length) throw new Error(`não há nenhum .md em ${pasta}`)
+    if (arquivos.length > MAX_FICHAS) throw new Error(`${arquivos.length} arquivos .md em ${pasta}; o teto é ${MAX_FICHAS}`)
+
+    const fichas: FichaDeCatalogo[] = []
+    const pulados: string[] = []
+    for (const arquivo of arquivos) {
+      let bruto: string
+      try {
+        bruto = readFileSync(join(pasta, arquivo), 'utf8')
+      } catch (erro) {
+        pulados.push(`${arquivo}: não deu para ler (${erro instanceof Error ? erro.message : erro})`)
+        continue
+      }
+      const lida = lerFicha(arquivo, bruto)
+      if ('erro' in lida) pulados.push(lida.erro)
+      else fichas.push(lida.ficha)
+    }
+    if (!fichas.length) {
+      throw new Error([`nenhuma ficha válida em ${pasta}`, ...pulados.map((p) => `  ${p}`)].join(String.fromCharCode(10)))
+    }
+
+    const r = await pedirAJanela({ tipo: 'catalogo', espacoId: eu.espacoId, id: eu.id, fichas })
+    if (!r.ok) throw new Error(r.erro)
+    const sobras = pulados.length ? ['', 'Arquivos pulados (sem cabeçalho de ficha):', ...pulados.map((p) => `  ${p}`)] : []
+    return { saida: [r.texto ?? '', ...sobras].join(String.fromCharCode(10)).trim() }
+  },
+
   funcoes: async ({ eu }) => {
     await abrirJanelaPronta(eu.espacoId)
     const r = await pedirAJanela({ tipo: 'funcoes', espacoId: eu.espacoId })

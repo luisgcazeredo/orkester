@@ -34,6 +34,43 @@ function mudarPlano(espaco: Espaco, alvo: Plano, mudar: (plano: Plano) => Plano)
 }
 
 /** Cria o cartão pedido, sem tocar no estado da janela nem em relógio ou aleatoriedade próprios. */
+/**
+ * Com que preset o cartão abre: o do `--preset`, senão o preferido da função, senão o primeiro do tipo.
+ *
+ * Até a 1.2.5 era sempre o primeiro do tipo. O preset da função — onde moram o motor e o nível — só
+ * valia quando o usuário clicava na função na barra; pelo `ork abrir` ele era ignorado, e o agente
+ * escolhia motor mas nunca nível. Num time em que o Maestro reparte tarefas por nível, isso é metade
+ * do desenho faltando.
+ */
+function escolherPreset(
+  ambiente: AmbienteTransformacoesDoQuadro,
+  pedido: PedidoAbrir,
+  funcao: Funcao | undefined
+): { preset: PresetAgente } | { erro: string } {
+  const todos = ambiente.presets.length ? ambiente.presets : ambiente.presetsPadrao
+  const daFuncao = funcao?.preset ? todos.find((p) => p.id === funcao.preset) : undefined
+
+  if (pedido.preset) {
+    const alvo = pedido.preset.trim().toLowerCase()
+    const achado = todos.find((p) => p.id.toLowerCase() === alvo || p.nome.toLowerCase() === alvo)
+    if (!achado) return { erro: `não existe o preset "${pedido.preset}"; os que existem: ${todos.map((p) => `"${p.nome}"`).join(', ')}` }
+    if (pedido.agente && achado.agente !== pedido.agente) {
+      return { erro: `o preset "${achado.nome}" é de ${achado.agente}, e você pediu ${pedido.agente}` }
+    }
+    return { preset: achado }
+  }
+
+  // sem agente dito: quem manda é a função. É o caso de `ork abrir --funcao "Revisor"`.
+  if (!pedido.agente) {
+    if (daFuncao) return { preset: daFuncao }
+    return { erro: 'diga o agente (claude, codex ou shell) ou use uma função que tenha preset' }
+  }
+
+  if (daFuncao && daFuncao.agente === pedido.agente) return { preset: daFuncao }
+  const doTipo = todos.find((p) => p.agente === pedido.agente) ?? ambiente.presetsPadrao.find((p) => p.agente === pedido.agente)
+  return doTipo ? { preset: doTipo } : { erro: `não há preset de ${pedido.agente}` }
+}
+
 export function abrir(
   espaco: Espaco,
   pedido: PedidoAbrir,
@@ -45,8 +82,7 @@ export function abrir(
   // Um criador de outro espaço não tem cartão aqui: o novo começa no andar ativo, sem corda.
   const plano = planoDoCriador ?? espaco.andares.find((andar) => andar.id === espaco.andarAtivo) ?? espaco
 
-  const preset = ambiente.presets.find((item) => item.agente === pedido.agente) ?? ambiente.presetsPadrao.find((item) => item.agente === pedido.agente)!
-  // função pedida pelo nome: ela dá o nome do cartão, a pasta e o primeiro pedido
+  // função pedida pelo nome: ela dá o nome do cartão, a pasta, o primeiro pedido e o preset preferido
   const funcao = pedido.funcao
     ? ambiente.funcoes.find((f) => f.nome.toLowerCase() === pedido.funcao!.trim().toLowerCase())
     : undefined
@@ -54,6 +90,9 @@ export function abrir(
     const quais = ambiente.funcoes.map((f) => `"${f.nome}"`).join(', ')
     return { espaco, resposta: { ok: false, erro: `não existe a função "${pedido.funcao}"${quais ? `; as que existem: ${quais}` : ' (nenhuma criada ainda)'}` } }
   }
+  const escolhido = escolherPreset(ambiente, pedido, funcao)
+  if ('erro' in escolhido) return { espaco, resposta: { ok: false, erro: escolhido.erro } }
+  const preset = escolhido.preset
   const nomes = new Set(planos.flatMap((atual) => atual.nos.flatMap((no) => (no.tipo === 'terminal' ? [no.nome.toLowerCase()] : []))))
   const base = pedido.nome || funcao?.nome || preset.nome
   let nome = base

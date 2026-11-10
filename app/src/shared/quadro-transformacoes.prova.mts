@@ -7,6 +7,25 @@ import type { Andar, Corda, Espaco, NoTerminal } from './modelo'
 
 const instante = '2026-10-30T12:00:00.000Z'
 
+const PRESETS = [
+  { id: 'claude-medio', nome: 'Claude médio', agente: 'claude' as const, comando: 'claude --model sonnet' },
+  { id: 'claude-forte', nome: 'Claude forte', agente: 'claude' as const, comando: 'claude --model opus' },
+  { id: 'codex-forte', nome: 'Codex forte', agente: 'codex' as const, comando: 'codex' }
+]
+
+/** Ambiente com catálogo: presets por nível e funções que apontam para eles, como o time de verdade. */
+function ambienteComCatalogo(): AmbienteTransformacoesDoQuadro {
+  return {
+    ...ambiente(),
+    presets: PRESETS,
+    funcoes: [
+      { id: 'f-revisor', nome: 'Revisor', prompt: 'Revise.', preset: 'codex-forte' },
+      { id: 'f-arquiteto', nome: 'Arquiteto', prompt: 'Desenhe.', preset: 'claude-forte' },
+      { id: 'f-sem-preset', nome: 'Avulso', prompt: 'Faça.' }
+    ]
+  }
+}
+
 function ambiente(): AmbienteTransformacoesDoQuadro {
   let proximo = 1
   return {
@@ -166,4 +185,86 @@ test('passar distingue donoDoSucessor ausente de presente e nulo', () => {
   )
   assert.equal(comNulo.resposta.ok, true)
   assert.equal((comNulo.espaco.nos.find((no) => no.id === 'sucessor') as NoTerminal).criadoPor, undefined)
+})
+
+test('abrir respeita o preset da função: o motor e o nível saem da ficha', () => {
+  // até a 1.2.5 o preset da função só valia quando o usuário clicava nela na barra; pelo ork, o cartão
+  // nascia sempre no primeiro preset do tipo, e o agente escolhia motor mas nunca nível
+  const r = abrir(
+    espaco([terminal('criador')]),
+    { tipo: 'abrir', espacoId: 'espaco', criador: 'criador', agente: 'codex', funcao: 'Revisor' },
+    ambienteComCatalogo()
+  )
+  const criado = r.espaco.nos.at(-1) as NoTerminal
+  assert.equal(criado.comando, 'codex')
+  assert.equal(criado.nome, 'Revisor')
+  assert.equal(criado.funcao, 'Revisor')
+})
+
+test('abrir sem dizer o agente: quem decide o motor é a função', () => {
+  const r = abrir(
+    espaco([terminal('criador')]),
+    { tipo: 'abrir', espacoId: 'espaco', criador: 'criador', funcao: 'Arquiteto' },
+    ambienteComCatalogo()
+  )
+  const criado = r.espaco.nos.at(-1) as NoTerminal
+  assert.equal(criado.agente, 'claude')
+  assert.equal(criado.comando, 'claude --model opus')
+  assert.ok(criado.sessao, 'cartão de Claude nasce com id de conversa')
+})
+
+test('abrir sem agente e sem função com preset: recusa dizendo o que falta', () => {
+  const r = abrir(
+    espaco([terminal('criador')]),
+    { tipo: 'abrir', espacoId: 'espaco', criador: 'criador', funcao: 'Avulso' },
+    ambienteComCatalogo()
+  )
+  assert.equal(r.resposta.ok, false)
+  assert.match('erro' in r.resposta ? r.resposta.erro : '', /diga o agente/)
+})
+
+test('--preset escolhe pelo nome ou pelo id, e recusa o que não existe', () => {
+  const porNome = abrir(
+    espaco([terminal('criador')]),
+    { tipo: 'abrir', espacoId: 'espaco', criador: 'criador', agente: 'claude', preset: 'Claude forte' },
+    ambienteComCatalogo()
+  )
+  assert.equal((porNome.espaco.nos.at(-1) as NoTerminal).comando, 'claude --model opus')
+
+  const porId = abrir(
+    espaco([terminal('criador')]),
+    { tipo: 'abrir', espacoId: 'espaco', criador: 'criador', agente: 'claude', preset: 'claude-medio' },
+    ambienteComCatalogo()
+  )
+  assert.equal((porId.espaco.nos.at(-1) as NoTerminal).comando, 'claude --model sonnet')
+
+  const inventado = abrir(
+    espaco([terminal('criador')]),
+    { tipo: 'abrir', espacoId: 'espaco', criador: 'criador', agente: 'claude', preset: 'Claude turbinado' },
+    ambienteComCatalogo()
+  )
+  assert.equal(inventado.resposta.ok, false)
+  assert.match('erro' in inventado.resposta ? inventado.resposta.erro : '', /não existe o preset/)
+})
+
+test('--preset de outro motor com o agente dito: recusa em vez de escolher sozinho', () => {
+  const r = abrir(
+    espaco([terminal('criador')]),
+    { tipo: 'abrir', espacoId: 'espaco', criador: 'criador', agente: 'claude', preset: 'Codex forte' },
+    ambienteComCatalogo()
+  )
+  assert.equal(r.resposta.ok, false)
+  assert.match('erro' in r.resposta ? r.resposta.erro : '', /é de codex, e você pediu claude/)
+})
+
+test('a função de outro motor não sequestra o agente que foi dito', () => {
+  // o Maestro disse claude e pediu o papel do Revisor, que é de Codex: manda o que ele disse
+  const r = abrir(
+    espaco([terminal('criador')]),
+    { tipo: 'abrir', espacoId: 'espaco', criador: 'criador', agente: 'claude', funcao: 'Revisor' },
+    ambienteComCatalogo()
+  )
+  const criado = r.espaco.nos.at(-1) as NoTerminal
+  assert.equal(criado.agente, 'claude')
+  assert.equal(criado.comando, 'claude --model sonnet')
 })
