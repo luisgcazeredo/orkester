@@ -5,7 +5,7 @@ import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, st
 import { createServer, type Socket } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve, sep } from 'node:path'
-import { CANAIS, CANAIS_AGENTES, MAX_SESSOES_POR_AGENTE, type PedidoDoAgente, type RespostaAoAgente, type ResumoContextoTerminal } from '../shared/api'
+import { CANAIS, CANAIS_AGENTES, type PedidoDoAgente, type RespostaAoAgente, type ResumoContextoTerminal } from '../shared/api'
 import type { Agente, ResultadoDaRotina } from '../shared/modelo'
 import { nodeServe } from '../shared/node-do-sistema'
 import type { PedidoNoQuadro } from '../shared/quadro/agente'
@@ -225,8 +225,6 @@ function liberarOrkNoCodex(): void {
 // ---------- pedidos que mexem no quadro: vão para a janela dona do espaço ----------
 
 const respostas = new Map<string, { janela: number; resolver: (r: RespostaAoAgente) => void }>()
-/** Aberturas em andamento por agente (contam no limite enquanto a janela cria o cartão). */
-const abrindo = new Map<string, number>()
 /** Janelas que já instalaram o atendente do renderer. */
 const janelasProntas = new Set<number>()
 
@@ -762,7 +760,7 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
         `Você é "${eu.espec.nome}" (${eu.espec.agente})${eu.espec.funcao ? ` · função ${eu.espec.funcao}` : ''} · pasta ${eu.espec.pasta} · ${textoDoContexto(await contextoRestante(eu))}`,
         'Ligados a você:',
         ...(linhas.length ? linhas : ['  ninguém (o usuário liga cartões com uma corda; quem você abre continua acessível mesmo em outro espaço)']),
-        `Você abriu ${filhos} de ${MAX_SESSOES_POR_AGENTE} sessões possíveis.`
+        `Você abriu ${contaSessoes(filhos)}.`
       ].join('\n')
     }
   },
@@ -772,28 +770,20 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
   abrir: async ({ eu, pos, opcoes, texto, cancelado }) => {
     const agente = agenteDe(pos[0])
     if (!agente) throw new Error('diga qual agente: ork abrir claude|codex|shell [--espaco "Nome"] [--nome N] [--pedido "texto"]')
-    // as aberturas ainda em andamento contam: vários `abrir` ao mesmo tempo não passam do limite
-    const filhos = sessoesCriadasPor(eu.id, { comFolga: true }).length + (abrindo.get(eu.id) ?? 0)
-    if (filhos >= MAX_SESSOES_POR_AGENTE) {
-      throw new Error(`você já abriu ${contaSessoes(filhos)} (o limite é ${MAX_SESSOES_POR_AGENTE}); feche uma com \`ork fechar\``)
-    }
     const pasta = pastaPedida(eu, opcoes.pasta)
     const nome = typeof opcoes.nome === 'string' ? opcoes.nome.trim().slice(0, 80) || undefined : undefined
     const funcao = typeof opcoes.funcao === 'string' ? opcoes.funcao.trim() || undefined : undefined
     // o primeiro pedido pode vir do --pedido, da função, ou dos dois
     let pedidoInicial = texto
     const espaco = typeof opcoes.espaco === 'string' ? espacoPorNome(opcoes.espaco) : { id: eu.espacoId, nome: '' }
-    abrindo.set(eu.id, (abrindo.get(eu.id) ?? 0) + 1)
     let novo: Sessao | undefined
-    try {
+    {
       await abrirJanelaPronta(espaco.id)
       const r = await pedirAJanela({ tipo: 'abrir', espacoId: espaco.id, criador: eu.id, agente, nome, pasta, funcao })
       if (!r.ok) throw new Error(r.erro)
       // o prompt da função é o primeiro pedido; com --pedido junto, a função vem antes e o pedido depois
       if (r.texto) pedidoInicial = [r.texto, pedidoInicial].filter(Boolean).join('\n\n')
       novo = r.id ? await esperarSessao(r.id, 5000) : undefined
-    } finally {
-      abrindo.set(eu.id, (abrindo.get(eu.id) ?? 1) - 1)
     }
     if (!novo) throw new Error('o cartão foi criado, mas o processo não abriu')
     registrar(eu, novo, 'abrir', pedidoInicial)
@@ -1056,10 +1046,6 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
     if (sucessor.id === eu.id) throw new Error('você não pode passar sessões para si mesmo')
     if (!sucessor.processo) throw new Error(`"${sucessor.espec.nome}" está encerrado; escolha uma sessão viva`)
     const transferidas = sessoesCriadasPor(eu.id).filter((s) => s.id !== sucessor.id)
-    const totalDoSucessor = sessoesCriadasPor(sucessor.id, { comFolga: true }).length + transferidas.length
-    if (totalDoSucessor > MAX_SESSOES_POR_AGENTE) {
-      throw new Error(`"${sucessor.espec.nome}" ficaria com ${contaSessoes(totalDoSucessor)} (o limite é ${MAX_SESSOES_POR_AGENTE}); nada foi passado`)
-    }
     if (!transferidas.length) return { saida: `Não havia outras sessões para passar a "${sucessor.espec.nome}".` }
     await transferirSessoes(eu, sucessor, transferidas)
     registrar(eu, sucessor, 'passar', contaSessoes(transferidas.length))

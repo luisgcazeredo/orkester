@@ -2221,23 +2221,37 @@ export async function rodarAutoteste(
       `raiz: ${!!sessaoPorId(sairComAsMinhas)} · filho: ${!!sessaoPorId(junto)} · neto: ${!!sessaoPorId(netoJunto)}`
     )
 
+    // Não há limite de sessões por agente (o de 8 saiu na 1.2, porque um time grande esbarrava nele). O que
+    // este trecho mede é justamente que **nada recusa por quantidade**: nove aberturas seguidas, uma delas em
+    // outro espaço, e o `ork quem` somando as duas pontas. O freio que resta é o do quadro, não um por dono.
+    const quantasSessoes = async (): Promise<number> => {
+      await comando(chefe, 'Clear-Host')
+      await esperar(600)
+      const tela = await comandoAte(chefe, 'ork quem', /Você abriu \d+ sess/, 15_000)
+      return Number(/Você abriu (\d+) sess/.exec(tela)?.[1] ?? -1)
+    }
+    const antesDasMuitas = await quantasSessoes()
+    const aberturas: string[] = []
     for (let i = 1; i <= 7; i++) {
       const nome = `Limite ${i}`
       await comando(chefe, `ork abrir shell --nome "${nome}"`)
-      await aguardar(() => telaNoApp(chefe), `Abri "${nome}"`, 20_000)
+      aberturas.push(await aguardar(() => telaNoApp(chefe), `Abri "${nome}"`, 20_000))
     }
     await comando(chefe, 'ork abrir --espaco "Frente 2" shell --nome "Nono"')
-    const nono = await aguardar(() => telaNoApp(chefe), 'o limite é 8', 20_000)
-    conferir('ork mantém o limite de 8 somando os dois espaços', nono.includes('o limite é 8'), ultimas(nono, 3))
-
-    const limiteEmFolga = await js<string>(`(() => { const L = window.__teste.loja
+    aberturas.push(await aguardar(() => telaNoApp(chefe), /Abri .Nono./, 20_000))
+    // e uma abertura com um cartão recém-apagado ainda na folga do Ctrl+Z: antes, o apagado contava contra
+    // o limite e esta era recusada
+    const apagadoNaFolga = await js<string>(`(() => { const L = window.__teste.loja
       const n = L.planoAtual().nos.find((n) => n.tipo === 'terminal' && n.nome === 'Limite 1'); if (!n) return ''
       L.apagar({ tipo: 'no', id: n.id }); return n.id })()`)
-    const recusouNaFolga = await comandoAte(chefe, 'ork abrir shell --nome "Durante a folga"', 'o limite é 8')
+    await comando(chefe, 'ork abrir shell --nome "Durante a folga"')
+    aberturas.push(await aguardar(() => telaNoApp(chefe), /Abri .Durante a folga./, 20_000))
+    const depoisDasMuitas = await quantasSessoes()
+    const recusada = aberturas.find((t) => /limite/.test(t))
     conferir(
-      'limite de 8 inclui cartão apagado durante a folga do Ctrl+Z',
-      !!limiteEmFolga && recusouNaFolga.includes('o limite é 8'),
-      ultimas(recusouNaFolga, 3)
+      'um agente abre quantas sessões precisar, somando os dois espaços',
+      !recusada && !!apagadoNaFolga && depoisDasMuitas >= 8 && depoisDasMuitas > antesDasMuitas,
+      `${antesDasMuitas} → ${depoisDasMuitas} sessões · recusada: ${recusada ? ultimas(recusada, 2) : 'nenhuma'}`
     )
 
     await js(`(() => { const L = window.__teste.loja

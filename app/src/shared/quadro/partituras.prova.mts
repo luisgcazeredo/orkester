@@ -9,7 +9,7 @@ import type { Funcao, No, Partitura, Plano } from '../modelo'
 
 const instante = '2026-11-05T12:00:00.000Z'
 
-function ambiente(extra: { funcoes?: Funcao[]; dono?: string; limiteSessoesPorAgente?: number } = {}) {
+function ambiente(extra: { funcoes?: Funcao[]; dono?: string } = {}) {
   let proximo = 0
   return { novoId: () => `novo-${++proximo}`, agora: () => instante, funcoes: extra.funcoes ?? [], ...extra }
 }
@@ -165,7 +165,7 @@ test('função apagada depois de salvar: o cartão sobe sem primeiro pedido, e a
 
 test('subida por agente: nasce ligada a ele e sob a responsabilidade dele', () => {
   const chefe = agente('chefe', 'Maestro', -5000, -5000)
-  const r = subida(aplicarPartitura(plano([chefe]), {}, salvar(), 0, 0, ambiente({ dono: 'chefe', limiteSessoesPorAgente: 8 })))
+  const r = subida(aplicarPartitura(plano([chefe]), {}, salvar(), 0, 0, ambiente({ dono: 'chefe' })))
   const novos = r.plano.nos.filter((n) => n.tipo === 'terminal' && n.id !== 'chefe')
   assert.equal(novos.length, 2)
   assert.ok(novos.every((n) => n.tipo === 'terminal' && n.criadoPor === 'chefe'))
@@ -181,11 +181,11 @@ test('subida pelo usuário não inventa dono nem corda a mais', () => {
   assert.ok(r.plano.nos.every((n) => n.tipo !== 'terminal' || n.criadoPor === undefined))
 })
 
-test('o limite de sessões do agente vale para a partitura inteira', () => {
-  const nos = [agente('chefe', 'Maestro', -9000, -9000), ...Array.from({ length: 7 }, (_, i) => agente(`f${i}`, `Filho ${i}`, -9000 + i * 900, -8000, { criadoPor: 'chefe' }))]
-  const r = aplicarPartitura(plano(nos), {}, salvar(), 0, 0, ambiente({ dono: 'chefe', limiteSessoesPorAgente: 8 }))
-  assert.ok('erro' in r)
-  assert.match(r.erro, /o limite é 8/)
+test('não há limite de sessões por agente: a partitura sobe com o agente já cheio de filhos', () => {
+  // o limite de 8 por agente saiu na 1.2; o freio que resta é o do quadro (MAX_NOS), não um por dono
+  const nos = [agente('chefe', 'Maestro', -9000, -9000), ...Array.from({ length: 20 }, (_, i) => agente(`f${i}`, `Filho ${i}`, -9000 + i * 900, -8000, { criadoPor: 'chefe' }))]
+  const r = aplicarPartitura(plano(nos), {}, salvar(), 0, 0, ambiente({ dono: 'chefe' }))
+  assert.ok(!('erro' in r), 'erro' in r ? r.erro : '')
 })
 
 test('lugar ocupado: o arranjo desce até achar canto livre, sem empurrar ninguém', () => {

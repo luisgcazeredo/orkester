@@ -13,7 +13,6 @@ export interface AmbienteTransformacoesDoQuadro {
   /** As funções guardadas; `abrir --funcao` procura aqui pelo nome. */
   funcoes: Funcao[]
   presetsPadrao: PresetAgente[]
-  limiteSessoesPorAgente: number
   novoId: () => string
   agora: () => string
 }
@@ -45,16 +44,6 @@ export function abrir(
   const criador = planoDoCriador?.nos.find((no) => no.id === pedido.criador)
   // Um criador de outro espaço não tem cartão aqui: o novo começa no andar ativo, sem corda.
   const plano = planoDoCriador ?? espaco.andares.find((andar) => andar.id === espaco.andarAtivo) ?? espaco
-  const filhos = planos.reduce(
-    (total, atual) => total + atual.nos.filter((no) => no.tipo === 'terminal' && no.criadoPor === pedido.criador).length,
-    0
-  )
-  if (criador && filhos >= ambiente.limiteSessoesPorAgente) {
-    return {
-      espaco,
-      resposta: { ok: false, erro: `você já tem ${filhos} sessões abertas (o limite é ${ambiente.limiteSessoesPorAgente})` }
-    }
-  }
 
   const preset = ambiente.presets.find((item) => item.agente === pedido.agente) ?? ambiente.presetsPadrao.find((item) => item.agente === pedido.agente)!
   // função pedida pelo nome: ela dá o nome do cartão, a pasta e o primeiro pedido

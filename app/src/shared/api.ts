@@ -85,8 +85,6 @@ export interface ResumoContextoTerminal {
   contexto: number | null
 }
 
-/** Quantas sessões um agente pode ter abertas pelo `ork abrir` ao mesmo tempo. */
-export const MAX_SESSOES_POR_AGENTE = 8
 
 /** Pedidos que um agente faz pelo `ork` e que mexem no quadro (só a janela dona do espaço pode). */
 export type PedidoDoAgente =

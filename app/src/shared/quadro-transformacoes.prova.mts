@@ -17,7 +17,6 @@ function ambiente(): AmbienteTransformacoesDoQuadro {
       { id: 'codex', nome: 'Codex', agente: 'codex', comando: 'codex' },
       { id: 'shell', nome: 'PowerShell', agente: 'shell', comando: '' }
     ],
-    limiteSessoesPorAgente: 8,
     novoId: () => `novo-${proximo++}`,
     agora: () => instante
   }
@@ -102,15 +101,17 @@ test('abrir sem criador no quadro ignora o limite local e começa no andar ativo
   assert.deepEqual(resultado.espaco.andares[0].cordas, [])
 })
 
-test('abrir recusa o nono filho quando o criador está no quadro', () => {
+test('abrir não tem limite por criador: o nono filho entra como qualquer outro', () => {
+  // o limite de 8 por agente saiu na 1.2, porque um time grande esbarrava nele. O freio que resta é o do
+  // quadro inteiro (MAX_NOS), não um por dono: um maestro abre quantos ajudantes a tarefa pedir.
   const resultado = abrir(
     espaco([terminal('criador'), ...Array.from({ length: 8 }, (_, indice) => terminal(`filho-${indice}`, 'criador'))]),
     { tipo: 'abrir', espacoId: 'espaco', criador: 'criador', agente: 'codex' },
     ambiente()
   )
 
-  assert.deepEqual(resultado.resposta, { ok: false, erro: 'você já tem 8 sessões abertas (o limite é 8)' })
-  assert.equal(resultado.espaco.nos.length, 9)
+  assert.equal(resultado.resposta.ok, true)
+  assert.equal(resultado.espaco.nos.length, 10)
 })
 
 test('fechar cartão ausente recusa sem transformar o espaço', () => {

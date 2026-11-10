@@ -26,7 +26,7 @@ import {
   type ResumoEspaco,
   type Tema
 } from '../../../shared/modelo'
-import { MAX_SESSOES_POR_AGENTE, type AvisoJanelas, type AvisoRotina, type EspecTerminal, type PedidoDoAgente, type RespostaAoAgente } from '../../../shared/api'
+import { type AvisoJanelas, type AvisoRotina, type EspecTerminal, type PedidoDoAgente, type RespostaAoAgente } from '../../../shared/api'
 import { proximoZ } from '../../../shared/quadro/geometria'
 import { empurrarParaBaixo } from '../../../shared/quadro/empurrar'
 import { abrir, fechar, passar } from '../../../shared/quadro/transformacoes'
@@ -561,8 +561,7 @@ export function subirPartitura(
     novoId,
     agora,
     funcoes: estado.preferencias.funcoes ?? [],
-    dono,
-    limiteSessoesPorAgente: MAX_SESSOES_POR_AGENTE
+    dono
   })
   if ('erro' in feito) return feito
   if (!dono) registrarHistorico()
@@ -2487,7 +2486,6 @@ function atenderAgente(pedido: PedidoDoAgente): RespostaAoAgente {
     presets: estado.preferencias.presets,
     funcoes: estado.preferencias.funcoes ?? [],
     presetsPadrao: PRESETS_PADRAO,
-    limiteSessoesPorAgente: MAX_SESSOES_POR_AGENTE,
     novoId,
     agora
   }

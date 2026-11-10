@@ -173,8 +173,8 @@ ork partitura salvar "Time de revisão" # guarda o que está no andar à mostra 
 ork partitura salvar "Dupla" "Main" "Revisor"   # ou só esses cartões
 \`\`\`
 
-- Os cartões que você sobe assim **são seus**: nascem ligados a você por corda, contam no seu limite de 8
-  sessões e você pode fechá-los com \`ork fechar\`.
+- Os cartões que você sobe assim **são seus**: nascem ligados a você por corda e você pode fechá-los com
+  \`ork fechar\`.
 - **A pasta não é salva de propósito**: cada cartão abre na pasta do espaço (ou na da função). A partitura
   é o time, não o projeto — é por isso que o mesmo time serve em qualquer lugar.
 - **O prompt vem da função de hoje**, não de uma cópia do dia em que se salvou. Função apagada depois:

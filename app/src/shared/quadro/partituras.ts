@@ -51,8 +51,6 @@ export interface AmbienteDePartitura {
   funcoes: Funcao[]
   /** Cartão do agente que pediu: os cartões nascem ligados a ele e sob a responsabilidade dele. */
   dono?: string
-  /** Limite de sessões por agente (só vale quando há `dono`). */
-  limiteSessoesPorAgente?: number
 }
 
 export interface SubidaDePartitura {
@@ -195,14 +193,6 @@ export function aplicarPartitura(
 
   const agentes = pecas.filter((p) => p.tipo === 'terminal').length
   const dono = amb.dono ? plano.nos.find((no) => no.id === amb.dono && no.tipo === 'terminal') : undefined
-  if (amb.dono && dono && amb.limiteSessoesPorAgente !== undefined) {
-    const filhos = plano.nos.filter((no) => no.tipo === 'terminal' && no.criadoPor === amb.dono).length
-    if (filhos + agentes > amb.limiteSessoesPorAgente) {
-      return {
-        erro: `você já tem ${filhos} sessões abertas e esta partitura abriria ${agentes}; o limite é ${amb.limiteSessoesPorAgente}`
-      }
-    }
-  }
 
   const lugar = cantoLivre(plano, { x, y, largura: partitura.largura, altura: partitura.altura })
   const usados = new Set(plano.nos.flatMap((no) => (no.tipo === 'terminal' ? [no.nome.toLowerCase()] : [])))
