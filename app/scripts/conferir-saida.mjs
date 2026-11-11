@@ -88,11 +88,16 @@ async function conferir() {
     const quantos = readdirSync(correio).length
     throw new Error(`a pasta do correio ficou em ${correio} (${quantos} arquivo(s))`)
   }
+
+  // 5. nem o endereço do cano (1.3): é por ele existir que o servidor MCP acha que o Orkester está aberto, e
+  // um arquivo velho faria o cliente tentar um cano morto em vez de dizer "abra o app"
+  const cano = join(dados, 'cano.json')
+  if (existsSync(cano)) throw new Error(`o endereço do cano ficou em ${cano} depois de o app sair`)
 }
 
 try {
   await conferir()
-  console.log('conferir-saida: fechou a janela e o app saiu sozinho, sem deixar correio no disco.')
+  console.log('conferir-saida: fechou a janela e o app saiu sozinho, sem deixar correio nem endereço de cano no disco.')
 } catch (erro) {
   console.error(`conferir-saida: ${erro instanceof Error ? erro.message : erro}`)
   process.exitCode = 1

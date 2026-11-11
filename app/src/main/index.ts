@@ -5,8 +5,9 @@ import { CANAIS_APP } from '../shared/api'
 import { registrarAndares } from './andares'
 import { pararRotinas, registrarRotinas } from './rotinas'
 import { registrarArea, registrarEsquemaImagem, servirImagens } from './area'
+import { registrarChaves } from './chaves'
 import { registrarCodigo } from './codigo'
-import { registrarComandos } from './comandos'
+import { fecharCano, registrarComandos } from './comandos'
 import { fecharCorreio } from './correio'
 import { gravarSessaoDeJanelas, idsDosEspacos, lerSessaoDeJanelas, quandoApagarEspaco, registrarDados } from './dados'
 import { encerrarNavegador, registrarNavegador, soltarAbasDaJanela } from './navegador'
@@ -241,6 +242,7 @@ if (!autoteste && !medindo && !app.requestSingleInstanceLock()) {
     configurarJanelas(criarJanela, idsDosEspacos, gravarSessaoDeJanelas)
     registrarJanelas()
     registrarDados()
+    registrarChaves()
     registrarAndares()
     registrarArea()
     registrarNavegador()
@@ -259,7 +261,7 @@ if (!autoteste && !medindo && !app.requestSingleInstanceLock()) {
 app.on('before-quit', () => {
   if (!autoteste && !medindo) gravarSessaoAgora()
   // nada do que os agentes conversaram pelo correio fica no disco depois que o app sai
-  fecharCorreio()
+  fecharCorreio(); fecharCano()
 })
 
 /**
@@ -280,7 +282,7 @@ app.on('window-all-closed', () => {
   // isto a pasta com os recados dos agentes ficaria em `%TEMP%` exatamente no caso em que prometemos que
   // ela não fica.
   const forca = setTimeout(() => {
-    fecharCorreio()
+    fecharCorreio(); fecharCano()
     app.exit(0)
   }, 5000)
   forca.unref()

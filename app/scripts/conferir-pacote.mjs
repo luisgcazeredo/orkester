@@ -42,3 +42,47 @@ if (r.status === null) {
 }
 
 console.log('conferir-pacote: o ork do pacote carrega e responde.')
+
+// ---------- o servidor MCP (1.3) ----------
+//
+// Mesma classe de defeito, mesmo portão. O `mcp.js` é copiado do lado do `cli.js` para a pasta de dados, e
+// a configuração que o usuário cola no cliente aponta para essa cópia. Se ele ficar preso dentro do .asar,
+// a cópia nunca acontece e a configuração aponta para um arquivo que não existe — e o autoteste passa,
+// porque roda o build, não o pacote. Aqui: ele tem de existir fora do .asar, carregar no Node puro (como o
+// cliente o roda) e responder ao aperto de mão do protocolo MCP.
+const mcp = join(pacote, 'out', 'main', 'mcp.js')
+if (!existsSync(mcp)) {
+  console.error(`conferir-pacote: não achei o servidor MCP desempacotado em ${mcp}`)
+  console.error('Conserto: "out/main/mcp.js" em build.asarUnpack no package.json.')
+  process.exit(1)
+}
+const aperto = JSON.stringify({
+  jsonrpc: '2.0',
+  id: 1,
+  method: 'initialize',
+  params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'conferir-pacote', version: '0' } }
+})
+const m = spawnSync(process.execPath, [mcp], { encoding: 'utf8', input: `${aperto}\n`, timeout: 15_000, env: { ...process.env, ORK_CHAVE: '' } })
+const saidaMcp = `${m.stdout ?? ''}${m.stderr ?? ''}`
+if (/Cannot find module|MODULE_NOT_FOUND|ERR_MODULE_NOT_FOUND/.test(saidaMcp)) {
+  console.error('conferir-pacote: o servidor MCP do pacote não carrega — falta arquivo fora do .asar.')
+  console.error(saidaMcp.trim())
+  process.exit(1)
+}
+const respostaMcp = (m.stdout ?? '')
+  .split('\n')
+  .filter(Boolean)
+  .map((l) => {
+    try {
+      return JSON.parse(l)
+    } catch {
+      return null
+    }
+  })
+  .find((x) => x?.id === 1)
+if (respostaMcp?.result?.serverInfo?.name !== 'orkester') {
+  console.error('conferir-pacote: o servidor MCP do pacote não respondeu ao aperto de mão.')
+  console.error(saidaMcp.trim().slice(0, 600))
+  process.exit(1)
+}
+console.log('conferir-pacote: o servidor MCP do pacote carrega e responde ao aperto de mão.')

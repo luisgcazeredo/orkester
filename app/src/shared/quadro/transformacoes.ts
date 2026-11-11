@@ -117,7 +117,9 @@ export function abrir(
     pasta: pedido.pasta || funcao?.pasta || undefined,
     funcao: funcao?.nome,
     sessao: preset.agente === 'claude' ? ambiente.novoId() : undefined,
-    criadoPor: pedido.criador
+    // criador vazio é o usuário (um cliente MCP, pela chave): o cartão nasce sem dono, como os que ele
+    // cria pela tela — e sem dono ninguém o herda nem o fecha por engano
+    criadoPor: pedido.criador || undefined
   }
   const corda: Corda | null = criador ? { id: ambiente.novoId(), de: criador.id, para: no.id, criadoEm: ambiente.agora() } : null
   const proximo = mudarPlano(espaco, plano, (atual) => ({ ...atual, nos: [...atual.nos, no], cordas: corda ? [...atual.cordas, corda] : atual.cordas }))

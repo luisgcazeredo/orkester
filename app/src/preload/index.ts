@@ -23,8 +23,7 @@ import {
   type AvisoJanelas,
   type MudancaArquivo,
   type ApiOrkester,
-  type PedidoDoAgente
-} from '../shared/api'
+  type PedidoDoAgente, CANAIS_CHAVES, type ApiChaves } from '../shared/api'
 
 /** Cada canal vira uma função que chama o processo principal e devolve a resposta. */
 function chamadas<T>(canais: Record<string, string>): T {
@@ -108,6 +107,14 @@ const codigo: ApiCodigo = {
   diff: (caminho) => ipcRenderer.invoke(CANAIS_CODIGO.diff, caminho)
 }
 
+// O cofre das chaves de usuário: a aba de configurações cria, lista e revoga por aqui.
+const chaves: ApiChaves = {
+  listar: () => ipcRenderer.invoke(CANAIS_CHAVES.listar),
+  criar: (nome) => ipcRenderer.invoke(CANAIS_CHAVES.criar, nome),
+  revogar: (id) => ipcRenderer.invoke(CANAIS_CHAVES.revogar, id),
+  comandoDoMcp: () => ipcRenderer.invoke(CANAIS_CHAVES.comando)
+}
+
 // A janela não tem acesso ao Node: só a estas funções, nesta forma.
 const api: ApiOrkester = {
   terminal: {
@@ -141,6 +148,7 @@ const api: ApiOrkester = {
   },
   dados,
   codigo,
+  chaves,
   andares,
   area,
   janelas,

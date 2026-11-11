@@ -2394,6 +2394,61 @@ function atenderBanda(pedido: Extract<PedidoDoAgente, { tipo: 'banda' }>): Respo
  * Subir entra no desfazer (é o `subirPartitura` que registra); guardar não mexe no quadro, mexe nas
  * preferências. O time sobe à direita do cartão de quem pediu, ligado a ele, como o `ork abrir`.
  */
+/**
+ * O usuário falando pelo cano, com uma chave (um cliente MCP). Não há cartão de origem: nada nasce com
+ * dono nem com corda, exatamente como quando ele faz pela tela. A corda é permissão **entre agentes**;
+ * entre o dono e o quadro dele não existe fronteira nenhuma a respeitar.
+ */
+function atenderUsuario(pedido: Extract<PedidoDoAgente, { tipo: 'usuario' }>): RespostaAoAgente {
+  const espaco = estado.espaco
+  const plano = planoAtual()
+  if (!espaco || !plano) return { ok: false, erro: 'nenhum espaço aberto nesta janela' }
+  const andar = andarAtual()
+  const onde = `Espaço "${espaco.nome}" · ${andar ? `andar "${andar.nome}"` : 'térreo'}`
+
+  if (pedido.acao === 'quadro') {
+    // `eu` vazio: ninguém é marcado como "você" na leitura, porque quem pergunta não tem cartão
+    const feito = mexerNoQuadro(plano, { acao: 'ler', eu: '', onde }, { novoId, agora, alcanca })
+    return 'erro' in feito ? { ok: false, erro: feito.erro } : { ok: true, texto: feito.texto }
+  }
+
+  if (pedido.acao === 'partitura') {
+    const nome = (pedido.nome ?? '').trim()
+    if (!nome) return { ok: false, erro: 'diga o nome da partitura' }
+    const guardada = (estado.preferencias.partituras ?? []).find((p) => p.nome.toLowerCase() === nome.toLowerCase())
+    if (!guardada) {
+      const quais = (estado.preferencias.partituras ?? []).map((p) => `"${p.nome}"`).join(', ')
+      return { ok: false, erro: `não existe a partitura "${nome}"${quais ? `; as que existem: ${quais}` : ''}` }
+    }
+    // sem dono: o time é do usuário, como o que ele sobe pelo botão. O lugar é o canto de cima à esquerda,
+    // e o arranjo desce sozinho até achar espaço livre (ver `cantoLivre` em partituras.ts).
+    const feito = subirPartitura(guardada, 120, 120)
+    return 'erro' in feito ? { ok: false, erro: feito.erro } : { ok: true, texto: feito.texto }
+  }
+
+  // abrir: o mesmo caminho do agente, com criador vazio — o cartão nasce solto
+  const ambiente = {
+    presets: estado.preferencias.presets,
+    funcoes: estado.preferencias.funcoes ?? [],
+    presetsPadrao: PRESETS_PADRAO,
+    novoId,
+    agora
+  }
+  const resultado = abrir(espaco, {
+    tipo: 'abrir',
+    espacoId: pedido.espacoId,
+    criador: '',
+    agente: pedido.agente,
+    preset: pedido.preset,
+    nome: pedido.nome,
+    pasta: pedido.pasta,
+    funcao: pedido.funcao
+  }, ambiente)
+  if (!resultado.resposta.ok) return resultado.resposta
+  mudarEspaco(() => resultado.espaco, false)
+  return resultado.resposta
+}
+
 function atenderPartitura(pedido: Extract<PedidoDoAgente, { tipo: 'partitura' }>): RespostaAoAgente {
   const plano = planoAtual()
   if (!plano) return { ok: false, erro: 'nenhum espaço aberto nesta janela' }
@@ -2473,6 +2528,7 @@ function atenderAgente(pedido: PedidoDoAgente): RespostaAoAgente {
   if (pedido.tipo === 'partitura') return atenderPartitura(pedido)
   if (pedido.tipo === 'trocar') return atenderTroca(pedido)
   if (pedido.tipo === 'banda') return atenderBanda(pedido)
+  if (pedido.tipo === 'usuario') return atenderUsuario(pedido)
   if (pedido.tipo === 'catalogo') {
     const { funcoes, relatorio } = juntarCatalogo(estado.preferencias.funcoes ?? [], pedido.fichas, estado.preferencias.presets, novoId)
     definirFuncoes(funcoes)

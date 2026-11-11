@@ -20,8 +20,7 @@ import {
   Sun,
   Type,
   Users,
-  type LucideIcon
-} from 'lucide-react'
+  type LucideIcon, Settings } from 'lucide-react'
 import type { No } from '../../../shared/modelo'
 import {
   abrirEspaco,
@@ -42,6 +41,7 @@ import { abrirNovoAndar } from './acoesAndar'
 import { colar } from './area'
 import { abrirAtalhos } from './Atalhos'
 import { enquadrarTudo } from './Controles'
+import { abrirConfiguracoes } from './Configuracoes'
 import { anexarArquivoEm, arvoreEm, portalEm } from './menus'
 
 // Ctrl+K: uma caixa de busca para achar qualquer coisa (cartão, andar, espaço) e rodar qualquer comando
@@ -162,6 +162,7 @@ function montarItens(): Item[] {
       ? { rotulo: 'Tema claro', grupo: 'Comando', icone: Sun, acao: () => definirTema('claro') }
       : { rotulo: 'Tema escuro', grupo: 'Comando', icone: Moon, acao: () => definirTema('escuro') },
     { rotulo: 'Atalhos do teclado', grupo: 'Comando', icone: Keyboard, detalhe: '?', acao: abrirAtalhos },
+    { rotulo: 'Configurações (chaves MCP)…', grupo: 'Comando', icone: Settings, acao: abrirConfiguracoes },
     ...plano.nos.map(
       (n): Item => ({
         rotulo: nomeDoCartao(n, notas),

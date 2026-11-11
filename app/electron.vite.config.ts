@@ -12,7 +12,8 @@ export default defineConfig({
     build: {
       rolldownOptions: {
         // cli.js: o comando `ork` que os agentes rodam nos terminais do app (fala com o app pelo pipe)
-        input: { index: resolve('src/main/index.ts'), cli: resolve('src/cli/ork.ts') }
+        // mcp.js: o servidor MCP que um cliente de fora sobe para mexer no quadro, com uma chave de usuário
+        input: { index: resolve('src/main/index.ts'), cli: resolve('src/cli/ork.ts'), mcp: resolve('src/mcp/orkester.ts') }
       }
     }
   },

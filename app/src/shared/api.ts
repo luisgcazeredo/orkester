@@ -102,6 +102,11 @@ export type PedidoDoAgente =
    * das preferências e faz a junção (ver `shared/catalogo.ts`).
    */
   | { tipo: 'catalogo'; espacoId: string; id: string; fichas: FichaDeCatalogo[] }
+  /**
+   * Quem fala é o **usuário**, por uma chave (um cliente MCP), não um cartão: não há `eu` no quadro, e
+   * por isso nada nasce com dono nem com corda — é a mesma coisa que o usuário fazer pela tela.
+   */
+  | { tipo: 'usuario'; espacoId: string; acao: 'quadro' | 'partitura' | 'abrir'; nome?: string; agente?: Agente; preset?: string; pasta?: string; funcao?: string }
   | { tipo: 'fechar'; espacoId: string; id: string }
   /** Árvores de código do cartão do próprio agente: listar, criar, usar, mostrar arquivos e desfazer. */
   | {
@@ -363,6 +368,16 @@ export interface ApiJanelas {
   aoAvisar(ouvinte: (aviso: AvisoJanelas) => void): void
 }
 
+/** O cofre das chaves de usuário. O segredo volta **uma vez**, na criação, e nunca mais.
+ * A impressão digital fica no disco; a tela nunca a recebe. */
+export interface ApiChaves {
+  listar(): Promise<Array<{ id: string; nome: string; comeco: string; criadaEm: string; usadaEm?: string; revogadaEm?: string }>>
+  criar(nome: string): Promise<{ segredo: string; nome: string } | { erro: string }>
+  revogar(id: string): Promise<void>
+  /** Como subir o servidor MCP nesta máquina: entra na configuração que o usuário cola no cliente. */
+  comandoDoMcp(): Promise<import('./chaves').ComandoDoMcp>
+}
+
 export interface ApiOrkester {
   terminal: ApiTerminal
   dados: ApiDados
@@ -373,6 +388,7 @@ export interface ApiOrkester {
   rotinas: ApiRotinas
   portal: ApiPortal
   agentes: ApiAgentes
+  chaves: ApiChaves
   /** Chamado quando a janela vai fechar; `salvar` diz se gravou. Se não gravou, o app pergunta antes de fechar. */
   aoPedirFechar(salvar: () => Promise<boolean>): void
   autoteste: boolean
@@ -444,6 +460,14 @@ export const CANAIS_PORTAL = {
   alternarJanela: 'portal:alternar-janela',
   fechar: 'portal:fechar',
   aviso: 'portal:aviso'
+} as const
+
+/** O cofre das chaves de usuário (ver shared/chaves.ts): a aba de configurações fala por aqui. */
+export const CANAIS_CHAVES = {
+  listar: 'chaves:listar',
+  criar: 'chaves:criar',
+  revogar: 'chaves:revogar',
+  comando: 'chaves:comando'
 } as const
 
 export const CANAIS_CODIGO = {

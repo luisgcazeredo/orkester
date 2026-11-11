@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Gauge, Map as IconeMapa, Minus, Moon, PanelLeft, PanelRight, Plus, Scan, Sun } from 'lucide-react'
+import { Gauge, Map as IconeMapa, Minus, Moon, PanelLeft, PanelRight, Plus, Scan, Settings, Sun } from 'lucide-react'
 import type { ResumoContextoTerminal } from '../../../shared/api'
 import {
   alternarExplorador,
@@ -14,6 +14,7 @@ import {
 } from '../estado/loja'
 import { COR_AGENTE, ICONE_AGENTE } from '../nos/icones'
 import { BotaoAndares, IndicadorAndar } from './Andares'
+import { abrirConfiguracoes } from './Configuracoes'
 import {
   caixaDoDesenho,
   caixaDoNo,
@@ -75,6 +76,9 @@ export function CantoSuperior() {
         onClick={() => definirTema(tema === 'escuro' ? 'claro' : 'escuro')}
       >
         {tema === 'escuro' ? <Sun size={16} /> : <Moon size={16} />}
+      </button>
+      <button className="botao-redondo" title="Configurações (chaves MCP)" data-configuracoes onClick={abrirConfiguracoes}>
+        <Settings size={16} />
       </button>
     </div>
   )

@@ -107,6 +107,25 @@ ork partitura usar "Name"     raise a saved team beside you
 
 Those are six of about twenty-five verbs. **The full reference is in [`docs/ork.md`](docs/ork.md).**
 
+## Connect your own Claude (MCP)
+
+The `ork` command is for agents *on* the canvas. To drive the canvas from **outside** — your own Claude Code,
+Claude Desktop, Codex, another session — Orkester ships an MCP server and a key to go with it.
+
+1. Click the gear in the top-right corner (or search **Settings** in the command palette).
+2. Name the key after whoever will use it and click **Generate key**.
+3. Copy the snippet for your client — Claude Code, Claude Desktop / `.mcp.json`, or Codex — and paste it.
+   The key is shown **once**: Orkester keeps only a fingerprint of it.
+
+The client then gets one tool per action: read the board, open an agent (with a role, so engine and level come
+from it), read a card's screen, list and raise saved teams, list roles, and import a team written as Markdown
+files. Whatever it does lands on the board **as you**: no owner, no rope — the rope is a permission between
+agents, not between you and your own board. Orkester has to be open.
+
+**What the key is not:** a boundary against programs already running on your machine. Anything that runs as
+you can read Orkester's data folder anyway. The key gives you intent, a name, revocation, and a record of who
+used it and when — revoke one in the same screen and the next call from it is refused.
+
 ## Under the hood
 
 Electron · React · TypeScript · xterm.js · node-pty.

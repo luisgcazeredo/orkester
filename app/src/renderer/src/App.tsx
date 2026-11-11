@@ -33,6 +33,7 @@ import { MenuContexto, menuAberto } from './ui/MenuContexto'
 import { abrirPaleta, Paleta } from './ui/Paleta'
 import { Perguntas } from './ui/Perguntas'
 import { Funcoes } from './ui/Funcoes'
+import { Configuracoes } from './ui/Configuracoes'
 import { Partituras } from './ui/Partituras'
 import { Rotinas } from './ui/Rotinas'
 import { Presets } from './ui/Presets'
@@ -152,6 +153,7 @@ export function App() {
       <Presets />
       <Funcoes />
       <Partituras />
+      <Configuracoes />
       <Rotinas />
     </div>
   )

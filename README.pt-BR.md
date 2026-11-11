@@ -107,6 +107,25 @@ ork partitura usar "Nome"     sobe um time salvo ao seu lado
 São seis de cerca de vinte e cinco verbos. **A referência completa está em
 [`docs/ork.pt-BR.md`](docs/ork.pt-BR.md).**
 
+## Ligar o seu Claude (MCP)
+
+O `ork` é para os agentes *dentro* do quadro. Para mexer no quadro **de fora** — o seu Claude Code, o Claude
+Desktop, o Codex, outra sessão — o Orkester traz um servidor MCP e uma chave para ele.
+
+1. Clique na engrenagem no canto de cima, à direita (ou procure **Configurações** na paleta de comandos).
+2. Dê à chave o nome de quem vai usá-la e clique em **Gerar chave**.
+3. Copie o bloco do seu cliente — Claude Code, Claude Desktop / `.mcp.json` ou Codex — e cole.
+   A chave aparece **uma vez**: o Orkester guarda só uma impressão digital dela.
+
+O cliente ganha uma ferramenta por ação: ler o quadro, abrir um agente (com uma função, e aí motor e nível vêm
+dela), ler a tela de um cartão, listar e subir times salvos, listar funções e importar um time escrito em
+arquivos Markdown. O que ele faz chega no quadro **como você**: sem dono e sem corda — a corda é permissão
+entre agentes, não entre você e o seu quadro. O Orkester precisa estar aberto.
+
+**O que a chave não é:** uma fronteira contra programas que já rodam na sua máquina. Qualquer coisa que rode
+como você já lê a pasta de dados do Orkester. A chave dá intenção, nome, revogação e o registro de quem usou e
+quando — revogue uma na mesma tela, e a próxima chamada dela é recusada.
+
 ## Por dentro
 
 Electron · React · TypeScript · xterm.js · node-pty.
