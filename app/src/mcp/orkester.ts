@@ -89,7 +89,7 @@ function pedir(comando: string, posicionais: string[] = [], opcoes: Record<strin
   })
 }
 
-const servidor = new McpServer({ name: 'orkester', version: '1.3.0' })
+const servidor = new McpServer({ name: 'orkester', version: __VERSAO__ })
 
 const texto = (t: string): { content: Array<{ type: 'text'; text: string }> } => ({ content: [{ type: 'text', text: t || '(sem resposta)' }] })
 const falha = (e: unknown): { content: Array<{ type: 'text'; text: string }>; isError: true } => ({

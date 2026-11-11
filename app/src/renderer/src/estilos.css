@@ -2740,12 +2740,17 @@ textarea:focus-visible,
 }
 
 /* ---------- configurações: chaves MCP ---------- */
+/* o diálogo alarga quando contém esta tela (mesmo jeito dos presets e dos atalhos) — sem isto o conteúdo
+   pedia mais largura do que a caixa tinha e vazava pela borda direita */
+.dialogo:has(.configuracoes) {
+  width: 600px;
+  max-width: calc(100vw - 32px);
+}
 .configuracoes {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-width: 520px;
-  max-width: 640px;
+  min-width: 0;
 }
 .configuracoes-titulo {
   display: flex;
@@ -2761,6 +2766,39 @@ textarea:focus-visible,
 }
 .chave-gerar input {
   flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  background: var(--lateral-filtro);
+  color: var(--texto);
+  font: inherit;
+  font-size: 14px;
+  outline: 0;
+}
+.chave-gerar input::placeholder {
+  color: var(--texto-suave);
+}
+.chave-gerar input:focus {
+  border-color: var(--destaque);
+}
+.chave-gerar button {
+  height: 36px;
+  padding: 0 var(--espaco-4);
+  border: 1px solid var(--destaque);
+  border-radius: var(--raio-pequeno);
+  background: var(--destaque);
+  color: #fff;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.chave-gerar button:hover:not(:disabled) {
+  background: var(--destaque-forte);
+}
+.chave-gerar button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .chave-nova {
   display: flex;
@@ -2777,8 +2815,14 @@ textarea:focus-visible,
 }
 .chave-formato {
   padding: 4px 10px;
+  border: 0;
   border-radius: var(--raio-pequeno);
+  background: transparent;
   color: var(--texto-suave);
+  font-size: 12.5px;
+}
+.chave-formato:hover {
+  color: var(--texto);
 }
 .chave-formato.ativo {
   color: var(--texto);

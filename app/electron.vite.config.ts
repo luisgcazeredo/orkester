@@ -9,6 +9,7 @@ const { version } = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as
 
 export default defineConfig({
   main: {
+    define: { __VERSAO__: JSON.stringify(version) },
     build: {
       rolldownOptions: {
         // cli.js: o comando `ork` que os agentes rodam nos terminais do app (fala com o app pelo pipe)

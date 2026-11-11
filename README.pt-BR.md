@@ -5,7 +5,7 @@
 
 **Um time de agentes de código num quadro infinito — e você desenha quem fala com quem.**
 
-![versão](https://img.shields.io/badge/vers%C3%A3o-1.0.10-4060e8)
+![versão](https://img.shields.io/github/v/release/luisgcazeredo/orkester?label=vers%C3%A3o&color=4060e8)
 ![plataforma](https://img.shields.io/badge/plataforma-Windows%2011%20x64-4060e8)
 
 [English](README.md) · Português
@@ -55,7 +55,7 @@ Três ideias seguram o resto:
 
 **[Baixar o instalador →](https://github.com/luisgcazeredo/orkester/releases/latest)**
 
-Um arquivo só, `Orkester-Instalador-1.0.10.exe` (119 MB). É só rodar: ele instala para o teu usuário — sem pedir
+Um arquivo só, `Orkester-Instalador-<versão>.exe` (uns 120 MB). É só rodar: ele instala para o teu usuário — sem pedir
 administrador — e põe o atalho **Orkester** na área de trabalho e no menu Iniciar. Precisa de **Windows 11
 x64** e de mais nada.
 
@@ -70,7 +70,7 @@ Duas coisas para saber antes de rodar:
 Os teus quadros ficam em `%USERPROFILE%\.orkester` — o quadro em JSON e os post-its em `.md`, legíveis fora
 do app — e não são apagados ao desinstalar.
 
-Histórico de versões: [CHANGELOG.md](CHANGELOG.md).
+O que mudou em cada versão: [Releases](https://github.com/luisgcazeredo/orkester/releases).
 
 ## Compilar do código
 
@@ -104,27 +104,17 @@ ork banda criar "Nome" …      põe uma moldura em volta de agentes: todos se f
 ork partitura usar "Nome"     sobe um time salvo ao seu lado
 ```
 
-São seis de cerca de vinte e cinco verbos. **A referência completa está em
+São seis de cerca de trinta verbos. **A referência completa está em
 [`docs/ork.pt-BR.md`](docs/ork.pt-BR.md).**
 
 ## Ligar o seu Claude (MCP)
 
 O `ork` é para os agentes *dentro* do quadro. Para mexer no quadro **de fora** — o seu Claude Code, o Claude
-Desktop, o Codex, outra sessão — o Orkester traz um servidor MCP e uma chave para ele.
+Desktop, o Codex, qualquer cliente MCP — clique na engrenagem no canto de cima, gere uma chave e cole o bloco
+que o app te dá. O cliente passa a ler o quadro, abrir agentes, subir times salvos e importar fichas de time,
+como se fosse você. O Orkester precisa estar aberto.
 
-1. Clique na engrenagem no canto de cima, à direita (ou procure **Configurações** na paleta de comandos).
-2. Dê à chave o nome de quem vai usá-la e clique em **Gerar chave**.
-3. Copie o bloco do seu cliente — Claude Code, Claude Desktop / `.mcp.json` ou Codex — e cole.
-   A chave aparece **uma vez**: o Orkester guarda só uma impressão digital dela.
-
-O cliente ganha uma ferramenta por ação: ler o quadro, abrir um agente (com uma função, e aí motor e nível vêm
-dela), ler a tela de um cartão, listar e subir times salvos, listar funções e importar um time escrito em
-arquivos Markdown. O que ele faz chega no quadro **como você**: sem dono e sem corda — a corda é permissão
-entre agentes, não entre você e o seu quadro. O Orkester precisa estar aberto.
-
-**O que a chave não é:** uma fronteira contra programas que já rodam na sua máquina. Qualquer coisa que rode
-como você já lê a pasta de dados do Orkester. A chave dá intenção, nome, revogação e o registro de quem usou e
-quando — revogue uma na mesma tela, e a próxima chamada dela é recusada.
+**Ferramentas, configuração e o que a chave protege e o que não protege: [`docs/mcp.pt-BR.md`](docs/mcp.pt-BR.md).**
 
 ## Por dentro
 
@@ -132,19 +122,20 @@ Electron · React · TypeScript · xterm.js · node-pty.
 
 O cálculo do quadro mora em módulos puros, cobertos por testes que rodam em Node sem abrir o app. Em cima
 deles, o autoteste abre o app de verdade, monta um quadro, mexe com mouse e teclado e confere o resultado na
-tela. Hoje: **157 provas** e **157 checagens** em 15 cenários.
+tela.
 
 ```text
 app/src/shared/    regras puras do quadro (bandas, partituras, trocar, rotinas, janelas, arquivos)
 app/src/main/      processo principal: terminais, verbos do `ork`, dados em disco, autoteste
 app/src/renderer/  o quadro em React
 app/src/cli/       o comando `ork` que o agente chama
-docs/              a referência do `ork`
+app/src/mcp/       o servidor MCP que um cliente de fora roda
+docs/              as referências do `ork` e do MCP
 ```
 
 ## Estado
 
-Versão **1.0.10**, lançada em 10/11/2026 e em uso diário no Windows. Só Windows 11 x64 — nada no código
+Em uso diário no Windows. Só Windows 11 x64 — nada no código
 impede outro sistema de propósito, mas nada foi testado fora dele.
 
 ## Licença

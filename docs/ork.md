@@ -18,6 +18,9 @@ learns the command by itself the first time it needs it.
 
 The command itself is in Portuguese, like the rest of the app's interface.
 
+To drive the canvas from **outside** the app — your own Claude, Codex, any MCP client — see
+[`mcp.md`](mcp.md).
+
 ### If the agent runs in a sandbox
 
 Nothing to do: `ork` works the same. Codex is the case that needs help, and the app sets it up on its own:
@@ -48,7 +51,7 @@ still the permission.
 
 | Command | What it does |
 |---|---|
-| `ork abrir <claude\|codex\|shell>` | opens a new session beside you, already linked |
+| `ork abrir [claude\|codex\|shell]` | opens a new session beside you, already linked. With `--funcao`, the agent kind is optional |
 | `ork pedir <name> "text"` | sends a request and waits for it to finish; returns the screen |
 | `ork esperar <name>` | waits for the other one to finish what it is doing |
 | `ork ver <name>` | reads its screen without sending anything |
@@ -64,7 +67,8 @@ Options for `ork abrir`:
 --espaco "Name"     open in another workspace (you remain its owner)
 --nome N            the card's name
 --pasta P           the folder the terminal opens in
---funcao "Role"     born with that role's prompt
+--funcao "Role"     born with that role's prompt, in its folder, on its preset (engine + level)
+--preset "Name"     overrides the preset for this one session ("Claude forte")
 --pedido "text"     the first request, already typed
 --arquivo p.md      the first request, read from a file
 --esperar           only return when it has finished
@@ -72,8 +76,6 @@ Options for `ork abrir`:
 ```
 
 `ork pedir` also takes `--arquivo`, `--sem-esperar` and `--tempo`.
-
-**Limit:** each agent may open at most 8 sessions.
 
 ## Building the team
 
@@ -86,6 +88,30 @@ Options for `ork abrir`:
 | `ork partitura` | lists the saved teams |
 | `ork partitura usar "Name"` | raises that team beside you, linked to you |
 | `ork partitura salvar "Name" [card]…` | saves those cards, or the whole floor, as a score |
+| `ork catalogo importar <folder>` | turns the `.md` sheets of a folder into roles (below) |
+
+### Team sheets
+
+A team written outside the app — by hand, by another agent, copied from another project — is a folder of
+Markdown files, one per role. Each has a header between `---` lines and a body that becomes the role's prompt:
+
+```markdown
+---
+nome: Revisor
+motor: Codex
+nivel: forte
+pasta: app
+---
+You review every change before it is pushed. …
+```
+
+- `nome` is required; the rest is optional. `pasta` is relative to the workspace folder.
+- `motor` names the engine. **"Codex e Claude"** (or "Codex, Claude") creates **two** roles, one per engine,
+  with the engine in the name; **"Shell com Claude"**, with no separator, is one card described in prose.
+- `nivel` is matched to a preset of that engine by name: `forte`, `medio` or `rapido` in the preset's name.
+  With no preset at that level it falls back to the engine's first preset, and the report says so.
+- Importing again **updates by name** instead of duplicating, and **never deletes** a role: the folder may be
+  part of a team, not all of it. A file without a header is skipped and named in the report.
 
 ## Working the canvas
 
@@ -138,6 +164,6 @@ ork ver "Revisor" --linhas 40
 # it stopped on a menu prompt: answer it
 ork teclas "Revisor" enter
 
-# done: close it and free the slot
+# done: close it
 ork fechar "Revisor"
 ```

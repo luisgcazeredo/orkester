@@ -9,7 +9,7 @@
 // A conferência é a mais simples possível: roda o `ork` do pacote com o Node e exige que ele chegue a
 // reclamar do que deve reclamar — que não está dentro do app. Um erro de módulo faltando reprova.
 import { spawnSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const app = join(import.meta.dirname, '..')
@@ -85,4 +85,10 @@ if (respostaMcp?.result?.serverInfo?.name !== 'orkester') {
   console.error(saidaMcp.trim().slice(0, 600))
   process.exit(1)
 }
-console.log('conferir-pacote: o servidor MCP do pacote carrega e responde ao aperto de mão.')
+// e diz a versão do app, que vem do package.json no build (na 1.3.0 ela estava digitada no código)
+const { version } = JSON.parse(readFileSync(join(app, 'package.json'), 'utf8'))
+if (respostaMcp.result.serverInfo.version !== version) {
+  console.error(`conferir-pacote: o servidor MCP diz versão ${respostaMcp.result.serverInfo.version}, e o app é ${version}.`)
+  process.exit(1)
+}
+console.log(`conferir-pacote: o servidor MCP do pacote carrega e responde ao aperto de mão (versão ${version}).`)

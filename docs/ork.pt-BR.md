@@ -31,6 +31,9 @@ fica na temporária do sistema, não guarda nada além dos pedidos em trânsito,
 Não é um jeito de furar o sandbox: o correio leva os mesmos verbos que o cano leva, e a corda continua sendo
 a permissão.
 
+Para mexer no quadro **de fora** do app — o seu Claude, o Codex, qualquer cliente MCP — veja
+[`mcp.pt-BR.md`](mcp.pt-BR.md).
+
 ---
 
 ## Onde eu estou
@@ -46,7 +49,7 @@ a permissão.
 
 | Comando | O que faz |
 |---|---|
-| `ork abrir <claude\|codex\|shell>` | abre uma sessão nova ao lado, já ligada a você |
+| `ork abrir [claude\|codex\|shell]` | abre uma sessão nova ao lado, já ligada a você. Com `--funcao`, o agente é opcional |
 | `ork pedir <nome> "texto"` | manda um pedido e espera terminar; devolve a tela |
 | `ork esperar <nome>` | espera o outro terminar o que está fazendo |
 | `ork ver <nome>` | lê a tela dele sem mandar nada |
@@ -62,7 +65,8 @@ Opções do `ork abrir`:
 --espaco "Nome"     abre em outro espaço (você continua sendo o dono)
 --nome N            o nome do cartão
 --pasta P           a pasta em que o terminal abre
---funcao "Papel"    nasce com o prompt dessa função
+--funcao "Papel"    nasce com o prompt dessa função, na pasta dela, no preset dela (motor + nível)
+--preset "Nome"     troca o preset só desta sessão ("Claude forte")
 --pedido "texto"    o primeiro pedido, já digitado
 --arquivo p.md      o primeiro pedido, lido de um arquivo
 --esperar           só volta quando ele terminar
@@ -70,8 +74,6 @@ Opções do `ork abrir`:
 ```
 
 `ork pedir` aceita `--arquivo`, `--sem-esperar` e `--tempo`.
-
-**Limite:** cada agente abre no máximo 8 sessões.
 
 ## Montar o time
 
@@ -84,6 +86,30 @@ Opções do `ork abrir`:
 | `ork partitura` | lista os times salvos |
 | `ork partitura usar "Nome"` | sobe esse time ao seu lado, ligado a você |
 | `ork partitura salvar "Nome" [cartão]…` | guarda como partitura esses cartões, ou o andar inteiro |
+| `ork catalogo importar <pasta>` | transforma as fichas `.md` de uma pasta em funções (abaixo) |
+
+### Fichas de time
+
+Um time escrito fora do app — à mão, por outro agente, copiado de outro projeto — é uma pasta de arquivos
+Markdown, um por papel. Cada um tem um cabeçalho entre linhas `---` e um corpo, que vira o prompt da função:
+
+```markdown
+---
+nome: Revisor
+motor: Codex
+nivel: forte
+pasta: app
+---
+Você revisa toda mudança antes do push. …
+```
+
+- Só `nome` é obrigatório. `pasta` é relativa à pasta do espaço.
+- `motor` diz o motor. **"Codex e Claude"** (ou "Codex, Claude") cria **duas** funções, uma por motor, com o
+  motor no nome; **"Shell com Claude"**, sem separador, é um cartão só, descrito em prosa.
+- `nivel` casa com um preset daquele motor pelo nome: `forte`, `medio` ou `rapido` no nome do preset. Sem
+  preset naquele nível, cai no primeiro do motor, e o relatório avisa.
+- Importar de novo **atualiza pelo nome** em vez de duplicar, e **nunca apaga** função: a pasta pode ser
+  parte do time, não ele inteiro. Arquivo sem cabeçalho é pulado e aparece no relatório.
 
 ## Mexer no quadro
 
@@ -136,6 +162,6 @@ ork ver "Revisor" --linhas 40
 # ele parou numa pergunta de menu: responde
 ork teclas "Revisor" enter
 
-# terminou: fecha e devolve a vaga
+# terminou: fecha
 ork fechar "Revisor"
 ```

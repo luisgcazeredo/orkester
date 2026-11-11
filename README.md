@@ -5,7 +5,7 @@
 
 **Run a team of coding agents on an infinite canvas — and draw who talks to whom.**
 
-![version](https://img.shields.io/badge/version-1.0.10-4060e8)
+![version](https://img.shields.io/github/v/release/luisgcazeredo/orkester?label=version&color=4060e8)
 ![platform](https://img.shields.io/badge/platform-Windows%2011%20x64-4060e8)
 
 English · [Português](README.pt-BR.md)
@@ -56,7 +56,7 @@ Three ideas hold the rest together:
 
 **[Download the installer →](https://github.com/luisgcazeredo/orkester/releases/latest)**
 
-One file, `Orkester-Instalador-1.0.10.exe` (119 MB). Run it and the app installs for your user only — no admin
+One file, `Orkester-Instalador-<version>.exe` (about 120 MB). Run it and the app installs for your user only — no admin
 rights — and puts an **Orkester** shortcut on the desktop and in the Start menu. Requires **Windows 11
 x64**; nothing else needs to be installed.
 
@@ -71,7 +71,7 @@ Two things you should know before running it:
 Your boards live in `%USERPROFILE%\.orkester` — the canvas as JSON and sticky notes as `.md`, readable
 outside the app — and are not deleted when you uninstall.
 
-Version history: [CHANGELOG.md](CHANGELOG.md).
+What changed in each version: [Releases](https://github.com/luisgcazeredo/orkester/releases).
 
 ## Build from source
 
@@ -105,26 +105,16 @@ ork banda criar "Name" …      put a frame around agents so they all talk
 ork partitura usar "Name"     raise a saved team beside you
 ```
 
-Those are six of about twenty-five verbs. **The full reference is in [`docs/ork.md`](docs/ork.md).**
+Those are six of about thirty verbs. **The full reference is in [`docs/ork.md`](docs/ork.md).**
 
 ## Connect your own Claude (MCP)
 
 The `ork` command is for agents *on* the canvas. To drive the canvas from **outside** — your own Claude Code,
-Claude Desktop, Codex, another session — Orkester ships an MCP server and a key to go with it.
+Claude Desktop, Codex, any MCP client — click the gear in the top-right corner, generate a key and paste the
+snippet the app gives you. The client can then read the board, open agents, raise saved teams and import
+team sheets, acting as you. Orkester has to be open.
 
-1. Click the gear in the top-right corner (or search **Settings** in the command palette).
-2. Name the key after whoever will use it and click **Generate key**.
-3. Copy the snippet for your client — Claude Code, Claude Desktop / `.mcp.json`, or Codex — and paste it.
-   The key is shown **once**: Orkester keeps only a fingerprint of it.
-
-The client then gets one tool per action: read the board, open an agent (with a role, so engine and level come
-from it), read a card's screen, list and raise saved teams, list roles, and import a team written as Markdown
-files. Whatever it does lands on the board **as you**: no owner, no rope — the rope is a permission between
-agents, not between you and your own board. Orkester has to be open.
-
-**What the key is not:** a boundary against programs already running on your machine. Anything that runs as
-you can read Orkester's data folder anyway. The key gives you intent, a name, revocation, and a record of who
-used it and when — revoke one in the same screen and the next call from it is refused.
+**Tools, configuration and what the key does and does not protect: [`docs/mcp.md`](docs/mcp.md).**
 
 ## Under the hood
 
@@ -132,19 +122,20 @@ Electron · React · TypeScript · xterm.js · node-pty.
 
 The canvas logic lives in pure modules, covered by tests that run in plain Node without opening the app. On
 top of those, a self-test launches the real app, builds a canvas, drives it with mouse and keyboard and
-checks the result on screen. Today: **157 unit tests** and **157 UI checks** across 15 scenarios.
+checks the result on screen.
 
 ```text
 app/src/shared/    pure canvas rules (bands, scores, agent swap, routines, windows, files)
 app/src/main/      main process: terminals, `ork` verbs, data on disk, self-test
 app/src/renderer/  the canvas, in React
 app/src/cli/       the `ork` command the agent calls
-docs/              the `ork` reference
+app/src/mcp/       the MCP server an outside client runs
+docs/              the `ork` and MCP references
 ```
 
 ## Status
 
-Version **1.0.10**, released on 10/11/2026 and in daily use on Windows. Windows 11 x64 only — nothing in the
+In daily use on Windows. Windows 11 x64 only — nothing in the
 code assumes otherwise on purpose, but nothing was tested elsewhere either.
 
 ## License

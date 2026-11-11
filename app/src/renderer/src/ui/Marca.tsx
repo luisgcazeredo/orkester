@@ -1,6 +1,6 @@
 /**
  * O símbolo do Orkester: três peças orbitando um núcleo. É a mesma geometria do ícone do app
- * (`app/scripts/gerar-icone.mjs`), simplificada para tamanho de interface — nestes 18 px o rabo fino das
+ * (`app/build/icon.png`), simplificada para tamanho de interface — nestes 18 px o rabo fino das
  * faixas viraria sujeira, então aqui elas são arcos de espessura constante com ponta redonda.
  */
 export function Simbolo({ tamanho = 18 }: { tamanho?: number }) {
