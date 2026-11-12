@@ -87,18 +87,30 @@ export type DependenciasDoEnvio = {
   ocupado: (tela: string) => boolean
   prazoDaColagemMs?: number
   prazoDoEnterMs?: number
-  /** quanto esperar a tela parar depois de a colagem aparecer, antes do Enter (0 = não espera) */
+  /** quanto tempo a tela precisa ficar parada depois de a colagem aparecer, antes do Enter (0 = não espera) */
   assentarMs?: number
+  /** quantos Enter no máximo (padrão 6: o Codex recém-aberto chegou a precisar de 4) */
+  tentativasDeEnter?: number
 }
 
-/** Espera a tela ficar igual em duas leituras seguidas (até 3 s): a colagem terminou de ser desenhada. */
-async function esperarTelaParar(d: DependenciasDoEnvio, ms: number): Promise<void> {
+/**
+ * Espera a tela ficar parada por `quieto` ms seguidos (no máximo `quieto` + 4 s).
+ *
+ * Medido com Claude Code 2.1.322 de verdade num PTY (12/11/2026): Enter ~50 ms depois de a colagem aparecer
+ * é engolido; 500 ms depois, é aceito. Com quatro agentes subindo juntos, tudo fica mais lento — 1 s de folga.
+ */
+async function esperarTelaParar(d: DependenciasDoEnvio, quieto: number): Promise<void> {
   let anterior = await d.tela()
-  for (const limite = Date.now() + ms; Date.now() < limite; ) {
-    await d.esperar(300)
+  let mudouEm = Date.now()
+  for (const limite = Date.now() + quieto + 4000; Date.now() < limite; ) {
+    await d.esperar(200)
     const agora = await d.tela()
-    if (agora === anterior) return
-    anterior = agora
+    if (agora !== anterior) {
+      anterior = agora
+      mudouEm = Date.now()
+    } else if (Date.now() - mudouEm >= quieto) {
+      return
+    }
   }
 }
 
@@ -117,7 +129,9 @@ export async function confirmarEnvio(d: DependenciasDoEnvio): Promise<ResultadoD
   d.escreverColagem()
   await d.esperar(120)
   let chegou = false
-  for (const limite = Date.now() + (d.prazoDaColagemMs ?? 8000); Date.now() < limite; await d.esperar(150)) {
+  // 30 s: com vários agentes subindo juntos, o Claude Code mostra a tela de pronto e só processa a entrada
+  // quando termina de subir de verdade — medido com 3 Claude + 1 Codex em paralelo, a colagem passou de 8 s
+  for (const limite = Date.now() + (d.prazoDaColagemMs ?? 30_000); Date.now() < limite; await d.esperar(150)) {
     if ((await d.tela()) !== antesDaColagem) {
       chegou = true
       break
@@ -125,15 +139,18 @@ export async function confirmarEnvio(d: DependenciasDoEnvio): Promise<ResultadoD
   }
   if (!chegou) return 'ficou'
   // a colagem apareceu: deixa o agente terminar de desenhá-la antes do Enter (um Enter no meio se perde)
-  if ((d.assentarMs ?? 3000) > 0) await esperarTelaParar(d, d.assentarMs ?? 3000)
+  if ((d.assentarMs ?? 1000) > 0) await esperarTelaParar(d, d.assentarMs ?? 1000)
 
   let ultima: ResultadoDoEnvio = 'incerto'
-  for (let tentativa = 1; tentativa <= 3; tentativa++) {
+  // Enter de novo é seguro: o texto não é reescrito, e Enter num campo vazio não faz nada no Claude nem no
+  // Codex. Cada tentativa espera 5 s: o Claude leva 1,5–2 s para mostrar que recebeu, e com 2 s de prazo o
+  // app às vezes concluía "ficou" de um pedido que tinha saído.
+  for (let tentativa = 1; tentativa <= (d.tentativasDeEnter ?? 6); tentativa++) {
     const antes = await d.tela()
     const perguntavaAntes = await d.emPergunta()
     d.escrever('\r')
     ultima = 'incerto'
-    for (const limite = Date.now() + (d.prazoDoEnterMs ?? 2000); Date.now() < limite; await d.esperar(100)) {
+    for (const limite = Date.now() + (d.prazoDoEnterMs ?? 5000); Date.now() < limite; await d.esperar(150)) {
       const emPergunta = await d.emPergunta()
       const depois = await d.tela()
       // shell: responde na hora, então a tela mudar basta (o eco do comando é a prova)

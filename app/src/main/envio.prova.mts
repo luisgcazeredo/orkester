@@ -141,10 +141,11 @@ test('C: a colagem aparece → envia CR e confirma quando o pedido sai', async (
   assert.deepEqual(escritos, ['\r'])
 })
 
-test('C: Enter engolido nas 3 tentativas → ficou, com 3 CR e sem nunca dizer saiu', async () => {
-  const { escritos, dep } = terminalFalso([compositor(''), compositor(pedido)])
+test('C: Enter engolido nas 6 tentativas → ficou, com 6 CR, uma colagem só e sem nunca dizer saiu', async () => {
+  const { escritos, ordem, dep } = terminalFalso([compositor(''), compositor(pedido)])
   assert.equal(await confirmarEnvio(dep), 'ficou')
-  assert.deepEqual(escritos, ['\r', '\r', '\r'])
+  assert.deepEqual(escritos, ['\r', '\r', '\r', '\r', '\r', '\r'])
+  assert.equal(ordem.filter((o) => o === 'colagem').length, 1)
 })
 
 // ---- 1: a tela de referência é lida ANTES de escrever a colagem ----
