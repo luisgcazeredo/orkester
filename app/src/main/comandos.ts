@@ -1416,7 +1416,11 @@ const HANDLERS_DO_USUARIO: Partial<Record<NomeDeVerbo, (ctx: ContextoDoUsuario) 
       funcao
     })
     if (!r.ok) throw new Error(r.erro)
-    return { saida: `Abri "${r.nome}".` }
+    // A função traz o primeiro pedido (o papel). Até a 1.4.0 ele voltava da janela e era ignorado aqui: o
+    // cartão aberto pelo MCP nascia com o agente certo e sem saber quem era. Quem digita é este processo,
+    // como no `ork abrir`, mas sem segurar a resposta do cliente (o agente leva até um minuto para ficar pronto).
+    if (r.texto && r.id) void digitarPrimeiroPedidoDoUsuario(r.id, r.texto)
+    return { saida: `Abri "${r.nome}".${r.texto ? ' O papel da função vai ser digitado assim que o agente ficar pronto.' : ''}` }
   },
 
   ver: async ({ pos, opcoes }) => {
@@ -1426,6 +1430,20 @@ const HANDLERS_DO_USUARIO: Partial<Record<NomeDeVerbo, (ctx: ContextoDoUsuario) 
     const linhas = Math.min(2000, Math.max(1, Number(opcoes.linhas) || 50))
     return { saida: `"${alvo.espec.nome}" · ${await situacao(alvo)}\n${await telaDe(alvo, linhas)}` }
   }
+}
+
+/** O papel de um cartão aberto pelo MCP: espera o agente ficar pronto e digita; o que acontecer vai para o registro. */
+async function digitarPrimeiroPedidoDoUsuario(id: string, texto: string): Promise<void> {
+  const s = await esperarSessao(id, 10_000)
+  if (!s) return
+  const pronto = await aguardarPronto(s, 90_000, () => false)
+  if (pronto !== 'pronto') {
+    registrar(s, null, 'primeiro-pedido-nao-digitado', `agente não ficou pronto (${pronto}); o papel NÃO foi digitado`)
+    return
+  }
+  const envio = await digitarPedido(s, texto)
+  const { comando, alerta } = registroDoEnvio('primeiro-pedido', envio)
+  registrar(s, null, comando, alerta ?? texto)
 }
 
 async function executarComoUsuario(chave: ChaveGuardada, pedido: Pedido): Promise<ResultadoDoComando> {

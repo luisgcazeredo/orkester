@@ -36,7 +36,7 @@ import { MAX_PARTITURAS, aplicarPartitura, partituraDe, resumoDaPartitura } from
 import { alcanca, alcancaveisPor, bandasDoNo, bandasDoPlano, cordasDaBanda, cordasEfetivas, criarBanda, manterBandas, membrosDaBanda } from '../../../shared/quadro/bandas'
 import { trocarAgente } from '../../../shared/quadro/trocar'
 import { MAX_ROTINAS, novaRotina, proximaDe } from '../../../shared/rotinas'
-import { caixaDoDesenho, caixaDoNo, distanciaAoDesenho, enquadrar, lerViewport, uniao, type Caixa } from '../quadro/geometria'
+import { caixaDoDesenho, caixaDoNo, centroDaTela, distanciaAoDesenho, enquadrar, lerViewport, uniao, type Caixa } from '../quadro/geometria'
 
 export type Ferramenta = 'selecionar' | 'postit' | 'texto' | 'desenho'
 
@@ -2513,7 +2513,9 @@ function atenderUsuario(pedido: Extract<PedidoDoAgente, { tipo: 'usuario' }>): R
     funcoes: estado.preferencias.funcoes ?? [],
     presetsPadrao: PRESETS_PADRAO,
     novoId,
-    agora
+    agora,
+    // nasce no meio da tela do usuário, e não no fim do quadro
+    centro: centroDaTela(plano.camera)
   }
   const resultado = abrir(espaco, {
     tipo: 'abrir',

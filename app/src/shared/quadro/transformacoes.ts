@@ -15,6 +15,8 @@ export interface AmbienteTransformacoesDoQuadro {
   presetsPadrao: PresetAgente[]
   novoId: () => string
   agora: () => string
+  /** Meio da tela do usuário no quadro: onde nasce o cartão que ninguém do quadro abriu. */
+  centro?: { x: number; y: number }
 }
 
 export interface ResultadoTransformacaoDoQuadro {
@@ -104,10 +106,13 @@ export function abrir(
     // o vão livre mais perto de quem abriu, em volta dele (ver `lugarPerto`)
     caixa = { ...lugarPerto(caixaDoNo(criador), tamanho, plano.nos.filter((no) => no.id !== criador.id).map(caixaDoNo)), ...tamanho }
   } else {
-    caixa = { x: 120, y: 120, ...tamanho }
-    for (let tentativa = 0; tentativa < 30 && plano.nos.some((no) => tocam(caixa, caixaDoNo(no), 30)); tentativa++) {
-      caixa.y += caixa.altura + 60
-    }
+    // sem quem abriu no quadro (o usuário, pelo MCP): no meio da tela dele, se a janela disse onde é; ocupado,
+    // o vão livre mais perto dali. Antes descia a partir de (120, 120) até achar vaga — no quadro do time de
+    // 12/11/2026 o cartão nasceu em y = 6880, fora da vista.
+    const centro = ambiente.centro
+    caixa = centro ? { x: Math.round(centro.x - tamanho.largura / 2), y: Math.round(centro.y - tamanho.altura / 2), ...tamanho } : { x: 120, y: 120, ...tamanho }
+    const ocupados = plano.nos.map(caixaDoNo)
+    if (ocupados.some((o) => tocam(caixa, o, 30))) caixa = { ...lugarPerto(caixa, tamanho, ocupados), ...tamanho }
   }
 
   const no: NoTerminal = {

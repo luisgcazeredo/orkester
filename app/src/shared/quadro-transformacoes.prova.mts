@@ -130,6 +130,15 @@ test('abrir oito agentes seguidos: ficam em volta de quem abriu, sem coluna giga
   assert.ok(Math.max(...filhos.map((f) => f.y)) < 3 * 520, 'a coluna não desce sem fim')
 })
 
+test('abrir pelo usuário (sem criador) nasce no meio da tela; ocupado, no vão livre mais perto', () => {
+  const amb = { ...ambiente(), centro: { x: 5000, y: 3000 } }
+  const livre = abrir(espaco([terminal('outro')]), { tipo: 'abrir', espacoId: 'espaco', criador: '', agente: 'claude' }, amb).espaco.nos.at(-1)!
+  assert.deepEqual({ x: livre.x, y: livre.y }, { x: 4640, y: 2770 })
+  const ocupado = { ...terminal('no-meio'), x: 4640, y: 2770 }
+  const perto = abrir(espaco([ocupado]), { tipo: 'abrir', espacoId: 'espaco', criador: '', agente: 'claude' }, amb).espaco.nos.at(-1)!
+  assert.ok(Math.abs(perto.x - 4640) <= 800 && Math.abs(perto.y - 2770) <= 520, `${perto.x},${perto.y}`)
+})
+
 test('abrir sem criador no quadro ignora o limite local e começa no andar ativo sem corda', () => {
   const filhosDeOutroEspaco = Array.from({ length: 8 }, (_, indice) => terminal(`filho-${indice}`, 'ausente'))
   const resultado = abrir(
