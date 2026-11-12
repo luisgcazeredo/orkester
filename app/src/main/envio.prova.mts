@@ -87,7 +87,8 @@ function terminalFalso(telas: string[], opcoes: { renderizaNaHora?: { antes: str
       esperar: async () => {},
       ocupado: (t: string) => /esc to interrupt/.test(t),
       prazoDaColagemMs: 30,
-      prazoDoEnterMs: 30
+      prazoDoEnterMs: 30,
+      assentarMs: 0
     }
   }
 }
@@ -98,62 +99,37 @@ test('C: a tela não muda depois da colagem → não envia CR e devolve ficou', 
   assert.deepEqual(escritos, [])
 })
 
-test('C: a tela não muda → cola de novo (até 3 vezes) e nunca aperta Enter', async () => {
+test('C: a tela não muda → cola uma vez só e nunca aperta Enter', async () => {
   const { ordem, escritos, dep } = terminalFalso([compositor('')])
   assert.equal(await confirmarEnvio(dep), 'ficou')
-  assert.equal(ordem.filter((o) => o === 'colagem').length, 3)
+  assert.equal(ordem.filter((o) => o === 'colagem').length, 1)
   assert.deepEqual(escritos, [])
 })
 
-test('C: agente que ainda não aceitava digitação: a 2ª colagem aparece e o pedido sai', async () => {
+test('C: agente recém-aberto mostra a colagem atrasado → uma colagem, depois Enter, e o pedido sai', async () => {
+  // como os cartões de 12/11: a colagem fica guardada e só aparece leituras depois; nada de colar de novo
   const vazio = compositor('')
   let colagens = 0
-  let leituraDepois = 0
+  let leituras = 0
   const escritos: string[] = []
   const dep = {
     texto: pedido,
     shell: false,
-    escreverColagem: () => {
-      colagens++
-      leituraDepois = 0
-    },
+    escreverColagem: () => void colagens++,
     escrever: (d: string) => escritos.push(d),
     tela: async () => {
-      // a 1ª colagem some (entrada ainda desligada); a 2ª aparece; depois do Enter, sai do campo
       if (escritos.length) return `> ${pedido}\n● pensando\n${vazio}\n esc to interrupt`
-      if (colagens >= 2 && leituraDepois++ >= 0) return compositor(pedido)
-      return vazio
+      return leituras++ < 6 ? vazio : compositor(pedido)
     },
     emPergunta: async () => false,
     esperar: async () => {},
     ocupado: (t: string) => /esc to interrupt/.test(t),
-    prazoDaColagemMs: 30,
+    prazoDaColagemMs: 1000,
     prazoDoEnterMs: 30
   }
   assert.equal(await confirmarEnvio(dep), 'saiu')
-  assert.equal(colagens, 2)
-  assert.deepEqual(escritos, ['\r'])
-})
-
-test('C: a 1ª colagem aparece atrasada, durante a espera → não cola de novo (não duplica)', async () => {
-  let colagens = 0
-  let leituras = 0
-  const dep = {
-    texto: pedido,
-    shell: false,
-    escreverColagem: () => void colagens++,
-    escrever: () => {},
-    // a referência é a única leitura antes da espera (prazo 0); na olhada antes da 2ª colagem, já mudou —
-    // como os cartões Claude de 12/11, em que o "[Pasted text]" apareceu depois de 1,5 s
-    tela: async () => (leituras++ < 1 ? compositor('') : compositor(pedido)),
-    emPergunta: async () => false,
-    esperar: async () => {},
-    ocupado: () => false,
-    prazoDaColagemMs: 0,
-    prazoDoEnterMs: 0
-  }
-  await confirmarEnvio(dep)
   assert.equal(colagens, 1)
+  assert.deepEqual(escritos, ['\r'])
 })
 
 test('C: a colagem aparece → envia CR e confirma quando o pedido sai', async () => {

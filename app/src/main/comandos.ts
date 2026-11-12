@@ -398,7 +398,9 @@ async function aguardarPronto(
   for (const limite = Date.now() + ms; Date.now() < limite && !cancelado(); await esperar(300)) {
     if (!s.processo) return 'encerrado'
     const quieto = Date.now() - s.ultimaSaida
-    if (Date.now() - s.iniciadoEm < 2000 || quieto < 1500) continue
+    // agente: 3 s de tela parada. O Claude Code 2.1.322 desenha a tela de pronto antes de ligar a entrada, e
+    // o que chega nessa janela fica guardado e aparece tarde (12/11/2026). Shell responde na hora.
+    if (Date.now() - s.iniciadoEm < 2000 || quieto < (s.espec.agente === 'shell' ? 1500 : 3000)) continue
     if (s.espec.agente === 'shell') return 'pronto'
     const tela = await telaDe(s, 40)
     if (DIALOGO.test(ultimasLinhasComTexto(tela))) return 'confirmar'

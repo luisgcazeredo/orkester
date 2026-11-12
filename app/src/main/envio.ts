@@ -87,9 +87,19 @@ export type DependenciasDoEnvio = {
   ocupado: (tela: string) => boolean
   prazoDaColagemMs?: number
   prazoDoEnterMs?: number
-  /** quantas vezes colar quando a tela não mudou nada (padrão 3) */
-  tentativasDeColagem?: number
-  esperaEntreColagensMs?: number
+  /** quanto esperar a tela parar depois de a colagem aparecer, antes do Enter (0 = não espera) */
+  assentarMs?: number
+}
+
+/** Espera a tela ficar igual em duas leituras seguidas (até 3 s): a colagem terminou de ser desenhada. */
+async function esperarTelaParar(d: DependenciasDoEnvio, ms: number): Promise<void> {
+  let anterior = await d.tela()
+  for (const limite = Date.now() + ms; Date.now() < limite; ) {
+    await d.esperar(300)
+    const agora = await d.tela()
+    if (agora === anterior) return
+    anterior = agora
+  }
 }
 
 /**
@@ -100,31 +110,22 @@ export async function confirmarEnvio(d: DependenciasDoEnvio): Promise<ResultadoD
   // A tela de referência vem ANTES de a colagem ser escrita: o PTY pode renderizar o texto antes da primeira
   // leitura, e aí "a tela mudou" nunca seria visto (e o Enter nunca iria).
   const antesDaColagem = await d.tela()
+  // **Uma colagem só, nunca repetida.** Em 12/11/2026 os cartões recém-abertos (Claude Code 2.1.322, Codex)
+  // guardaram a colagem e só a mostraram vários segundos depois. Com 1,5 s de prazo o app desistia sem Enter
+  // (1.4.1); colando de novo quando a tela não mudava (1.4.2), as duas apareceram juntas, duplicadas. O
+  // agente pode demorar, mas o que foi escrito chega: então espera mais, e não escreve de novo.
+  d.escreverColagem()
+  await d.esperar(120)
   let chegou = false
-  // A colagem pode demorar a aparecer: em 12/11/2026 os cartões da partitura (Claude Code 2.1.322 e Codex
-  // recém-abertos) mostraram o "[Pasted text]" depois de 1,5 s, o app desistiu sem Enter e as fichas ficaram
-  // paradas no campo. Então: não apareceu, espera mais e olha de novo — mudou, era a colagem atrasada, segue
-  // para o Enter sem colar outra vez (duplicaria). Só com a tela ainda idêntica (nada foi escrito: a entrada
-  // não estava ligada) cola de novo.
-  for (let tentativa = 0; tentativa < (d.tentativasDeColagem ?? 3) && !chegou; tentativa++) {
-    if (tentativa > 0) {
-      // folgado de propósito: colar de novo uma colagem que só estava lenta duplicaria o pedido
-      await d.esperar(d.esperaEntreColagensMs ?? 4000)
-      if ((await d.tela()) !== antesDaColagem) {
-        chegou = true
-        break
-      }
-    }
-    d.escreverColagem()
-    await d.esperar(120)
-    for (const limite = Date.now() + (d.prazoDaColagemMs ?? 1500); Date.now() < limite; await d.esperar(100)) {
-      if ((await d.tela()) !== antesDaColagem) {
-        chegou = true
-        break
-      }
+  for (const limite = Date.now() + (d.prazoDaColagemMs ?? 8000); Date.now() < limite; await d.esperar(150)) {
+    if ((await d.tela()) !== antesDaColagem) {
+      chegou = true
+      break
     }
   }
   if (!chegou) return 'ficou'
+  // a colagem apareceu: deixa o agente terminar de desenhá-la antes do Enter (um Enter no meio se perde)
+  if ((d.assentarMs ?? 3000) > 0) await esperarTelaParar(d, d.assentarMs ?? 3000)
 
   let ultima: ResultadoDoEnvio = 'incerto'
   for (let tentativa = 1; tentativa <= 3; tentativa++) {
