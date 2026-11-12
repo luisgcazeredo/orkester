@@ -58,7 +58,14 @@ export function Quadro() {
   const linhasDoCodigo = usarLoja((e) => e.preferencias.linhasDoCodigo !== false)
   const estilo = usarLoja((e) => e.estiloDesenho)
   const area = useRef<HTMLDivElement>(null)
-  const [gesto, setGesto] = useState<Gesto | null>(null)
+  const [gesto, setGestoEstado] = useState<Gesto | null>(null)
+  // espelho síncrono do gesto: o estado do React só vale depois do próximo render, e os eventos de ponteiro que
+  // chegam antes dele (máquina carregada) viam "sem gesto" e eram perdidos (a borracha deixava o traço de pé)
+  const gestoAgora = useRef<Gesto | null>(null)
+  const setGesto = (g: Gesto | null): void => {
+    gestoAgora.current = g
+    setGestoEstado(g)
+  }
   const [espacoApertado, setEspacoApertado] = useState(false)
   const [borracha, setBorracha] = useState<Ponto | null>(null)
   // post-it ou texto criado neste clique: o mousedown que vem logo depois não pode tirar o foco da caixa nova
@@ -216,6 +223,7 @@ export function Quadro() {
     const tela = pontoDaTela(e)
     definirMouse(tela)
     if (usandoBorracha) setBorracha(tela)
+    const gesto = gestoAgora.current
     if (!gesto) return
     // soltou o botão onde o quadro não vê (em cima do portal, fora da janela): termina o gesto aqui
     if (e.buttons === 0) return aoSoltar(e)
@@ -244,6 +252,7 @@ export function Quadro() {
   }
 
   function aoSoltar(e: PointerEvent<HTMLDivElement>): void {
+    const gesto = gestoAgora.current
     if (gesto?.tipo === 'desenhar') {
       const [a, b] = [gesto.desenho.pontos[0], gesto.desenho.pontos[gesto.desenho.pontos.length - 1]]
       const tamanho = Math.hypot(b[0] - a[0], b[1] - a[1])
