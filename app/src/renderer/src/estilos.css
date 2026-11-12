@@ -491,6 +491,16 @@ button {
   letter-spacing: 0.03em;
 }
 
+.terminal-selo-aviso {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid var(--perigo);
+  background: transparent;
+  color: var(--perigo);
+  cursor: pointer;
+}
+
 .porta {
   position: absolute;
   top: 50%;

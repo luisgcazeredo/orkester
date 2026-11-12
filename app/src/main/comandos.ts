@@ -5,7 +5,7 @@ import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSyn
 import { createServer, type Socket } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve, sep } from 'node:path'
-import { CANAIS, CANAIS_AGENTES, CANAIS_CHAVES, type PedidoDoAgente, type RespostaAoAgente, type ResumoContextoTerminal } from '../shared/api'
+import { CANAIS, CANAIS_AGENTES, CANAIS_CHAVES, primeiroPedidoDoCartao, type PedidoDoAgente, type ResultadoDoPrimeiroPedido, type RespostaAoAgente, type ResumoContextoTerminal } from '../shared/api'
 import type { Agente, ResultadoDaRotina, ResumoEspaco } from '../shared/modelo'
 import { MAX_FICHAS, lerFicha, type FichaDeCatalogo } from '../shared/catalogo'
 import type { ChaveGuardada, ComandoDoMcp } from '../shared/chaves'
@@ -17,6 +17,7 @@ import { abrirJanela, donoDe } from './janelas'
 import { abrirCorreio, pastaDoCorreio } from './correio'
 import { AJUDA, SKILL } from './manual'
 import { extrairLeituraDeContexto, extrairLeituraDoRodape } from './contexto'
+import { confirmarEnvio, registroDoEnvio, resultadoDaRotina, type ResultadoDoEnvio } from './envio'
 import { validarChamada, type NomeDeVerbo } from './verbos'
 import {
   aceitaColagem,
@@ -421,47 +422,48 @@ async function recusarSeEmPergunta(s: Sessao): Promise<void> {
 }
 
 /**
- * Digita o pedido e confirma que ele **saiu**. Devolve falso se o texto ficou escrito sem enviar: quem
- * chamou tem de contar isso a quem pediu. Voltar calado é o que fez um pedido sumir na tela do Codex em
- * 09/11/2026 — o Maestro achou que tinha falado, e do outro lado ninguém tinha ouvido.
+ * Digita o pedido e confirma que ele **saiu**. Quem chamou tem de contar a quem pediu quando não saiu: voltar
+ * calado é o que fez um pedido sumir na tela do Codex em 09/11/2026 — o Maestro achou que tinha falado, e do
+ * outro lado ninguém tinha ouvido. `saiu`: confirmado. `ficou`: escrito no compositor (ou nem chegou), NÃO
+ * enviado. `incerto`: pode ter saído; não reenvie sem ver a tela.
  */
-async function digitarPedido(s: Sessao, texto: string): Promise<boolean> {
+async function digitarPedido(s: Sessao, texto: string): Promise<ResultadoDoEnvio> {
   const limpo = texto.replace(/\r\n?/g, '\n').trimEnd()
-  if (s.espec.agente !== 'shell' && aceitaColagem(s)) {
-    escreverNoProcesso(s, `\x1b[200~${limpo.replace(/\x1b\[20[01]~/g, '')}\x1b[201~`)
-  } else {
-    escreverNoProcesso(s, s.espec.agente === 'shell' ? limpo.replace(/\n/g, '\r') : limpo.replace(/\n/g, ' '))
-  }
-  // O Enter vai separado da colagem: junto, alguns agentes o tomam como parte do texto.
-  //
-  // Antes esta espera era de 250 ms fixos, e era um chute. Num agente recém-nascido, com a máquina
-  // ocupada, 250 ms não bastam: o Enter chega antes de o compositor ter o texto e é engolido — o pedido
-  // fica escrito na tela, sem enviar, até alguém apertar Enter à mão (visto com Codex em 09/11/2026).
-  // Agora espera-se a evidência de que a colagem chegou, e depois confirma-se que o pedido saiu.
-  const antesDaColagem = await telaDe(s, 12)
-  await esperar(120)
-  await esperarMudanca(s, antesDaColagem, 1500)
-
-  for (let tentativa = 1; tentativa <= 3; tentativa++) {
-    const antesDoEnter = await telaDe(s, 12)
-    escreverNoProcesso(s, '\r')
-    // enviado é uma de duas coisas: o agente começou a trabalhar (ou a perguntar), ou a tela mudou — o
-    // shell, que responde na hora, cai no segundo caso antes de dar tempo de ficar "trabalhando"
-    for (const limite = Date.now() + 2000; Date.now() < limite; await esperar(100)) {
-      const agora = await situacao(s)
-      if (agora === 'trabalhando' || agora === 'pergunta') return true
-      if ((await telaDe(s, 12)) !== antesDoEnter) return true
+  const escreverColagem = (): void => {
+    if (s.espec.agente !== 'shell' && aceitaColagem(s)) {
+      escreverNoProcesso(s, `\x1b[200~${limpo.replace(/\x1b\[20[01]~/g, '')}\x1b[201~`)
+    } else {
+      escreverNoProcesso(s, s.espec.agente === 'shell' ? limpo.replace(/\n/g, '\r') : limpo.replace(/\n/g, ' '))
     }
   }
-  return false
+  // O Enter vai separado da colagem e só depois de ela aparecer (a espera fixa de 250 ms perdeu pedido no Codex
+  // em 09/11/2026). Quem espera, aperta e confirma é `confirmarEnvio`, em `envio.ts`, que tem prova.
+  return confirmarEnvio({
+    texto: limpo,
+    shell: s.espec.agente === 'shell',
+    escreverColagem,
+    escrever: (dados) => escreverNoProcesso(s, dados),
+    tela: () => telaDe(s, 12),
+    emPergunta: async () => (await situacao(s)) === 'pergunta',
+    esperar,
+    ocupado: (tela) => OCUPADO.test(tela)
+  })
 }
 
-/** Espera a tela mudar (a colagem aparecendo, por exemplo). Falso se nada mudou no prazo. */
-async function esperarMudanca(s: Sessao, antes: string, ms: number): Promise<boolean> {
-  for (const limite = Date.now() + ms; Date.now() < limite; await esperar(100)) {
-    if ((await telaDe(s, 12)) !== antes) return true
+/** O que dizer a quem pediu quando o envio não foi confirmado. `incerto` não manda reenviar às cegas. */
+async function avisoDeEnvio(s: Sessao, r: 'ficou' | 'incerto', linhas: number): Promise<string> {
+  const nome = s.espec.nome
+  const quadro = `Tela agora:\n${await telaDe(s, linhas)}`
+  if (r === 'incerto') {
+    return (
+      `não consegui confirmar se o pedido saiu em "${nome}": não separo o campo de entrada do histórico na tela. ` +
+      `Ele PODE ter sido enviado — veja com \`ork ver "${nome}"\` antes de mandar de novo, para não duplicar.\n${quadro}`
+    )
   }
-  return false
+  return (
+    `o pedido NÃO foi enviado a "${nome}": ficou escrito no campo de entrada (ou nem chegou lá) e o Enter não ` +
+    `o mandou. Veja com \`ork ver "${nome}"\`, resolva o que estiver em cima com \`ork teclas\` e mande de novo.\n${quadro}`
+  )
 }
 
 /**
@@ -474,9 +476,10 @@ export async function dispararNoTerminal(id: string, texto: string): Promise<Res
   if (!s || s.fim) return 'sem-cartao'
   const agora = await situacao(s)
   if (agora !== 'livre') return agora === 'encerrado' ? 'encerrado' : agora === 'pergunta' ? 'pergunta' : 'ocupado'
-  if (!(await digitarPedido(s, texto))) return 'nao-enviou'
-  registrar(s, null, 'rotina', texto)
-  return 'rodou'
+  // `incerto` não vira `nao-enviou`: a rotina repetiria e duplicaria o pedido. Fica anotado no registro.
+  const envio = await digitarPedido(s, texto)
+  registrar(s, null, registroDoEnvio('rotina', envio).comando, texto)
+  return resultadoDaRotina(envio)
 }
 
 function registrar(de: Sessao, para: Sessao | null, comando: string, texto = ''): void {
@@ -819,14 +822,8 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
       }[pronto]
       return { saida: `${aberto}\n${motivo}\nTela agora:\n${await telaDe(novo, 30)}` }
     }
-    if (!(await digitarPedido(novo, pedidoInicial))) {
-      return {
-        saida:
-          `${aberto}\nO pedido foi digitado e NÃO foi enviado: ele não aceitou o Enter (algum aviso ou ` +
-          `pergunta em cima, talvez). Veja a tela com \`ork ver "${novo.espec.nome}"\`, resolva com ` +
-          `\`ork teclas\` e mande de novo com \`ork pedir\`.\nTela agora:\n${await telaDe(novo, 30)}`
-      }
-    }
+    const envio = await digitarPedido(novo, pedidoInicial)
+    if (envio !== 'saiu') return { saida: `${aberto}\n${await avisoDeEnvio(novo, envio, 30)}` }
     if (!opcoes.esperar || opcoes['sem-esperar']) return { saida: `${aberto} Pedido enviado. Acompanhe com \`ork esperar "${novo.espec.nome}"\` ou \`ork ver\`.` }
     return { saida: `${aberto}\n${await resultado(novo, tempoDe(opcoes), cancelado)}` }
   },
@@ -841,13 +838,8 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
       throw new Error(`"${alvo.espec.nome}" está rodando um comando; espere terminar (\`ork esperar "${alvo.espec.nome}"\`) e mande de novo`)
     }
     registrar(eu, alvo, 'pedir', texto)
-    if (!(await digitarPedido(alvo, texto))) {
-      throw new Error(
-        `o pedido foi digitado em "${alvo.espec.nome}" e NÃO foi enviado: ele não aceitou o Enter. Veja a ` +
-          `tela com \`ork ver "${alvo.espec.nome}"\`, resolva o que estiver em cima com \`ork teclas\` e ` +
-          `mande de novo.\nTela agora:\n${await telaDe(alvo, 25)}`
-      )
-    }
+    const envio = await digitarPedido(alvo, texto)
+    if (envio !== 'saiu') throw new Error(await avisoDeEnvio(alvo, envio, 25))
     if (opcoes['sem-esperar']) return { saida: `Pedido enviado para "${alvo.espec.nome}".` }
     return { saida: await resultado(alvo, tempoDe(opcoes), cancelado) }
   },
@@ -1332,17 +1324,29 @@ export function registrarComandos(): void {
    * Cartão criado pela interface com uma função: o prompt dela é o primeiro pedido. Quem espera o agente
    * ficar pronto é o processo principal, que é quem lê a tela — a janela não sabe quando a abertura acabou.
    */
-  ipcMain.on(CANAIS.primeiroPedido, (_evento, id: unknown, texto: unknown) => {
-    if (typeof id !== 'string' || typeof texto !== 'string' || !texto.trim()) return
-    void (async () => {
-      const s = await esperarSessao(id, 5000)
-      if (!s) return
+  ipcMain.handle(CANAIS.primeiroPedido, (_evento, id: unknown, texto: unknown): Promise<ResultadoDoPrimeiroPedido> =>
+    primeiroPedidoDoCartao<Sessao>({
+      id,
+      texto,
+      acharSessao: (sid) => esperarSessao(sid, 5000),
       // falhou em ficar pronto (pergunta de confiar na pasta, por exemplo): não digita nada, o cartão
       // fica lá esperando o usuário — melhor do que escrever o papel no meio de um diálogo
-      if ((await aguardarPronto(s, 90_000, () => false)) !== 'pronto') return
-      await digitarPedido(s, texto)
-    })()
-  })
+      aguardarPronto: (s) => aguardarPronto(s, 90_000, () => false),
+      digitar: digitarPedido,
+      // o chamador recebe o status; o registro e o log continuam, e nada é reenviado
+      registrar: (s, r) => {
+        if (r.status === 'nao-pronto') {
+          registrar(s, null, 'primeiro-pedido-nao-digitado', `agente não ficou pronto (${r.motivo}); o primeiro pedido NÃO foi digitado`)
+          console.warn(`[orkester] primeiro pedido de "${s.espec.nome}" não digitado: agente não ficou pronto (${r.motivo})`)
+          return
+        }
+        if (r.status === 'sem-sessao') return
+        const { comando, alerta } = registroDoEnvio('primeiro-pedido', r.status)
+        registrar(s, null, comando, alerta ?? String(texto))
+        if (alerta) console.warn(`[orkester] "${s.espec.nome}": ${alerta}`)
+      }
+    })
+  )
 
   ipcMain.on(CANAIS_AGENTES.resposta, (evento, id: unknown, resposta: RespostaAoAgente) => {
     const pendente = typeof id === 'string' ? respostas.get(id) : undefined

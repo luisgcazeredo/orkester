@@ -1244,6 +1244,77 @@ export async function rodarAutoteste(
       `nome ${doCartao.nome} · função ${doCartao.funcao} · ${ultimas(chegou, 2)}`
     )
 
+    // aviso do primeiro pedido: confirmado (saiu) não deixa selo; não confirmado mostra o selo no cartão e dispensa some
+    const seloDe = (id: string): Promise<boolean> =>
+      js<boolean>(`!!document.querySelector('[data-no-id="${id}"] [data-teste="aviso-primeiro-pedido"]')`)
+    const semSeloDeInicio = !(await seloDe(idFuncao))
+    const espacoDoTeste = await js<string>('window.__teste.loja.lerEstado().espaco.id')
+    const avisos = (): Promise<Record<string, string>> => js('window.__teste.loja.lerEstado().avisosDoPrimeiroPedido')
+    const chave = (esp: string, id: string): string => `${esp}${id}`
+    const anotar = (esp: string, id: string, status: string): Promise<unknown> =>
+      js(`window.__teste.loja.anotarAvisoDoPrimeiroPedido('${esp}', '${id}', '${status}')`)
+    const dicaDe = (id: string): Promise<string> =>
+      js<string>(`document.querySelector('[data-no-id="${id}"] [data-teste="aviso-primeiro-pedido"]')?.title ?? ''`)
+    // cada status não confirmado (e o erro do canal) põe o selo com a mensagem própria; o clique só remove o aviso
+    const esperada: Record<string, RegExp> = {
+      ficou: /NÃO foi enviado/,
+      incerto: /pode ter saído/,
+      'nao-pronto': /não ficou pronto/,
+      'sem-sessao': /não há processo/,
+      erro: /comunicação/
+    }
+    const dicas: Record<string, string> = {}
+    let selosOk = true
+    let dispensaSoRemove = true
+    for (const status of Object.keys(esperada)) {
+      await anotar(espacoDoTeste, idFuncao, status)
+      const apareceu = (await aguardar(async () => String(await seloDe(idFuncao)), 'true', 5000)) === 'true'
+      dicas[status] = await dicaDe(idFuncao)
+      if (!apareceu || !esperada[status].test(dicas[status])) selosOk = false
+      await js(`document.querySelector('[data-no-id="${idFuncao}"] [data-teste="aviso-primeiro-pedido"]')?.click()`)
+      await esperar(300)
+      const depois = await avisos()
+      if ((await seloDe(idFuncao)) || chave(espacoDoTeste, idFuncao) in depois || Object.values(depois).includes('saiu')) dispensaSoRemove = false
+    }
+    const mensagensDistintas = new Set(Object.values(dicas)).size === 5
+    // o mesmo id de cartão em outro espaço não aparece neste cartão, e some só com a chave dele
+    await anotar('espaco-de-fora', idFuncao, 'ficou')
+    await esperar(300)
+    const outroNaoAparece = !(await seloDe(idFuncao)) && chave('espaco-de-fora', idFuncao) in (await avisos())
+    await js(`window.__teste.loja.dispensarAvisoDoPrimeiroPedido('espaco-de-fora', '${idFuncao}')`)
+    const outroSaiu = !(chave('espaco-de-fora', idFuncao) in (await avisos()))
+    // dispensar com o pedido ainda pendente: a resposta tardia não recria o selo (controle: sem dispensar, ela cria)
+    const emVoo = (status: string): Promise<unknown> =>
+      js(`(() => { window.__pend = {}; const p = new Promise((r) => { window.__pend.r = r })
+        window.__teste.loja.entregarPrimeiroPedido('${idFuncao}', 'x', () => p)
+        return true })()`).then(() => js(`window.__pend.r({ status: '${status}' })`))
+    await emVoo('incerto')
+    const controleCriou = (await aguardar(async () => String(await seloDe(idFuncao)), 'true', 5000)) === 'true'
+    await js(`window.__teste.loja.dispensarAvisoDoPrimeiroPedido('${espacoDoTeste}', '${idFuncao}')`)
+    await js(`(() => { window.__pend = {}; const p = new Promise((r) => { window.__pend.r = r })
+      window.__teste.loja.entregarPrimeiroPedido('${idFuncao}', 'x', () => p); return true })()`)
+    await js(`window.__teste.loja.dispensarAvisoDoPrimeiroPedido('${espacoDoTeste}', '${idFuncao}')`)
+    await js(`window.__pend.r({ status: 'ficou' })`)
+    await esperar(400)
+    const tardiaAposDispensar = !(await seloDe(idFuncao)) && !(chave(espacoDoTeste, idFuncao) in (await avisos()))
+    await js(`window.__teste.loja.dispensarAvisoDoPrimeiroPedido('${espacoDoTeste}', '${idFuncao}')`)
+    // cartão apagado: o aviso sai do mapa, e uma resposta tardia não o traz de volta
+    const idEfemero = await js<string>(`(() => { const L = window.__teste.loja
+      const preset = L.lerEstado().preferencias.presets.find((p) => p.agente === 'shell')
+      return L.adicionarNo({ tipo: 'terminal', preset }, 3900, 2200) })()`)
+    await anotar(espacoDoTeste, idEfemero, 'ficou')
+    const tinha = chave(espacoDoTeste, idEfemero) in (await avisos())
+    await js(`(() => { const L = window.__teste.loja; L.selecionar({ tipo: 'no', id: '${idEfemero}' }); L.apagarSelecao() })()`)
+    await esperar(300)
+    const limpou = !(chave(espacoDoTeste, idEfemero) in (await avisos()))
+    await anotar(espacoDoTeste, idEfemero, 'ficou')
+    const tardiaIgnorada = !(chave(espacoDoTeste, idEfemero) in (await avisos()))
+    conferir(
+      'primeiro pedido não confirmado: o cartão ganha o selo de aviso e ele some ao dispensar',
+      semSeloDeInicio && selosOk && mensagensDistintas && dispensaSoRemove && outroNaoAparece && outroSaiu && controleCriou && tardiaAposDispensar && tinha && limpou && tardiaIgnorada,
+      `sem selo ao nascer ${semSeloDeInicio} · selo e mensagem própria (ficou/incerto/nao-pronto/sem-sessao/erro) ${selosOk} · 5 mensagens distintas ${mensagensDistintas} · dispensar só remove ${dispensaSoRemove} · outro espaço isolado ${outroNaoAparece}/${outroSaiu} · pendente: controle criou ${controleCriou}, dispensado não recria ${tardiaAposDispensar} · cartão apagado: tinha ${tinha}, saiu ${limpou} · resposta tardia ignorada ${tardiaIgnorada}`
+    )
+
     // o agente também enxerga as funções e abre por elas
     const listaFuncoes = await comandoAte(chefe, 'ork funcoes', /Carteiro/, 15_000)
     const abriuComFuncao = await comandoAte(chefe, 'ork abrir shell --funcao "Carteiro" --nome Entregador', /Abri "Entregador"/, 30_000)

@@ -17,6 +17,42 @@ import type { FichaDeCatalogo } from './catalogo'
 import type { PreferenciasParciais } from './preferencias'
 
 /** O que o processo principal precisa para manter o processo de um cartão de terminal. */
+
+/** Por que um agente recém-aberto não ficou pronto para receber o primeiro pedido. */
+export type MotivoNaoPronto = 'confirmar' | 'desconhecido' | 'tempo' | 'encerrado'
+
+/**
+ * O que aconteceu com o primeiro pedido de um cartão.
+ * - `saiu`: confirmado. `ficou`: escrito no campo de entrada e NÃO enviado. `incerto`: pode ter saído; não repetir sem ver a tela.
+ * - `nao-pronto`: nada foi digitado, o agente não ficou pronto (`motivo` diz por quê).
+ * - `sem-sessao`: não há processo para esse cartão (ou o pedido era inválido); nada foi digitado.
+ */
+export type ResultadoDoPrimeiroPedido =
+  | { status: 'saiu' | 'ficou' | 'incerto' | 'sem-sessao' }
+  | { status: 'nao-pronto'; motivo: MotivoNaoPronto }
+
+/**
+ * A decisão do primeiro pedido, sem Electron: acha a sessão, espera o agente ficar pronto, digita e devolve o
+ * status. `registrar` é chamado com a sessão e o resultado (é onde o processo principal grava registro e log).
+ */
+export async function primeiroPedidoDoCartao<S>(d: {
+  id: unknown
+  texto: unknown
+  acharSessao: (id: string) => Promise<S | undefined>
+  aguardarPronto: (s: S) => Promise<'pronto' | MotivoNaoPronto>
+  digitar: (s: S, texto: string) => Promise<'saiu' | 'ficou' | 'incerto'>
+  registrar: (s: S, resultado: ResultadoDoPrimeiroPedido) => void
+}): Promise<ResultadoDoPrimeiroPedido> {
+  if (typeof d.id !== 'string' || typeof d.texto !== 'string' || !d.texto.trim()) return { status: 'sem-sessao' }
+  const s = await d.acharSessao(d.id)
+  if (!s) return { status: 'sem-sessao' }
+  const pronto = await d.aguardarPronto(s)
+  const resultado: ResultadoDoPrimeiroPedido =
+    pronto === 'pronto' ? { status: await d.digitar(s, d.texto) } : { status: 'nao-pronto', motivo: pronto }
+  d.registrar(s, resultado)
+  return resultado
+}
+
 export interface EspecTerminal {
   /** Id do cartão: é também o id do processo. */
   id: string
@@ -69,7 +105,7 @@ export interface ApiTerminal {
    * Primeiro pedido de um cartão que nasceu com função: o processo principal espera o agente ficar pronto
    * e digita. A janela não faria isso direito — ela não sabe quando o agente terminou de abrir.
    */
-  primeiroPedido(id: string, texto: string): void
+  primeiroPedido(id: string, texto: string): Promise<ResultadoDoPrimeiroPedido>
   /**
    * O cartão passou a ser de outro agente: encerra o processo e abre o novo. A espec nova chega antes, pelo
    * `sincronizar` (as mensagens para o processo principal mantêm a ordem).

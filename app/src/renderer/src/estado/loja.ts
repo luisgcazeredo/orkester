@@ -26,7 +26,7 @@ import {
   type ResumoEspaco,
   type Tema
 } from '../../../shared/modelo'
-import { type AvisoJanelas, type AvisoRotina, type EspecTerminal, type PedidoDoAgente, type RespostaAoAgente } from '../../../shared/api'
+import { type ResultadoDoPrimeiroPedido, type AvisoJanelas, type AvisoRotina, type EspecTerminal, type PedidoDoAgente, type RespostaAoAgente } from '../../../shared/api'
 import { juntarCatalogo, textoDoRelatorio } from '../../../shared/catalogo'
 import { proximoZ } from '../../../shared/quadro/geometria'
 import { empurrarParaBaixo } from '../../../shared/quadro/empurrar'
@@ -71,6 +71,8 @@ export interface EstadoUI {
   editando: string | null
   miniMapa: boolean
   erroAoSalvar: string | null
+  /** Cartões cujo primeiro pedido NÃO foi confirmado, por id (o selo no cabeçalho do cartão lê daqui). */
+  avisosDoPrimeiroPedido: Record<string, StatusDoAviso>
   /** Vista de andares (a pilha em perspectiva) aberta. */
   vistaAndares: boolean
   /** Espaços abertos em outras janelas (esta não pode abrir: traz a outra para a frente). */
@@ -78,6 +80,9 @@ export interface EstadoUI {
   /** Explorador de arquivos da direita: aberto, as pastas que ele mostra e as que estão abertas nele. */
   explorador: { aberto: boolean; raizes: string[]; expandidas: string[] }
 }
+
+/** `ficou`: escrito no campo e não enviado. `incerto`: pode ter saído. `nao-pronto`/`sem-sessao`: nada foi digitado. `erro`: o canal com o processo principal falhou. */
+export type StatusDoAviso = 'ficou' | 'incerto' | 'nao-pronto' | 'sem-sessao' | 'erro'
 
 let estado: EstadoUI = {
   carregado: false,
@@ -92,6 +97,7 @@ let estado: EstadoUI = {
   editando: null,
   miniMapa: false,
   erroAoSalvar: null,
+  avisosDoPrimeiroPedido: {},
   vistaAndares: false,
   emOutrasJanelas: [],
   explorador: { aberto: false, raizes: [], expandidas: [] }
@@ -116,6 +122,7 @@ export function usarLoja<T>(seletor: (e: EstadoUI) => T): T {
 function definir(parcial: Partial<EstadoUI>): void {
   estado = { ...estado, ...parcial }
   if ('espaco' in parcial) {
+    esquecerAvisosDeCartoesApagados()
     sincronizarTerminais()
     sincronizarRotinas()
     ajustarVigiasDeCodigo()
@@ -570,8 +577,82 @@ export function subirPartitura(
   mudarPlano(() => feito.plano, false)
   definir({ selecao: { ...NADA, nos: feito.ids }, editando: null })
   // o prompt de cada função é entregue pelo processo principal, que sabe quando o agente ficou pronto
-  for (const pedido of feito.pedidos) window.ork.terminal.primeiroPedido(pedido.id, pedido.texto)
+  for (const pedido of feito.pedidos) entregarPrimeiroPedido(pedido.id, pedido.texto)
   return { ids: feito.ids, texto: feito.texto }
+}
+
+/** Chave de um aviso: espaço + cartão, para que ids iguais em espaços diferentes nunca se misturem. */
+export function chaveDoAviso(espacoId: string | undefined, cartaoId: string): string {
+  return `${espacoId ?? ''}${cartaoId}`
+}
+
+function existeTerminal(id: string): boolean {
+  const e = estado.espaco
+  return !!e && [e, ...e.andares].some((p) => p.nos.some((n) => n.tipo === 'terminal' && n.id === id))
+}
+
+/**
+ * Cartão apagado (em qualquer andar) do espaço aberto: o aviso dele sai do mapa. Os avisos de outros espaços
+ * ficam como estão e voltam a valer (ou são podados) quando o espaço reabrir. Sem avisos, não custa nada.
+ */
+function esquecerAvisosDeCartoesApagados(): void {
+  const chaves = Object.keys(estado.avisosDoPrimeiroPedido)
+  if (!chaves.length || !estado.espaco) return
+  const prefixo = chaveDoAviso(estado.espaco.id, '')
+  const vivos = chaves.filter((c) => !c.startsWith(prefixo) || existeTerminal(c.slice(prefixo.length)))
+  if (vivos.length === chaves.length) return
+  estado = { ...estado, avisosDoPrimeiroPedido: Object.fromEntries(vivos.map((c) => [c, estado.avisosDoPrimeiroPedido[c]])) }
+}
+
+/** Anota o aviso de um primeiro pedido não confirmado (nunca é chamada para um pedido que saiu). */
+export function anotarAvisoDoPrimeiroPedido(espacoId: string, cartaoId: string, status: StatusDoAviso): void {
+  // o espaço aberto é o único que dá para conferir: cartão apagado enquanto a resposta vinha não ganha aviso
+  if (estado.espaco?.id === espacoId && !existeTerminal(cartaoId)) return
+  definir({ avisosDoPrimeiroPedido: { ...estado.avisosDoPrimeiroPedido, [chaveDoAviso(espacoId, cartaoId)]: status } })
+}
+
+/**
+ * Pedidos à espera da resposta do processo principal, por chave (espaço + cartão). Quem dispensa o aviso tira a
+ * marca: a resposta que chegar depois não encontra a sua marca e não recria o selo.
+ */
+const pedidosEmVoo = new Map<string, symbol>()
+
+/** Tira o aviso (dispensado pelo usuário, ou o pedido saiu). Só remove: não registra nada no lugar. */
+export function dispensarAvisoDoPrimeiroPedido(espacoId: string, cartaoId: string): void {
+  const chave = chaveDoAviso(espacoId, cartaoId)
+  pedidosEmVoo.delete(chave)
+  if (!(chave in estado.avisosDoPrimeiroPedido)) return
+  const { [chave]: _tirado, ...resto } = estado.avisosDoPrimeiroPedido
+  definir({ avisosDoPrimeiroPedido: resto })
+}
+
+/** Manda o primeiro pedido; se o processo principal não confirmar que saiu, o cartão ganha um selo de aviso. */
+export function entregarPrimeiroPedido(
+  id: string,
+  texto: string,
+  enviar: (id: string, texto: string) => Promise<ResultadoDoPrimeiroPedido> = window.ork.terminal.primeiroPedido
+): void {
+  const espacoId = estado.espaco?.id
+  if (!espacoId) return
+  const chave = chaveDoAviso(espacoId, id)
+  const marca = Symbol(chave)
+  pedidosEmVoo.set(chave, marca)
+  // a marca some quando o usuário dispensa (ou outro pedido do mesmo cartão a troca): resposta sem marca é descartada
+  const vale = (): boolean => pedidosEmVoo.get(chave) === marca
+  enviar(id, texto)
+    .then((r) => {
+      if (!vale()) return
+      pedidosEmVoo.delete(chave)
+      if (r.status === 'saiu') dispensarAvisoDoPrimeiroPedido(espacoId, id)
+      else anotarAvisoDoPrimeiroPedido(espacoId, id, r.status)
+    })
+    .catch((erro) => {
+      // falha no canal: não dá para saber se algo foi digitado; o aviso próprio diz isso, sem fingir que saiu
+      console.warn(`[orkester] primeiro pedido de "${id}": não deu para confirmar o envio`, erro)
+      if (!vale()) return
+      pedidosEmVoo.delete(chave)
+      anotarAvisoDoPrimeiroPedido(espacoId, id, 'erro')
+    })
 }
 
 // ---------- rotinas (o que o app digita sozinho num cartão) ----------
@@ -693,7 +774,7 @@ export function trocarAgenteDoCartao(id: string, preset: PresetAgente, porAgente
   // o `sincronizar` sai no mesmo instante (dentro de `definir`), então o main já tem o cartão novo quando a
   // troca chega: as mensagens para o processo principal mantêm a ordem em que foram mandadas
   window.ork.terminal.trocar(feito.id)
-  if (feito.primeiroPedido) window.ork.terminal.primeiroPedido(feito.id, feito.primeiroPedido)
+  if (feito.primeiroPedido) entregarPrimeiroPedido(feito.id, feito.primeiroPedido)
   return { texto: feito.texto }
 }
 
@@ -1062,7 +1143,7 @@ export function adicionarNo(novo: NovoNo, x: number, y: number): string {
       break
   }
   mudarPlano((p) => ({ ...p, nos: [...p.nos, no] }), false)
-  if (novo.tipo === 'terminal' && novo.funcao?.prompt.trim()) window.ork.terminal.primeiroPedido(no.id, novo.funcao.prompt)
+  if (novo.tipo === 'terminal' && novo.funcao?.prompt.trim()) entregarPrimeiroPedido(no.id, novo.funcao.prompt)
   definir({
     selecao: { ...NADA, nos: [no.id] },
     editando: (novo.tipo === 'postit' || novo.tipo === 'texto') && !novo.texto ? no.id : null,

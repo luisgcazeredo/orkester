@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react'
-import { FileCode, Folder, PanelBottom, Paperclip } from 'lucide-react'
+import { FileCode, Folder, PanelBottom, Paperclip, TriangleAlert } from 'lucide-react'
+import { chaveDoAviso, dispensarAvisoDoPrimeiroPedido, usarLoja } from '../estado/loja'
 import type { NoTerminal } from '../../../shared/modelo'
 import { MolduraNo, type Marca } from '../quadro/MolduraNo'
 import { CorpoXterm } from '../terminal/CorpoXterm'
@@ -7,6 +8,14 @@ import { abrirMenu } from '../ui/MenuContexto'
 import { anexarArquivosAoPrompt, anexarPastaAoPrompt } from '../ui/anexar'
 import { itensDoCodigoDoTerminal } from '../ui/menus'
 import { COR_AGENTE, ICONE_AGENTE } from './icones'
+
+const TEXTO_DO_AVISO = {
+  ficou: 'O primeiro pedido foi escrito no campo do agente e NÃO foi enviado.',
+  incerto: 'Não deu para confirmar o primeiro pedido: pode ter saído. Veja a tela antes de repetir.',
+  'nao-pronto': 'O agente não ficou pronto (talvez esteja perguntando algo): o primeiro pedido NÃO foi digitado.',
+  'sem-sessao': 'O primeiro pedido NÃO foi digitado: não há processo para este cartão.',
+  erro: 'Falha na comunicação ao enviar o primeiro pedido: não dá para saber se saiu. Veja a tela antes de repetir.'
+} as const
 
 /** Fora da tela por este tempo, o cartão para de desenhar (o processo segue rodando). */
 const DESCARREGAR_DEPOIS = window.ork.autoteste ? 1500 : 20_000
@@ -56,6 +65,8 @@ export const PecaTerminal = memo(function PecaTerminal({ no, selecionado, pastaD
   const corpo = useRef<HTMLDivElement>(null)
   const montado = usarMontado(corpo)
   const ativo = selecionado === 'sozinho'
+  const espacoId = usarLoja((e) => e.espaco?.id)
+  const aviso = usarLoja((e) => e.avisosDoPrimeiroPedido[chaveDoAviso(e.espaco?.id, no.id)])
   return (
     <MolduraNo no={no} selecionado={selecionado}>
       <header className="terminal-cabecalho" data-arrasta>
@@ -63,6 +74,17 @@ export const PecaTerminal = memo(function PecaTerminal({ no, selecionado, pastaD
         <span className="terminal-nome">{no.nome}</span>
         <span className="terminal-indice">{indice}</span>
         {no.criadoPor && <span className="terminal-selo" title="Aberto por um agente pelo ork">agente</span>}
+        {aviso && (
+          <button
+            className="terminal-selo terminal-selo-aviso"
+            data-teste="aviso-primeiro-pedido"
+            title={`${TEXTO_DO_AVISO[aviso]} Clique para dispensar.`}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => espacoId && dispensarAvisoDoPrimeiroPedido(espacoId, no.id)}
+          >
+            <TriangleAlert size={10} /> pedido?
+          </button>
+        )}
       </header>
       <div className={`terminal-corpo ${ativo ? 'rolavel' : ''}`} ref={corpo} data-sem-arrasto={ativo ? '' : undefined}>
         {montado ? <CorpoXterm id={no.id} ativo={ativo} /> : <div className="terminal-descarregado">fora da tela · o processo continua</div>}
