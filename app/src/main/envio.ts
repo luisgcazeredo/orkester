@@ -87,6 +87,9 @@ export type DependenciasDoEnvio = {
   ocupado: (tela: string) => boolean
   prazoDaColagemMs?: number
   prazoDoEnterMs?: number
+  /** quantas vezes colar quando a tela não mudou nada (padrão 3) */
+  tentativasDeColagem?: number
+  esperaEntreColagensMs?: number
 }
 
 /**
@@ -97,13 +100,28 @@ export async function confirmarEnvio(d: DependenciasDoEnvio): Promise<ResultadoD
   // A tela de referência vem ANTES de a colagem ser escrita: o PTY pode renderizar o texto antes da primeira
   // leitura, e aí "a tela mudou" nunca seria visto (e o Enter nunca iria).
   const antesDaColagem = await d.tela()
-  d.escreverColagem()
-  await d.esperar(120)
   let chegou = false
-  for (const limite = Date.now() + (d.prazoDaColagemMs ?? 1500); Date.now() < limite; await d.esperar(100)) {
-    if ((await d.tela()) !== antesDaColagem) {
-      chegou = true
-      break
+  // A colagem pode demorar a aparecer: em 12/11/2026 os cartões da partitura (Claude Code 2.1.322 e Codex
+  // recém-abertos) mostraram o "[Pasted text]" depois de 1,5 s, o app desistiu sem Enter e as fichas ficaram
+  // paradas no campo. Então: não apareceu, espera mais e olha de novo — mudou, era a colagem atrasada, segue
+  // para o Enter sem colar outra vez (duplicaria). Só com a tela ainda idêntica (nada foi escrito: a entrada
+  // não estava ligada) cola de novo.
+  for (let tentativa = 0; tentativa < (d.tentativasDeColagem ?? 3) && !chegou; tentativa++) {
+    if (tentativa > 0) {
+      // folgado de propósito: colar de novo uma colagem que só estava lenta duplicaria o pedido
+      await d.esperar(d.esperaEntreColagensMs ?? 4000)
+      if ((await d.tela()) !== antesDaColagem) {
+        chegou = true
+        break
+      }
+    }
+    d.escreverColagem()
+    await d.esperar(120)
+    for (const limite = Date.now() + (d.prazoDaColagemMs ?? 1500); Date.now() < limite; await d.esperar(100)) {
+      if ((await d.tela()) !== antesDaColagem) {
+        chegou = true
+        break
+      }
     }
   }
   if (!chegou) return 'ficou'
