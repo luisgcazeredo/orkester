@@ -447,7 +447,8 @@ async function digitarPedido(s: Sessao, texto: string): Promise<ResultadoDoEnvio
     shell: s.espec.agente === 'shell',
     escreverColagem,
     escrever: (dados) => escreverNoProcesso(s, dados),
-    tela: () => telaDe(s, 12),
+    // 24 linhas: o campo de entrada com um texto longo (Codex) ocupa várias, e o sinal dele fica no alto
+    tela: () => telaDe(s, 24),
     emPergunta: async () => (await situacao(s)) === 'pergunta',
     esperar,
     ocupado: (tela) => OCUPADO.test(tela)

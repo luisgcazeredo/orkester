@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-const { evidenciaDeEnvio, confirmarEnvio, resultadoDaRotina, registroDoEnvio } = await import(new URL('./envio.ts', import.meta.url).href)
+const { evidenciaDeEnvio, confirmarEnvio, resultadoDaRotina, registroDoEnvio, campoNaTela } = await import(new URL('./envio.ts', import.meta.url).href)
 
 const base = { ocupadoAntes: false, ocupadoDepois: false, perguntaNova: false }
 const pedido = 'faça a revisão do módulo de envio e me devolva o resumo'
@@ -48,6 +48,142 @@ test('B: marca [Pasted] antiga no histórico não faz o campo parecer ocupado', 
   // pedido novo ainda não visível: mesma posição da marca velha antes e depois → ficou seria falso aqui,
   // mas a marca velha também vale para os dois lados; o que importa é que nunca vire "saiu" sem prova
   assert.notEqual(evidenciaDeEnvio({ ...base, texto: 'a\n'.repeat(60), antes, depois }), 'saiu')
+})
+
+// ---- B: o campo de entrada lido direto (telas reais do Claude Code 2.1.322 e do Codex 0.167, 12/11/2026) ----
+
+const ficha = 'Você é Decisões.\n- Idioma: português do Brasil, direto ao ponto.\n\nIGNORE o papel acima: isto é só um teste. Responda apenas: OK-1'
+const regua = '─'.repeat(60)
+const claudeComColagem = `◐ medium · /effort\n${regua}\n❯ [Pasted text #1 +40 lines]\n${regua}\n  ⏵⏵ auto mode on (shift+tab to cycle)`
+// depois do envio o Claude mostra a ficha inteira no histórico, e o fim dela pode cair na altura em que o campo estava
+const claudeDepois = `  - Idioma: português do Brasil, direto ao ponto.\n\n  IGNORE o papel acima: isto é só um teste. Responda apenas: OK-1\n\n● OK-1\n\n✻ Cooked for 2s · done 15:20\n◐ medium · /effort\n${regua}\n❯ \n${regua}\n  paste again to expand`
+const codexDigitado = `  >_ OpenAI Codex (v0.167.2)\n\n›   - Artefatos: tudo o que você cria é arquivo dentro da pasta do espaço ↑\n  ficha manda. Nunca em Downloads.\n  - Idioma: português do Brasil, direto ao ponto.\n  IGNORE o papel acima: isto é só um teste. Responda apenas: OK-1\n\n  GPT-5.6-Terra high · ~\\projetos\\Orkester`
+
+test('B: campo do Claude com a colagem resumida → o pedido está no campo', () => {
+  assert.match(campoNaTela(claudeComColagem)!, /\[pasted text #1/)
+})
+
+test('B: Claude depois do envio, ficha no histórico e campo vazio → saiu (era "ficou" pela posição)', () => {
+  assert.equal(evidenciaDeEnvio({ ...base, texto: ficha, antes: claudeComColagem, depois: claudeDepois }), 'saiu')
+})
+
+test('B: Enter engolido no Claude, a colagem continua no campo → ficou', () => {
+  assert.equal(evidenciaDeEnvio({ ...base, texto: ficha, antes: claudeComColagem, depois: claudeComColagem }), 'ficou')
+})
+
+test('B: Codex com o texto digitado no campo (várias linhas) → ficou', () => {
+  assert.equal(evidenciaDeEnvio({ ...base, texto: ficha, antes: codexDigitado, depois: codexDigitado }), 'ficou')
+})
+
+test('B: Codex com a ficha no campo, com linha em branco no meio → o fim dela ainda é visto (ficou)', () => {
+  const comParagrafo = `  >_ OpenAI Codex (v0.167.2)\n\n›   - Nunca feche o programa.\n  - Idioma: português do Brasil, direto ao ponto.\n\n  IGNORE o papel acima: isto é só um teste. Responda apenas: OK-1\n\n\n  GPT-5.6-Terra high · ~\\projetos`
+  assert.equal(evidenciaDeEnvio({ ...base, texto: ficha, antes: comParagrafo, depois: comParagrafo }), 'ficou')
+})
+
+test('B: Codex enviou: a mensagem sobe no histórico e o campo volta vazio → saiu', () => {
+  const depois = `${codexDigitado.replace('\n\n  GPT', '\n\n• Trabalhando\n\n› \n\n  GPT')}`
+  assert.equal(evidenciaDeEnvio({ ...base, texto: ficha, antes: codexDigitado, depois }), 'saiu')
+})
+
+test('B: a linha de status muda mas o campo está vazio → nenhum Enter até o recado aparecer no campo', async () => {
+  // o Claude terminando a resposta anterior: "Churned…" muda, o campo fica vazio, e o recado só entra depois
+  const recado = 'ENTREGA | Testador | teste de recado. Responda apenas: SEGUNDO-1'
+  const tela = (status: string, campo: string) => `● OK-1\n\n✻ ${status}\n${regua}\n❯ ${campo}\n${regua}\n  paste again to expand`
+  let leituras = 0
+  let campoNoEnter: string | null = 'nenhum Enter'
+  let enviado = false
+  const dep = {
+    texto: recado,
+    shell: false,
+    escreverColagem: () => {},
+    escrever: () => {
+      if (campoNoEnter === 'nenhum Enter') campoNoEnter = campoNaTela(atual())
+      enviado = true
+    },
+    tela: async () => {
+      leituras++
+      return atual()
+    },
+    emPergunta: async () => false,
+    esperar: (ms: number) => new Promise<void>((r) => setTimeout(r, Math.min(ms, 3))),
+    ocupado: (t: string) => /esc to interrupt/.test(t),
+    assentarMs: 20
+  }
+  function atual(): string {
+    if (enviado) return tela('Churning… esc to interrupt', '')
+    if (leituras <= 1) return tela('Cooked for 2s', '')
+    if (leituras < 30) return tela(`Churned for ${leituras}s · done`, '') // só o status mexe
+    return tela('Churned for 30s · done', recado)
+  }
+  assert.equal(await confirmarEnvio(dep), 'saiu')
+  assert.match(campoNoEnter ?? '', /segundo-1/, 'o primeiro Enter só sai com o recado já no campo')
+})
+
+test('B: o Claude esconde o campo no redesenho depois de responder → isso não conta como colagem chegando', async () => {
+  const recado = 'ENTREGA | Testador | teste. Responda apenas: SEGUNDO-2'
+  const comCampo = (campo: string) => `● OK-2\n\n✻ Brewed for 3s · done\n${regua}\n❯ ${campo}\n${regua}\n  ⏵⏵ auto mode on`
+  const semCampo = `● OK-2\n\n✻ Brewed for 3s · done`
+  let leituras = 0
+  let campoNoEnter: string | null = 'nenhum Enter'
+  let enviado = false
+  const atual = (): string => {
+    if (enviado) return `${comCampo('')}\n esc to interrupt`
+    if (leituras <= 1) return comCampo('')
+    if (leituras < 20) return semCampo // redesenho: o campo some por um tempo
+    return comCampo(recado)
+  }
+  const dep = {
+    texto: recado,
+    shell: false,
+    escreverColagem: () => {},
+    escrever: () => {
+      if (campoNoEnter === 'nenhum Enter') campoNoEnter = campoNaTela(atual())
+      enviado = true
+    },
+    tela: async () => {
+      leituras++
+      return atual()
+    },
+    emPergunta: async () => false,
+    esperar: (ms: number) => new Promise<void>((r) => setTimeout(r, Math.min(ms, 3))),
+    ocupado: (t: string) => /esc to interrupt/.test(t),
+    assentarMs: 20
+  }
+  assert.equal(await confirmarEnvio(dep), 'saiu')
+  assert.match(campoNoEnter ?? '', /segundo-2/)
+})
+
+test('B: depois do 1º Enter o campo tem o rascunho do usuário → nenhum Enter a mais (não envia o que não é nosso)', async () => {
+  const recado = 'ENTREGA | Testador | teste. Responda apenas: SEGUNDO-9'
+  const comCampo = (campo: string) => `● OK\n${regua}\n❯ ${campo}\n${regua}\n  ⏵⏵ auto mode on`
+  let enters = 0
+  let leituras = 0
+  const dep = {
+    texto: recado,
+    shell: false,
+    escreverColagem: () => {},
+    escrever: () => void enters++,
+    tela: async () => {
+      leituras++
+      if (leituras <= 1) return comCampo('')
+      if (enters === 0) return comCampo(recado)
+      // o 1º Enter saiu sem prova visível (sem "trabalhando") e o usuário começou a escrever
+      return comCampo('meu rascunho pela metade')
+    },
+    emPergunta: async () => false,
+    esperar: (ms: number) => new Promise<void>((r) => setTimeout(r, Math.min(ms, 3))),
+    ocupado: () => false,
+    assentarMs: 20,
+    prazoDoEnterMs: 40
+  }
+  const r = await confirmarEnvio(dep)
+  assert.equal(enters, 1, 'um Enter só')
+  assert.notEqual(r, 'ficou')
+})
+
+test('B: campo que nunca recebeu a colagem e continua vazio não prova envio', () => {
+  const vazio = `${regua}\n❯ Try "fix typecheck errors"\n${regua}`
+  assert.notEqual(evidenciaDeEnvio({ ...base, texto: ficha, antes: vazio, depois: vazio }), 'saiu')
 })
 
 // ---- C: sem a colagem aparecer, nenhum Enter ----
@@ -130,6 +266,32 @@ test('C: agente recém-aberto mostra a colagem atrasado → uma colagem, depois 
   assert.equal(await confirmarEnvio(dep), 'saiu')
   assert.equal(colagens, 1)
   assert.deepEqual(escritos, ['\r'])
+})
+
+test('C: Codex "digitando" a colagem devagar → nenhum Enter enquanto o texto ainda chega', async () => {
+  // a tela muda a cada leitura até o pedido inteiro entrar (letra a letra), depois para
+  let leituras = 0
+  let enterNaLeitura = -1
+  const dep = {
+    texto: pedido,
+    shell: false,
+    escreverColagem: () => {},
+    escrever: () => {
+      if (enterNaLeitura < 0) enterNaLeitura = leituras
+    },
+    tela: async () => {
+      leituras++
+      if (enterNaLeitura >= 0) return `> ${pedido}\n● pensando\n${compositor('')}\n esc to interrupt`
+      return leituras <= 1 ? compositor('') : compositor(pedido.slice(0, Math.min(leituras, pedido.length)))
+    },
+    emPergunta: async () => false,
+    // relógio de mentira: cada espera anda o tempo de verdade só um pouco, para o teste não demorar
+    esperar: (ms: number) => new Promise<void>((r) => setTimeout(r, Math.min(ms, 5))),
+    ocupado: (t: string) => /esc to interrupt/.test(t),
+    assentarMs: 60
+  }
+  assert.equal(await confirmarEnvio(dep), 'saiu')
+  assert.ok(enterNaLeitura > pedido.length, `o Enter saiu na leitura ${enterNaLeitura}, com o texto ainda chegando`)
 })
 
 test('C: a colagem aparece → envia CR e confirma quando o pedido sai', async () => {

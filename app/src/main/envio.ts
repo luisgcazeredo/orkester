@@ -38,6 +38,37 @@ export function distanciaDoPedido(tela: string, marca: string): number {
 
 export type EvidenciaDeEnvio = 'saiu' | 'ficou' | 'indeterminado'
 
+/** O sinal com que o Claude Code (❯) e o Codex (›) abrem o campo de entrada — e cada mensagem no histórico. */
+const SINAL_DO_CAMPO = /^\s*[❯›]\s?/
+
+/**
+ * O que está escrito no campo de entrada do agente, em minúsculas e sem quebras; null se a tela não mostra
+ * um campo reconhecível. O campo começa na **última** linha que começa com ❯ (Claude) ou › (Codex) e vai
+ * até o pé da tela (o histórico usa o mesmo sinal, mas o campo é sempre o de baixo).
+ *
+ * Por que (12/11/2026): a regra da posição a contar do pé errava com fichas longas no Claude Code 2.1.322 —
+ * depois do envio, o texto inteiro aparece no histórico e às vezes cai na mesma altura em que estava no campo.
+ * O app dizia "ficou" de um pedido que tinha saído, e na caixa de entrada isso faz quem mandou repetir.
+ */
+export function campoNaTela(tela: string): string | null {
+  const linhas = tela.split('\n')
+  let i = -1
+  for (let k = linhas.length - 1; k >= 0; k--) {
+    if (SINAL_DO_CAMPO.test(linhas[k])) {
+      i = k
+      break
+    }
+  }
+  if (i < 0) return null
+  // até o pé da tela, rodapé incluído: cortar na primeira linha em branco perdia o fim de uma ficha com
+  // parágrafos (o Codex mostra o texto inteiro no campo), e é pelo fim que o pedido é reconhecido. O rodapé
+  // não atrapalha: aqui só se pergunta se o pedido está no campo.
+  return limpar([linhas[i].replace(SINAL_DO_CAMPO, ''), ...linhas.slice(i + 1)].join(' ')).toLowerCase()
+}
+
+const campoTemPedido = (campo: string, marca: string): boolean =>
+  (marca.length >= 4 && campo.includes(marca)) || COLAGEM_RESUMIDA.test(campo)
+
 /**
  * - 'ficou': o pedido continua onde estava, no compositor. Nunca vira 'saiu', nem com agente "trabalhando".
  * - 'saiu': sumiu da tela; ou o agente passou a trabalhar agora sem o pedido continuar no lugar; ou apareceu
@@ -54,6 +85,20 @@ export function evidenciaDeEnvio(p: {
   perguntaNova: boolean
 }): EvidenciaDeEnvio {
   const marca = marcaDoPedido(p.texto)
+
+  // Primeiro, o próprio campo de entrada, quando a tela o mostra: é a prova direta.
+  const campoDepois = campoNaTela(p.depois)
+  if (campoDepois !== null) {
+    if (campoTemPedido(campoDepois, marca)) return 'ficou'
+    // O campo não tem mais o pedido. Só é "saiu" se ele esteve lá (ou se o campo de antes nem aparecia):
+    // um campo que nunca recebeu a colagem e continua vazio não prova envio nenhum.
+    const campoAntes = campoNaTela(p.antes)
+    if (campoAntes === null || campoTemPedido(campoAntes, marca)) return 'saiu'
+    // O campo nunca mostrou o pedido: não dá para dizer que saiu, e muito menos que "ficou" (não está lá).
+    // "Ficou" faz quem mandou repetir; só é dito com o pedido visível no campo.
+    return 'indeterminado'
+  }
+
   const antes = distanciaDoPedido(p.antes, marca)
   const depois = distanciaDoPedido(p.depois, marca)
 
@@ -94,15 +139,19 @@ export type DependenciasDoEnvio = {
 }
 
 /**
- * Espera a tela ficar parada por `quieto` ms seguidos (no máximo `quieto` + 4 s).
+ * Espera a tela ficar parada por `quieto` ms seguidos (no máximo `teto` ms).
  *
- * Medido com Claude Code 2.1.322 de verdade num PTY (12/11/2026): Enter ~50 ms depois de a colagem aparecer
- * é engolido; 500 ms depois, é aceito. Com quatro agentes subindo juntos, tudo fica mais lento — 1 s de folga.
+ * Medido com agentes de verdade num PTY (12/11/2026): no Claude Code 2.1.322, Enter ~50 ms depois de a colagem
+ * aparecer é engolido e 500 ms depois é aceito. No **Codex no Windows**, a colagem chega como uma enxurrada de
+ * teclas e ele vai "digitando" o texto; com quatro agentes subindo juntos, ~4 mil letras levaram dezenas de
+ * segundos, e um Enter no meio disso vira **quebra de linha** no campo, não envio — foram os 6 Enters da
+ * 1.4.5, todos viraram linhas em branco. Por isso o teto é longo: enquanto a tela muda, o texto ainda está
+ * chegando, e Enter nenhum vai.
  */
-async function esperarTelaParar(d: DependenciasDoEnvio, quieto: number): Promise<void> {
+async function esperarTelaParar(d: DependenciasDoEnvio, quieto: number, teto: number): Promise<void> {
   let anterior = await d.tela()
   let mudouEm = Date.now()
-  for (const limite = Date.now() + quieto + 4000; Date.now() < limite; ) {
+  for (const limite = Date.now() + teto; Date.now() < limite; ) {
     await d.esperar(200)
     const agora = await d.tela()
     if (agora !== anterior) {
@@ -128,25 +177,72 @@ export async function confirmarEnvio(d: DependenciasDoEnvio): Promise<ResultadoD
   // agente pode demorar, mas o que foi escrito chega: então espera mais, e não escreve de novo.
   d.escreverColagem()
   await d.esperar(120)
+  // "Chegou" = o pedido está **no campo de entrada**, quando a tela mostra um campo reconhecível (Claude ❯,
+  // Codex ›). Só "a tela mudou" não basta: medido em 12/11/2026, o Claude terminando a resposta anterior
+  // segurou a colagem por ~25 s enquanto a linha de status mudava ("Churned for 5s · done"); o app tomou isso
+  // pela colagem, apertou Enter num campo vazio e concluiu "ficou" de um recado que entrou depois.
+  // Sem campo reconhecível (shell, tela desconhecida), vale a tela ter mudado, como antes.
+  const marca = marcaDoPedido(d.texto)
   let chegou = false
-  // 30 s: com vários agentes subindo juntos, o Claude Code mostra a tela de pronto e só processa a entrada
-  // quando termina de subir de verdade — medido com 3 Claude + 1 Codex em paralelo, a colagem passou de 8 s
-  for (const limite = Date.now() + (d.prazoDaColagemMs ?? 30_000); Date.now() < limite; await d.esperar(150)) {
-    if ((await d.tela()) !== antesDaColagem) {
+  let telaMudou = false
+  // a tela já mostrava um campo reconhecível antes da colagem: daqui em diante, uma leitura sem campo é redesenho
+  let viuCampo = campoNaTela(antesDaColagem) !== null
+  // 60 s: o agente pode segurar a colagem bastante. Medido em 12/11/2026: com vários agentes subindo juntos,
+  // o Claude Code mostra a tela de pronto e só processa a entrada quando termina de subir (passou de 8 s); e
+  // logo depois de responder, chegou a segurar um recado por ~35 s
+  for (const limite = Date.now() + (d.prazoDaColagemMs ?? 60_000); Date.now() < limite; await d.esperar(150)) {
+    const agora = await d.tela()
+    if (agora === antesDaColagem) continue
+    telaMudou = true
+    const campo = campoNaTela(agora)
+    if (campo !== null) viuCampo = true
+    // Sem campo nesta leitura: num shell (que não tem campo) a tela ter mudado basta; num agente, é só um
+    // redesenho — logo depois de responder, o Claude esconde o campo por um instante, e tomar isso pela
+    // colagem levava o Enter para um campo vazio (12/11/2026).
+    if (campo === null ? d.shell || !viuCampo : campoTemPedido(campo, marca)) {
       chegou = true
       break
     }
   }
-  if (!chegou) return 'ficou'
+  // agente cuja tela nunca mostrou um campo reconhecível (outra versão, outro agente): vale a tela ter mudado
+  if (!chegou && !viuCampo && telaMudou) chegou = true
+  // O pedido não apareceu no campo, mas a tela mexeu: pode ser um campo que esta leitura não reconhece. Segue
+  // para o Enter — num campo sem o pedido, Enter não faz nada, e a evidência abaixo decide.
+  if (!chegou && !telaMudou) return 'ficou'
   // a colagem apareceu: deixa o agente terminar de desenhá-la antes do Enter (um Enter no meio se perde)
-  if ((d.assentarMs ?? 1000) > 0) await esperarTelaParar(d, d.assentarMs ?? 1000)
+  const quieto = d.assentarMs ?? 1500
+  if (quieto > 0) await esperarTelaParar(d, quieto, 60_000)
 
   let ultima: ResultadoDoEnvio = 'incerto'
+  let antesDoPrimeiro: string | undefined
   // Enter de novo é seguro: o texto não é reescrito, e Enter num campo vazio não faz nada no Claude nem no
   // Codex. Cada tentativa espera 5 s: o Claude leva 1,5–2 s para mostrar que recebeu, e com 2 s de prazo o
   // app às vezes concluía "ficou" de um pedido que tinha saído.
   for (let tentativa = 1; tentativa <= (d.tentativasDeEnter ?? 6); tentativa++) {
-    const antes = await d.tela()
+    // antes de cada Enter de novo, a tela parada de novo: o anterior pode ter caído no meio do texto chegando
+    if (tentativa > 1 && quieto > 0) await esperarTelaParar(d, quieto, 15_000)
+    const antesDesteEnter = await d.tela()
+    // Enter de novo só com o pedido ainda no campo. Saiu (ou o campo agora tem outra coisa — o usuário pode ter
+    // começado a escrever), um Enter a mais enviaria o que não é nosso: para por aqui e decide pela prova.
+    if (tentativa > 1 && !d.shell) {
+      const campo = campoNaTela(antesDesteEnter)
+      if (campo !== null && !campoTemPedido(campo, marca)) {
+        const prova = evidenciaDeEnvio({
+          texto: d.texto,
+          antes: antesDoPrimeiro ?? antesDesteEnter,
+          depois: antesDesteEnter,
+          ocupadoAntes: d.ocupado(antesDoPrimeiro ?? antesDesteEnter),
+          ocupadoDepois: d.ocupado(antesDesteEnter),
+          perguntaNova: false
+        })
+        return prova === 'saiu' ? 'saiu' : 'incerto'
+      }
+    }
+    // A prova compara com a tela de antes do **primeiro** Enter, quando o pedido estava no campo. Comparando
+    // com a de antes de cada tentativa, um primeiro Enter aceito (o Claude respondeu em 7 s, depois do prazo
+    // desta olhada) deixava as seguintes com o campo já vazio dos dois lados, e o "saiu" nunca era visto.
+    antesDoPrimeiro ??= antesDesteEnter
+    const antes = d.shell ? antesDesteEnter : antesDoPrimeiro
     const perguntavaAntes = await d.emPergunta()
     d.escrever('\r')
     ultima = 'incerto'
