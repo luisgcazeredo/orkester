@@ -33,6 +33,11 @@ function lerArgumentos(comando: string, argumentos: string[]): { posicionais: st
 function lerTexto(comando: string, posicionais: string[], opcoes: Record<string, string | true>): string {
   if (typeof opcoes.arquivo === 'string') return readFileSync(opcoes.arquivo, 'utf8')
   if (comando === 'abrir') return typeof opcoes.pedido === 'string' ? opcoes.pedido : ''
+  // `ork entregar "texto"` (e os apelidos): o texto é todo o resto da linha, ou a entrada padrão com `-`
+  if (['entregar', 'responder', 'devolver'].includes(comando)) {
+    if (posicionais[0] === '-') return readFileSync(0, 'utf8')
+    return posicionais.join(' ')
+  }
   if (comando !== 'pedir') return ''
   // `ork pedir Nome -`: o pedido vem pela entrada padrão
   if (posicionais[1] === '-') return readFileSync(0, 'utf8')

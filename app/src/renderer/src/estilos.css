@@ -501,6 +501,22 @@ button {
   cursor: pointer;
 }
 
+/* caixa de entrada: recados de agentes esperando a vez de entrar neste terminal */
+.terminal-selo-caixa {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid var(--destaque-claro);
+  background: transparent;
+  color: var(--destaque-claro);
+  cursor: pointer;
+}
+
+.terminal-selo-caixa.terminal-selo-aviso {
+  border-color: var(--perigo);
+  color: var(--perigo);
+}
+
 .porta {
   position: absolute;
   top: 50%;
@@ -1108,27 +1124,104 @@ body.em-gesto webview {
   height: 28px;
 }
 
+/* o menu do Terminal: painel com seções (Agentes, Funções, Times), não uma pílula que cresce para os lados */
 .menu-terminal {
-  gap: 2px;
-  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(640px, calc(100vw - 48px));
+  max-height: min(64vh, 560px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--pilula-borda);
+  border-radius: var(--raio);
+  background: var(--pilula-fundo);
+  box-shadow: var(--sombra-leve);
+}
+
+.menu-terminal-secao {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.menu-terminal-cabeca {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.menu-terminal-titulo {
+  color: var(--texto-suave);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.menu-terminal-filtro {
+  flex: 0 1 220px;
+  min-width: 0;
+  padding: 4px 9px;
+  border: 1px solid var(--pilula-borda);
+  border-radius: var(--raio-pilula);
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+}
+
+.menu-terminal-grade {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* funções em colunas iguais: dá para correr o olho por 18 nomes sem caçar */
+.menu-terminal-grade-funcoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
 }
 
 .menu-terminal button {
   display: flex;
   align-items: center;
   gap: 7px;
+  min-width: 0;
   padding: 6px 12px;
   border: 0;
   border-radius: var(--raio-pilula);
   background: transparent;
   font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-terminal button > svg {
+  flex: none;
 }
 
 .menu-terminal button:hover {
   background: var(--hover);
 }
 
-.menu-terminal .menu-terminal-editar {
+.menu-terminal-vazio {
+  padding: 6px 12px;
+  color: var(--texto-suave);
+  font-size: 12px;
+}
+
+.menu-terminal-rodape {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding-top: 8px;
+  border-top: 1px solid var(--pilula-borda);
+}
+
+.menu-terminal .menu-terminal-rodape button {
   color: var(--texto-suave);
 }
 

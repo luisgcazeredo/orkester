@@ -51,6 +51,7 @@ Para mexer no quadro **de fora** do app — o seu Claude, o Codex, qualquer clie
 |---|---|
 | `ork abrir [claude\|codex\|shell]` | abre uma sessão nova ao lado, já ligada a você. Com `--funcao`, o agente é opcional |
 | `ork pedir <nome> "texto"` | manda um pedido e espera terminar; devolve a tela |
+| `ork entregar "texto"` | manda o resultado a quem te deu a tarefa (ou a quem te abriu); sem recibo. Também `responder`, `devolver` |
 | `ork esperar <nome>` | espera o outro terminar o que está fazendo |
 | `ork ver <nome>` | lê a tela dele sem mandar nada |
 | `ork teclas <nome> <tecla>…` | responde menus e perguntas: `enter`, `esc`, `tab`, `shift-tab`, setas, `ctrl-c`, `y`, `n`, números |
@@ -73,7 +74,20 @@ Opções do `ork abrir`:
 --tempo S           quantos segundos esperar
 ```
 
-`ork pedir` aceita `--arquivo`, `--sem-esperar` e `--tempo`.
+`ork pedir` aceita `--arquivo`, `--sem-esperar` e `--tempo`. `ork entregar` aceita `--arquivo` e `--para "Nome"`.
+
+### A caixa de entrada
+
+Nada que um agente manda a outro é digitado na hora. `ork pedir` e `ork entregar` põem o recado na **caixa de
+entrada** do destino, e o app digita um de cada vez, só quando o destino está livre **e o usuário não está
+escrevendo nele** (nenhuma tecla há 5 s e nada no campo de entrada). Assim um agente que termina não cola a
+entrega no meio do que você está escrevendo. O cartão mostra um selo com quantos recados esperam e por quê; se
+você limpou o campo e o selo insiste, clique nele.
+
+Quem delega não precisa vigiar. A entrega chega no terminal de quem pediu como `[ork · entrega de "Nome"]`. Se o
+agente trabalhar e parar uns 20 s sem entregar, o app avisa quem pediu com `[ork · aviso do Orkester]` e as
+últimas linhas da tela dele; numa pergunta, mais cedo. Num shell, entrega e aviso entram como comentário (`# `),
+para o PowerShell não executar nada.
 
 ## Montar o time
 

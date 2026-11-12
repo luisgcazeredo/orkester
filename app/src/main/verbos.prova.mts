@@ -6,11 +6,15 @@ const { VERBOS, tabelaDeComandos, validarChamada, verboPorNome } = (await import
 
 test('registro declara os verbos operacionais, a ajuda, aliases e opções', () => {
   assert.deepEqual(VERBOS.map((verbo) => verbo.nome), [
-    'ajuda', 'quem', 'orcamento', 'espacos', 'janela', 'abrir', 'pedir', 'esperar', 'ver', 'teclas', 'arvore',
+    'ajuda', 'quem', 'orcamento', 'espacos', 'janela', 'abrir', 'pedir', 'entregar', 'esperar', 'ver', 'teclas', 'arvore',
     'quadro', 'ler', 'apagar', 'mover', 'arrumar', 'nome', 'ligar', 'desligar', 'anotar', 'juntar',
     'trocar', 'banda', 'partitura', 'funcoes', 'catalogo', 'limpar', 'fechar', 'passar', 'sair'
   ])
   assert.equal(verboPorNome('help')?.nome, 'ajuda')
+  // o agente que escreve "responder" ou "devolver" chega ao mesmo verbo
+  assert.equal(verboPorNome('responder')?.nome, 'entregar')
+  assert.equal(verboPorNome('devolver')?.nome, 'entregar')
+  assert.deepEqual(validarChamada('entregar', ['pronto', 'tudo'], { para: 'Maestro' }).opcoes, { para: 'Maestro' })
   for (const verbo of VERBOS) {
     assert.ok(Array.isArray(verbo.opcoes), `${verbo.nome} declara opções`)
     assert.ok(verbo.descricao, `${verbo.nome} tem descrição`)

@@ -2,7 +2,7 @@ import type { PedidoDoAgente, RespostaAoAgente } from '../api'
 import type { Corda, Espaco, Funcao, No, NoTerminal, Plano, PresetAgente } from '../modelo'
 // Node executa as provas TypeScript diretamente e precisa da extensão neste único import de execução.
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
-import { caixaDoNo, proximoZ, tocam, type Caixa } from './geometria.ts'
+import { caixaDoNo, lugarPerto, proximoZ, tocam, type Caixa } from './geometria.ts'
 
 type PedidoAbrir = Extract<PedidoDoAgente, { tipo: 'abrir' }>
 type PedidoFechar = Extract<PedidoDoAgente, { tipo: 'fechar' }>
@@ -98,11 +98,16 @@ export function abrir(
   let nome = base
   for (let indice = 2; nomes.has(nome.toLowerCase()); indice++) nome = `${base} ${indice}`
 
-  const caixa: Caixa = criador
-    ? { x: criador.x + criador.largura + 80, y: criador.y, largura: 720, altura: 460 }
-    : { x: 120, y: 120, largura: 720, altura: 460 }
-  for (let tentativa = 0; tentativa < 30 && plano.nos.some((no) => tocam(caixa, caixaDoNo(no), 30)); tentativa++) {
-    caixa.y += caixa.altura + 60
+  const tamanho = { largura: 720, altura: 460 }
+  let caixa: Caixa
+  if (criador) {
+    // o vão livre mais perto de quem abriu, em volta dele (ver `lugarPerto`)
+    caixa = { ...lugarPerto(caixaDoNo(criador), tamanho, plano.nos.filter((no) => no.id !== criador.id).map(caixaDoNo)), ...tamanho }
+  } else {
+    caixa = { x: 120, y: 120, ...tamanho }
+    for (let tentativa = 0; tentativa < 30 && plano.nos.some((no) => tocam(caixa, caixaDoNo(no), 30)); tentativa++) {
+      caixa.y += caixa.altura + 60
+    }
   }
 
   const no: NoTerminal = {

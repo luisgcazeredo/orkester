@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react'
-import { FileCode, Folder, PanelBottom, Paperclip, TriangleAlert } from 'lucide-react'
+import { FileCode, Folder, Mail, PanelBottom, Paperclip, TriangleAlert } from 'lucide-react'
 import { chaveDoAviso, dispensarAvisoDoPrimeiroPedido, usarLoja } from '../estado/loja'
+import { carregarCaixas, MOTIVO_CURTO, usarCaixa } from '../estado/caixas'
 import type { NoTerminal } from '../../../shared/modelo'
 import { MolduraNo, type Marca } from '../quadro/MolduraNo'
 import { CorpoXterm } from '../terminal/CorpoXterm'
@@ -67,6 +68,8 @@ export const PecaTerminal = memo(function PecaTerminal({ no, selecionado, pastaD
   const ativo = selecionado === 'sozinho'
   const espacoId = usarLoja((e) => e.espaco?.id)
   const aviso = usarLoja((e) => e.avisosDoPrimeiroPedido[chaveDoAviso(e.espaco?.id, no.id)])
+  const caixa = usarCaixa(no.id)
+  useEffect(() => carregarCaixas(espacoId), [espacoId])
   return (
     <MolduraNo no={no} selecionado={selecionado}>
       <header className="terminal-cabecalho" data-arrasta>
@@ -83,6 +86,23 @@ export const PecaTerminal = memo(function PecaTerminal({ no, selecionado, pastaD
             onClick={() => espacoId && dispensarAvisoDoPrimeiroPedido(espacoId, no.id)}
           >
             <TriangleAlert size={10} /> pedido?
+          </button>
+        )}
+        {caixa && caixa.fila > 0 && (
+          <button
+            className={`terminal-selo terminal-selo-caixa ${caixa.motivo === 'rascunho' ? 'terminal-selo-aviso' : ''}`}
+            data-teste="caixa-do-cartao"
+            title={
+              `${caixa.fila === 1 ? '1 recado esperando' : `${caixa.fila} recados esperando`} para entrar neste terminal ` +
+              `(de ${[...new Set(caixa.de)].join(', ')}).` +
+              (caixa.motivo ? ` Agora: ${MOTIVO_CURTO[caixa.motivo]}.` : '') +
+              ' O Orkester digita um de cada vez, quando o agente está livre e você não está escrevendo aqui.' +
+              (caixa.motivo === 'rascunho' ? ' Se você já limpou o campo, clique para liberar.' : '')
+            }
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => window.ork.terminal.liberarCaixa(no.id)}
+          >
+            <Mail size={10} /> {caixa.fila}
           </button>
         )}
       </header>

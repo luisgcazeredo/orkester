@@ -53,7 +53,13 @@ export const VERBOS = [
     nome: 'pedir', aliases: [], posicionais: [obrigatorio('nome'), { nome: 'texto', resto: true }],
     opcoes: [texto('arquivo'), bandeira('sem-esperar'), numero('tempo', 1, 3600)],
     descricao: 'manda um pedido e espera ele terminar (devolve a tela)',
-    ajuda: '  ork pedir <nome> "texto" | --arquivo pedido.md [--sem-esperar] [--tempo S]\n                                      manda um pedido e espera ele terminar (devolve a tela)'
+    ajuda: '  ork pedir <nome> "texto" | --arquivo pedido.md [--sem-esperar] [--tempo S]\n                                      manda um pedido e espera ele terminar (devolve a tela); o pedido\n                                      entra na caixa de entrada dele e só é digitado com ele livre'
+  },
+  {
+    nome: 'entregar', aliases: ['responder', 'devolver'], posicionais: [{ nome: 'texto', resto: true }],
+    opcoes: [texto('arquivo'), texto('para')],
+    descricao: 'manda o resultado a quem te deu a tarefa (entra na caixa de entrada dele)',
+    ajuda: '  ork entregar "texto" | --arquivo entrega.md [--para "Nome"]\n                                      manda o resultado a quem te deu a tarefa (ou a quem te abriu);\n                                      entra na caixa de entrada dele, sem recibo a esperar'
   },
   { nome: 'esperar', aliases: [], posicionais: [obrigatorio('nome')], opcoes: [numero('tempo', 1, 3600)], descricao: 'espera terminar o que está fazendo', ajuda: '  ork esperar <nome> [--tempo S]     espera terminar o que está fazendo' },
   { nome: 'ver', aliases: [], posicionais: [obrigatorio('nome')], opcoes: [numero('linhas', 1, 2000)], descricao: 'lê a tela sem mandar nada', ajuda: '  ork ver <nome> [--linhas N]        lê a tela sem mandar nada' },

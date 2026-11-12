@@ -80,6 +80,17 @@ export interface RetratoTerminal {
   saiu: number | null
 }
 
+/** Por que os recados de um cartão estão esperando (ver main/caixa.ts). */
+export type MotivoDaFila = 'trabalhando' | 'pergunta' | 'digitando' | 'rascunho' | 'encerrado'
+
+/** A caixa de entrada de um cartão: quantos recados esperam para ser digitados nele, e por quê. */
+export interface ResumoDaCaixa {
+  fila: number
+  motivo: MotivoDaFila | null
+  /** quem mandou cada recado, na ordem */
+  de: string[]
+}
+
 export interface ApiTerminal {
   /**
    * Diz ao processo principal quais terminais o espaço tem (todos os andares) e as cordas entre eles.
@@ -99,6 +110,12 @@ export interface ApiTerminal {
   aoSair(id: string, ouvinte: (codigo: number) => void): () => void
   /** O processo principal descobriu a conversa do agente (Codex) de um cartão. */
   aoDescobrirSessao(ouvinte: (id: string, sessao: string) => void): void
+  /** A caixa de entrada de um cartão mudou (recados esperando para entrar nele). */
+  aoMudarCaixa(ouvinte: (id: string, resumo: ResumoDaCaixa) => void): void
+  /** As caixas com recado esperando, dos cartões deste espaço (para a janela que acabou de abrir). */
+  caixas(espacoId: string): Promise<Record<string, ResumoDaCaixa>>
+  /** O usuário diz que o campo de entrada do cartão está limpo: os recados podem entrar. */
+  liberarCaixa(id: string): void
   /** Retrato leve dos terminais deste espaço para o painel de contexto. */
   contextos(espacoId: string): Promise<ResumoContextoTerminal[]>
   /**
@@ -447,7 +464,10 @@ export const CANAIS = {
   sessao: 'terminal:sessao',
   contextos: 'terminal:contextos',
   primeiroPedido: 'terminal:primeiro-pedido',
-  trocar: 'terminal:trocar'
+  trocar: 'terminal:trocar',
+  caixa: 'terminal:caixa',
+  caixas: 'terminal:caixas',
+  liberarCaixa: 'terminal:liberar-caixa'
 } as const
 
 export const CANAIS_AGENTES = {

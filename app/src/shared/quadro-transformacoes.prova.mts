@@ -105,6 +105,31 @@ test('abrir cria ao lado do criador, desconflita nome e liga a corda', () => {
   assert.deepEqual(resultado.espaco.cordas, [corda('novo-2', 'criador', 'novo-1')])
 })
 
+test('abrir oito agentes seguidos: ficam em volta de quem abriu, sem coluna gigante e sem sobrepor', () => {
+  let atual = espaco([terminal('criador')])
+  const amb = ambiente()
+  for (let i = 0; i < 8; i++) atual = abrir(atual, { tipo: 'abrir', espacoId: 'espaco', criador: 'criador', agente: 'codex' }, amb).espaco
+  const filhos = atual.nos.filter((n) => n.id !== 'criador')
+  assert.equal(filhos.length, 8)
+  // ninguém por cima de ninguém
+  for (let i = 0; i < atual.nos.length; i++) {
+    for (let j = i + 1; j < atual.nos.length; j++) {
+      const a = atual.nos[i]
+      const b = atual.nos[j]
+      const cruza = a.x < b.x + b.largura && b.x < a.x + a.largura && a.y < b.y + b.altura && b.y < a.y + a.altura
+      assert.ok(!cruza, `${a.id} cobre ${b.id}`)
+    }
+  }
+  // perto: todos a no máximo dois passos de quem abriu, para cada lado
+  for (const f of filhos) {
+    assert.ok(Math.abs(f.x) <= 2 * 800, `${f.id} longe na horizontal: ${f.x}`)
+    assert.ok(Math.abs(f.y) <= 2 * 520, `${f.id} longe na vertical: ${f.y}`)
+  }
+  // e não numa coluna só (a regra antiga punha os oito na mesma coluna, até 3640 px para baixo)
+  assert.ok(new Set(filhos.map((f) => f.x)).size >= 2, 'mais de uma coluna')
+  assert.ok(Math.max(...filhos.map((f) => f.y)) < 3 * 520, 'a coluna não desce sem fim')
+})
+
 test('abrir sem criador no quadro ignora o limite local e começa no andar ativo sem corda', () => {
   const filhosDeOutroEspaco = Array.from({ length: 8 }, (_, indice) => terminal(`filho-${indice}`, 'ausente'))
   const resultado = abrir(

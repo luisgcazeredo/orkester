@@ -23,7 +23,7 @@ import {
   type AvisoJanelas,
   type MudancaArquivo,
   type ApiOrkester,
-  type PedidoDoAgente, CANAIS_CHAVES, type ApiChaves } from '../shared/api'
+  type PedidoDoAgente, CANAIS_CHAVES, type ApiChaves, type ResumoDaCaixa } from '../shared/api'
 
 /** Cada canal vira uma função que chama o processo principal e devolve a resposta. */
 function chamadas<T>(canais: Record<string, string>): T {
@@ -129,6 +129,11 @@ const api: ApiOrkester = {
     aoDescobrirSessao: (ouvinte) => {
       ipcRenderer.on(CANAIS.sessao, (_evento, id: string, sessao: string) => ouvinte(id, sessao))
     },
+    aoMudarCaixa: (ouvinte) => {
+      ipcRenderer.on(CANAIS.caixa, (_evento, id: string, resumo: ResumoDaCaixa) => ouvinte(id, resumo))
+    },
+    caixas: (espacoId) => ipcRenderer.invoke(CANAIS.caixas, espacoId),
+    liberarCaixa: (id) => ipcRenderer.send(CANAIS.liberarCaixa, id),
     contextos: (espacoId) => ipcRenderer.invoke(CANAIS.contextos, espacoId),
     primeiroPedido: (id, texto) => ipcRenderer.invoke(CANAIS.primeiroPedido, id, texto),
     trocar: (id) => ipcRenderer.send(CANAIS.trocar, id)

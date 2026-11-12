@@ -49,8 +49,8 @@ Seu contexto é caro e fica poluído com o tempo. Em vez de carregar tudo numa c
   use \`ork sair\`.
 - **Só apague o antigo se ele não for mais trabalhar.** Se ainda há algo que só ele sabe ou faz, ele fica. Na dúvida,
   mantenha os dois e avise o usuário.
-- **Subterminais paralelos:** abra frentes independentes com \`--sem-esperar\` e recolha com \`ork ver\` ou
-  \`ork esperar\`; cada uma recebe somente o contexto da sua parte. Dois agentes não editam o mesmo arquivo, e resultado
+- **Subterminais paralelos:** abra frentes independentes com \`--sem-esperar\`; cada uma devolve com
+  \`ork entregar\` (ou o Orkester avisa quando parar sem entregar), e você pode conferir com \`ork ver\`; cada uma recebe somente o contexto da sua parte. Dois agentes não editam o mesmo arquivo, e resultado
   longo vai para arquivo.
 - O contexto vem do rodapé do cliente e pode faltar. Sem número, decida pelo que percebe da conversa, sem chutar.
 
@@ -60,8 +60,23 @@ ${'```'}
 ${AJUDA.split('\n').slice(2).join('\n')}
 ${'```'}
 
-- \`ork pedir\` digita o pedido no terminal do outro e espera ele ficar livre; devolve as últimas linhas da tela.
-  Se o tempo acabar, ele continua trabalhando: use \`ork esperar\` (ou \`ork ver\`) depois.
+- \`ork pedir\` põe o pedido na **caixa de entrada** do outro e espera ele terminar; devolve as últimas linhas da
+  tela. Se o tempo acabar, ele continua trabalhando: use \`ork esperar\` (ou \`ork ver\`) depois.
+- **Caixa de entrada:** nada é digitado na hora no terminal de outro agente. O Orkester digita um recado de cada vez,
+  só quando o destino está livre **e o usuário não está escrevendo nele** (assim nada corta o que ele escreve). Se a
+  resposta disser que o pedido "está na caixa de entrada", ele **vai** ser entregue: não mande de novo.
+
+## Entregar o resultado: \`ork entregar\`
+
+Terminou uma tarefa que um agente te deu (ou foi aberto por um agente)? Mande o resultado com
+\`ork entregar "resumo curto"\` ou \`ork entregar --arquivo entrega.md\`. Vai para quem te deu a tarefa (sem
+\`--para\`, é quem pediu por último ou quem te abriu) e entra na caixa de entrada dele. **Não há recibo a esperar:**
+o Orkester confirma que entrou, ou diz que está na fila e entrega sozinho. Depois de entregar, pode parar.
+
+Se você parar sem entregar, o Orkester avisa quem te deu a tarefa (com as últimas linhas da sua tela) depois de uns
+20 s parado; numa pergunta, mais cedo. Quem delega **não precisa vigiar** com \`ork esperar\`: o resultado (ou o
+aviso) chega sozinho no terminal dele, como uma mensagem que começa com \`[ork · entrega de "Nome"]\` ou
+\`[ork · aviso do Orkester]\`.
 - Texto com aspas, \`%\`, \`!\` ou várias linhas: grave num arquivo e use \`--arquivo\`.
 - **Git Bash e comandos de barra:** ele pode converter \`/context\` em um caminho. Rode
   \`MSYS2_ARG_CONV_EXCL='*' ork pedir "Nome" "/context"\`, ou grave o comando num arquivo e use \`--arquivo\`.

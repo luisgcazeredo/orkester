@@ -53,6 +53,7 @@ still the permission.
 |---|---|
 | `ork abrir [claude\|codex\|shell]` | opens a new session beside you, already linked. With `--funcao`, the agent kind is optional |
 | `ork pedir <name> "text"` | sends a request and waits for it to finish; returns the screen |
+| `ork entregar "text"` | sends your result to whoever gave you the task (or opened you); no receipt. Also `responder`, `devolver` |
 | `ork esperar <name>` | waits for the other one to finish what it is doing |
 | `ork ver <name>` | reads its screen without sending anything |
 | `ork teclas <name> <key>…` | answers menus and prompts: `enter`, `esc`, `tab`, `shift-tab`, arrows, `ctrl-c`, `y`, `n`, numbers |
@@ -75,7 +76,20 @@ Options for `ork abrir`:
 --tempo S           how many seconds to wait
 ```
 
-`ork pedir` also takes `--arquivo`, `--sem-esperar` and `--tempo`.
+`ork pedir` also takes `--arquivo`, `--sem-esperar` and `--tempo`. `ork entregar` takes `--arquivo` and `--para "Name"`.
+
+### The inbox
+
+Nothing an agent sends to another is typed on the spot. `ork pedir` and `ork entregar` put the message in the
+target's **inbox**, and the app types one at a time, only when the target is idle **and the user is not writing
+in it** (no key for 5 s and nothing in the input field). So an agent that finishes does not paste its delivery
+into the middle of what you are typing. The card shows a badge with how many messages wait and why; if you
+cleared the field and the badge insists, click it.
+
+Whoever delegates does not need to watch. The delivery reaches the asker as `[ork · entrega de "Name"]`. If the
+agent works and then stops for about 20 s without delivering, the app tells the asker with
+`[ork · aviso do Orkester]` and the last lines of its screen; at a question, sooner. In a shell, deliveries and
+notices go in as comments (`# `), so PowerShell runs nothing.
 
 ## Building the team
 

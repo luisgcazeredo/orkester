@@ -9,6 +9,7 @@ import { Terminal as Espelho } from '@xterm/headless'
 import { SerializeAddon } from '@xterm/addon-serialize'
 import { CANAIS, type EspecTerminal, type RetratoTerminal } from '../shared/api'
 import { ambienteDoComando } from './comandos'
+import { entradaVazia, lerEntradaDoUsuario, type EntradaDoUsuario } from './caixa'
 import { donoDe, exigirDono } from './janelas'
 
 // Cada cartão de terminal é um processo de verdade (ConPTY no Windows). O processo é do app, não da janela:
@@ -54,6 +55,8 @@ export interface Sessao {
   /** Identifica o terminal no `ork` (vai no ambiente do processo, nunca para a janela). */
   cracha: string
   fim: ReturnType<typeof setTimeout> | null
+  /** O que o usuário anda digitando neste cartão: a caixa de entrada não entrega por cima disso. */
+  usuario: EntradaDoUsuario
 }
 
 const sessoes = new Map<string, Sessao>()
@@ -151,6 +154,7 @@ function iniciarProcesso(s: Sessao): void {
   })
   s.processo = processo
   s.saiu = null
+  s.usuario = entradaVazia()
   s.iniciadoEm = s.ultimaSaida = Date.now()
   processo.onData((dados) => {
     if (s.processo !== processo) return
@@ -191,7 +195,8 @@ function criarSessao(espacoId: string, espec: EspecTerminal): Sessao {
     iniciadoEm: 0,
     saiu: null,
     cracha: '',
-    fim: null
+    fim: null,
+    usuario: entradaVazia()
   }
   sessoes.set(s.id, s)
   if (processosVivos() >= MAX_TERMINAIS) porNaFila(s)
@@ -416,7 +421,12 @@ export function registrarTerminais(): void {
 
   ipcMain.on(CANAIS.escrever, (evento, id: unknown, dados: unknown) => {
     if (typeof dados !== 'string' || dados.length > MAX_BYTES_POR_ESCRITA) return
-    daJanelaDona(evento, id)?.processo?.write(dados)
+    const s = daJanelaDona(evento, id)
+    if (!s?.processo) return
+    // tudo o que vem da janela é o usuário (teclado, colagem, anexar caminho) ou resposta automática do
+    // terminal, que `lerEntradaDoUsuario` separa: a caixa de entrada não entrega por cima do que ele escreve
+    s.usuario = lerEntradaDoUsuario(s.usuario, dados, Date.now())
+    s.processo.write(dados)
   })
 
   ipcMain.on(CANAIS.redimensionar, (evento, id: unknown, colunas: unknown, linhas: unknown) => {
@@ -512,6 +522,12 @@ export async function esperarSessao(id: string, ms: number): Promise<Sessao | un
 }
 
 export const encerrarAgora = encerrar
+
+/** O usuário disse, pelo selo do cartão, que o campo está limpo: a caixa pode entregar. */
+export function esquecerRascunho(id: string): void {
+  const s = sessoes.get(id)
+  if (s) s.usuario = entradaVazia()
+}
 
 export function encerrarDoEspaco(espacoId: string): void {
   for (const s of [...sessoes.values()]) if (s.espacoId === espacoId) encerrar(s.id)

@@ -19,12 +19,14 @@ import { AJUDA, SKILL } from './manual'
 import { extrairLeituraDeContexto, extrairLeituraDoRodape } from './contexto'
 import { confirmarEnvio, registroDoEnvio, resultadoDaRotina, type ResultadoDoEnvio } from './envio'
 import { validarChamada, type NomeDeVerbo } from './verbos'
+import { criarCaixa, motivoDeEspera, TEXTO_DO_MOTIVO, type FimDoRecado, type MotivoDeEspera, type TipoDeRecado } from './caixa'
 import {
   aceitaColagem,
   cordasDoEspaco,
   encerrarAgora,
   escreverNoProcesso,
   esperarSessao,
+  esquecerRascunho,
   sessaoPorCracha,
   sessaoPorId,
   sessoesCriadasPor,
@@ -476,6 +478,8 @@ export async function dispararNoTerminal(id: string, texto: string): Promise<Res
   if (!s || s.fim) return 'sem-cartao'
   const agora = await situacao(s)
   if (agora !== 'livre') return agora === 'encerrado' ? 'encerrado' : agora === 'pergunta' ? 'pergunta' : 'ocupado'
+  // o usuário escrevendo nesse cartão (ou com texto no campo) também é "ocupado": a rotina não cola por cima
+  if (motivoDeEspera(agora, s.usuario, Date.now())) return 'ocupado'
   // `incerto` não vira `nao-enviou`: a rotina repetiria e duplicaria o pedido. Fica anotado no registro.
   const envio = await digitarPedido(s, texto)
   registrar(s, null, registroDoEnvio('rotina', envio).comando, texto)
@@ -493,6 +497,87 @@ function registrar(de: Sessao, para: Sessao | null, comando: string, texto = '')
   } catch {
     // registro é extra: não atrapalha o comando
   }
+}
+
+// ---------- a caixa de entrada ----------
+
+/**
+ * Nada que um agente manda a outro é digitado na hora: entra na caixa do destino, e o app digita um de cada
+ * vez, com o destino livre e sem o usuário escrevendo nele. O porquê está em `caixa.ts`.
+ */
+const caixa = criarCaixa({
+  agora: () => Date.now(),
+  novoId: () => randomUUID(),
+  situacao: async (id) => {
+    const s = sessaoPorId(id)
+    return s && !s.fim ? situacao(s) : null
+  },
+  usuario: (id) => sessaoPorId(id)?.usuario ?? { ultimaTecla: 0, rascunho: 0, ultimoEsc: 0 },
+  nome: (id) => {
+    const s = sessaoPorId(id)
+    return s && !s.fim ? s.espec.nome : null
+  },
+  shell: (id) => sessaoPorId(id)?.espec.agente === 'shell',
+  tela: async (id, linhas) => {
+    const s = sessaoPorId(id)
+    return s ? telaDe(s, linhas) : ''
+  },
+  digitar: async (id, texto) => {
+    const s = sessaoPorId(id)
+    if (!s?.processo) return 'ficou'
+    // o destino pode ter caído numa pergunta entre a olhada da caixa e agora: não digita em cima dela
+    if ((await situacao(s)) === 'pergunta') return 'ficou'
+    return digitarPedido(s, texto)
+  },
+  mudou: (id, resumo) => {
+    const s = sessaoPorId(id)
+    const dono = s ? donoDe(s.espacoId) : undefined
+    const janela = dono !== undefined ? webContents.fromId(dono) : undefined
+    if (janela && !janela.isDestroyed()) janela.send(CANAIS.caixa, id, resumo)
+  },
+  registrar: (recado, fim) => {
+    const para = sessaoPorId(recado.para) ?? null
+    const de = recado.de ? sessaoPorId(recado.de) : undefined
+    if (para) registrar(de ?? para, para, `caixa-${recado.tipo}-${fim}`, recado.texto)
+  }
+})
+
+/** Espera a caixa digitar o recado, até `ms`. null = continua na fila (o app entrega sozinho depois). */
+async function porNaCaixa(
+  eu: Sessao,
+  alvo: Sessao,
+  tipo: TipoDeRecado,
+  texto: string,
+  ms: number,
+  cancelado: () => boolean
+): Promise<{ fim: FimDoRecado | null; posicao: number; motivo: MotivoDeEspera | null }> {
+  const { posicao, fim } = caixa.enfileirar({ tipo, de: eu.id, deNome: eu.espec.nome, para: alvo.id, texto })
+  let chegou: FimDoRecado | null = null
+  void fim.then((f) => (chegou = f))
+  void caixa.rodada()
+  for (const limite = Date.now() + ms; !chegou && Date.now() < limite && !cancelado(); await esperar(150)) {
+    // a rodada do relógio é de segundo em segundo; aqui, quem está esperando apressa
+    void caixa.rodada()
+  }
+  return { fim: chegou, posicao, motivo: chegou ? null : await caixa.motivoAgora(alvo.id) }
+}
+
+/** O que dizer a quem mandou quando o recado ficou na fila. */
+function textoNaFila(alvo: Sessao, posicao: number, motivo: MotivoDeEspera | null, oQue: 'pedido' | 'entrega'): string {
+  const porque = motivo ? TEXTO_DO_MOTIVO[motivo] : 'a vez dele ainda não chegou'
+  const artigo = oQue === 'pedido' ? 'O pedido' : 'A entrega'
+  return (
+    `${artigo} está na caixa de entrada de "${alvo.espec.nome}" (${posicao}º da fila; agora: ${porque}). ` +
+    `O Orkester digita sozinho quando ele ficar livre e o usuário não estiver escrevendo nele. NÃO mande de novo.`
+  )
+}
+
+/** Quem pode receber uma entrega minha: os ligados, quem me abriu e quem me deu a tarefa pela caixa. */
+function quemRecebeDe(eu: Sessao): Sessao[] {
+  const extras = [eu.espec.criadoPor, caixa.pendenciaDe(eu.id)?.de]
+    .map((id) => (id ? sessaoPorId(id) : undefined))
+    .filter((s): s is Sessao => !!s && !s.fim)
+  return [...new Map([...ligadosA(eu), ...extras].map((s) => [s.id, s])).values()]
 }
 
 // ---------- quem fala com quem ----------
@@ -525,8 +610,16 @@ function tempoDe(opcoes: Record<string, unknown>): number {
   return Number.isFinite(n) && n > 0 ? Math.min(n, TEMPO_MAX) : TEMPO_PADRAO
 }
 
-async function resultado(s: Sessao, segundos: number, cancelado: () => boolean): Promise<string> {
-  const terminou = await aguardarFim(s, segundos * 1000, cancelado)
+async function resultado(s: Sessao, segundos: number, cancelado: () => boolean, quemEspera?: Sessao): Promise<string> {
+  // quem está esperando o fim vai ver a tela: enquanto isso, a caixa não manda o aviso de "parou"
+  const soltar = caixa.vigiar(s.id)
+  let terminou: boolean
+  try {
+    terminou = await aguardarFim(s, segundos * 1000, cancelado)
+  } finally {
+    soltar()
+  }
+  if (terminou && quemEspera && caixa.pendenciaDe(s.id)?.de === quemEspera.id) caixa.fecharPendencia(s.id)
   const tela = await telaDe(s, 60)
   if (terminou && (await situacao(s)) === 'pergunta') {
     return `"${s.espec.nome}" parou numa pergunta e espera resposta (responda com \`ork teclas\` se for seguro, ou pergunte ao usuário). Tela:\n${tela}`
@@ -822,10 +915,17 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
       }[pronto]
       return { saida: `${aberto}\n${motivo}\nTela agora:\n${await telaDe(novo, 30)}` }
     }
+    // cartão recém-aberto: ninguém escreveu nele ainda, então o primeiro pedido vai direto, sem caixa
     const envio = await digitarPedido(novo, pedidoInicial)
     if (envio !== 'saiu') return { saida: `${aberto}\n${await avisoDeEnvio(novo, envio, 30)}` }
-    if (!opcoes.esperar || opcoes['sem-esperar']) return { saida: `${aberto} Pedido enviado. Acompanhe com \`ork esperar "${novo.espec.nome}"\` ou \`ork ver\`.` }
-    return { saida: `${aberto}\n${await resultado(novo, tempoDe(opcoes), cancelado)}` }
+    // daqui em diante, se ele parar sem `ork entregar`, o app avisa você
+    caixa.abrirPendencia(eu.id, novo.id)
+    if (!opcoes.esperar || opcoes['sem-esperar']) {
+      return {
+        saida: `${aberto} Pedido enviado. Quando terminar, ele manda a entrega com \`ork entregar\`; se parar sem mandar, o Orkester avisa você aqui. Não precisa vigiar.`
+      }
+    }
+    return { saida: `${aberto}\n${await resultado(novo, tempoDe(opcoes), cancelado, eu)}` }
   },
 
   pedir: async ({ eu, pos, opcoes, texto, cancelado }) => {
@@ -834,19 +934,68 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
     if (!alvo.processo) throw new Error(`"${alvo.espec.nome}" está encerrado`)
     await recusarSeEmPergunta(alvo)
     // num agente, o pedido entra na fila dele; num shell rodando um comando, cairia no meio desse comando
-    if (alvo.espec.agente === 'shell' && (await situacao(alvo)) === 'trabalhando') {
+    // (com texto do usuário na linha, o shell também parece ocupado: aí não é comando rodando, e o pedido
+    // espera na caixa até ele limpar a linha)
+    const noShell = alvo.espec.agente === 'shell' ? await situacao(alvo) : null
+    // só o texto ainda não enviado conta: tecla recente com Enter no fim é um comando que o usuário rodou,
+    // e esse shell está mesmo ocupado
+    const doUsuario = noShell === 'trabalhando' && alvo.usuario.rascunho > 0
+    if (noShell === 'trabalhando' && !doUsuario) {
       throw new Error(`"${alvo.espec.nome}" está rodando um comando; espere terminar (\`ork esperar "${alvo.espec.nome}"\`) e mande de novo`)
     }
     registrar(eu, alvo, 'pedir', texto)
-    const envio = await digitarPedido(alvo, texto)
-    if (envio !== 'saiu') throw new Error(await avisoDeEnvio(alvo, envio, 25))
-    if (opcoes['sem-esperar']) return { saida: `Pedido enviado para "${alvo.espec.nome}".` }
-    return { saida: await resultado(alvo, tempoDe(opcoes), cancelado) }
+    // o pedido entra na caixa de entrada dele: só é digitado com ele livre e sem o usuário escrevendo nele
+    const comeco = Date.now()
+    const segundos = tempoDe(opcoes)
+    const espera = opcoes['sem-esperar'] ? 10_000 : segundos * 1000
+    const { fim, posicao, motivo } = await porNaCaixa(eu, alvo, 'pedido', texto, espera, cancelado)
+    if (fim === null) return { saida: textoNaFila(alvo, posicao, motivo, 'pedido') }
+    if (fim === 'sem-destino') throw new Error(`"${alvo.espec.nome}" foi encerrado antes de o pedido entrar; nada foi digitado`)
+    if (fim === 'ficou' || fim === 'incerto') throw new Error(await avisoDeEnvio(alvo, fim === 'ficou' ? 'ficou' : 'incerto', 25))
+    if (fim === 'cancelado') throw new Error('cancelado')
+    if (opcoes['sem-esperar']) {
+      return {
+        saida: `Pedido enviado para "${alvo.espec.nome}". Quando terminar, ele manda a entrega com \`ork entregar\`; se parar sem mandar, o Orkester avisa você aqui.`
+      }
+    }
+    const resto = Math.max(1, segundos - Math.round((Date.now() - comeco) / 1000))
+    return { saida: await resultado(alvo, resto, cancelado, eu) }
+  },
+
+  entregar: async ({ eu, opcoes, texto, cancelado }) => {
+    if (!texto.trim()) throw new Error('falta a entrega: ork entregar "texto" (ou --arquivo entrega.md)')
+    const possiveis = quemRecebeDe(eu)
+    let destino: Sessao | undefined
+    if (typeof opcoes.para === 'string') {
+      destino = acharEntre(possiveis, opcoes.para)
+    } else {
+      // sem --para: quem deu a tarefa (pela caixa) e, sem isso, quem abriu este cartão
+      const quemPediu = caixa.pendenciaDe(eu.id)?.de ?? eu.espec.criadoPor
+      destino = possiveis.find((s) => s.id === quemPediu)
+    }
+    if (!destino) {
+      const nomes = possiveis.map((s) => `"${s.espec.nome}"`).join(', ') || 'ninguém'
+      throw new Error(`não sei a quem entregar: ninguém te deu tarefa pelo ork e você não foi aberto por um agente. Use --para "Nome" (ao seu alcance: ${nomes})`)
+    }
+    if (!destino.processo) throw new Error(`"${destino.espec.nome}" está encerrado; a entrega não tem para onde ir. Deixe-a num arquivo e diga o caminho na tela.`)
+    // entregou: o app não precisa mais avisar ninguém que você parou
+    if (caixa.pendenciaDe(eu.id)?.de === destino.id) caixa.fecharPendencia(eu.id)
+    registrar(eu, destino, 'entregar', texto)
+    const { fim, posicao, motivo } = await porNaCaixa(eu, destino, 'entrega', texto, 8000, cancelado)
+    if (fim === null) {
+      return { saida: `${textoNaFila(destino, posicao, motivo, 'entrega')} Você pode encerrar o seu trabalho: não há recibo a esperar.` }
+    }
+    if (fim === 'entregue') return { saida: `Entrega feita a "${destino.espec.nome}". Não há recibo a esperar: o Orkester confirmou que ela entrou.` }
+    if (fim === 'incerto') {
+      return { saida: `A entrega foi digitada em "${destino.espec.nome}", mas não deu para confirmar que saiu do campo de entrada. NÃO mande de novo; se precisar, confira com \`ork ver "${destino.espec.nome}"\`.` }
+    }
+    if (fim === 'ficou') throw new Error(await avisoDeEnvio(destino, 'ficou', 25))
+    throw new Error(`"${destino.espec.nome}" foi encerrado antes de a entrega entrar`)
   },
 
   esperar: async ({ eu, pos, opcoes, cancelado }) => {
     const alvo = acharEntre(ligadosA(eu), pos[0])
-    return { saida: await resultado(alvo, tempoDe(opcoes), cancelado) }
+    return { saida: await resultado(alvo, tempoDe(opcoes), cancelado, eu) }
   },
 
   ver: async ({ eu, pos, opcoes }) => {
@@ -1370,6 +1519,24 @@ export function registrarComandos(): void {
         }
       })
     )
+  })
+
+  // a caixa de entrada: de segundo em segundo, entrega o que pode e confere quem parou sem entregar
+  setInterval(() => void caixa.rodada(), 1000).unref()
+  ipcMain.handle(CANAIS.caixas, (evento, espacoId: unknown) => {
+    if (typeof espacoId !== 'string' || donoDe(espacoId) !== evento.sender.id) return {}
+    const caixas: Record<string, ReturnType<typeof caixa.resumo>> = {}
+    for (const s of sessoesDoEspaco(espacoId)) {
+      const r = caixa.resumo(s.id)
+      if (r.fila) caixas[s.id] = r
+    }
+    return caixas
+  })
+  ipcMain.on(CANAIS.liberarCaixa, (evento, id: unknown) => {
+    const s = typeof id === 'string' ? sessaoPorId(id) : undefined
+    if (!s || donoDe(s.espacoId) !== evento.sender.id) return
+    esquecerRascunho(s.id)
+    void caixa.rodada()
   })
 
   const servidor = createServer((socket) => {
