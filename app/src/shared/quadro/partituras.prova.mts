@@ -261,3 +261,18 @@ test('a banda vai na partitura: o time sobe junto com a moldura que dá as permi
   )
   assert.match(resumoDaPartitura(salva), /banda/)
 })
+
+test('a função manda no motor: a partitura salva com Codex sobe com o preset de hoje da função', () => {
+  // o Revisor foi salvo em Codex; a função Revisor passou a apontar para um preset Claude (cota do Codex acabou)
+  const presets = [{ id: 'claude-forte', nome: 'Claude forte', agente: 'claude' as const, comando: 'claude --model opus' }]
+  const funcoes = [{ id: 'Revisor', nome: 'Revisor', prompt: 'Revise.', preset: 'claude-forte' }]
+  const r = subida(aplicarPartitura(plano([]), {}, salvar(), 0, 0, { ...ambiente({ funcoes }), presets }))
+  const revisor = r.plano.nos.find((n) => n.tipo === 'terminal' && n.nome === 'Revisor')
+  assert.ok(revisor && revisor.tipo === 'terminal')
+  assert.equal(revisor.agente, 'claude')
+  assert.equal(revisor.comando, 'claude --model opus')
+  assert.ok(revisor.sessao, 'Claude sobe com conversa própria')
+  // sem preset na função, vale o que a partitura guardou
+  const main = r.plano.nos.find((n) => n.tipo === 'terminal' && n.nome === 'Main')
+  assert.ok(main && main.tipo === 'terminal' && main.agente === 'claude' && main.comando === 'claude')
+})

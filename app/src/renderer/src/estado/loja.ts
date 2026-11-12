@@ -569,6 +569,7 @@ export function subirPartitura(
     novoId,
     agora,
     funcoes: estado.preferencias.funcoes ?? [],
+    presets: estado.preferencias.presets,
     dono
   })
   if ('erro' in feito) return feito

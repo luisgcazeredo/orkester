@@ -18,7 +18,7 @@
  *   o Ctrl+Z do usuário não mata sessão de agente no meio do trabalho; quem subiu fecha com `ork fechar`.
  *   Subida pelo usuário é cartão do usuário: entra no desfazer e sai inteira com um Ctrl+Z.
  */
-import type { Corda, Funcao, No, NoBanda, NoPostIt, NoTerminal, NoTexto, Partitura, PecaDePartitura, Plano } from '../modelo'
+import type { Corda, Funcao, No, NoBanda, NoPostIt, NoTerminal, NoTexto, Partitura, PecaDePartitura, Plano, PresetAgente } from '../modelo'
 // Node executa as provas TypeScript diretamente e precisa da extensão nestes imports de execução.
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
 import { MAX_NOS } from './agente.ts'
@@ -51,6 +51,8 @@ export interface AmbienteDePartitura {
   funcoes: Funcao[]
   /** Cartão do agente que pediu: os cartões nascem ligados a ele e sob a responsabilidade dele. */
   dono?: string
+  /** Os presets: a função que tem preset manda no motor do cartão, não o que ficou guardado na partitura. */
+  presets?: PresetAgente[]
 }
 
 export interface SubidaDePartitura {
@@ -238,16 +240,21 @@ export function aplicarPartitura(
     const funcao: Funcao | undefined = peca.funcao ? porNome.get(peca.funcao.trim().toLowerCase()) : undefined
     if (peca.funcao && !funcao) semFuncao.add(peca.funcao)
     if (funcao?.prompt.trim()) pedidos.push({ id, texto: funcao.prompt })
-    linhas.push(`  "${nome}" (${peca.agente})${peca.funcao ? ` · função "${peca.funcao}"${funcao ? '' : ' (não existe mais)'}` : ''}`)
+    // A função manda no motor e no nível (1.2.5). A partitura guarda o motor de quando foi salva: trocar a
+    // ficha do Maestro para Claude (Codex sem cota, 12/11/2026) e subir o time devolvia um Maestro em Codex.
+    const doPapel = funcao?.preset ? amb.presets?.find((pr) => pr.id === funcao.preset) : undefined
+    const agente = doPapel?.agente ?? peca.agente
+    const comando = doPapel ? doPapel.comando : peca.comando
+    linhas.push(`  "${nome}" (${agente})${peca.funcao ? ` · função "${peca.funcao}"${funcao ? '' : ' (não existe mais)'}` : ''}`)
     return {
       ...base,
       tipo: 'terminal',
       nome,
-      agente: peca.agente,
-      comando: peca.comando,
+      agente,
+      comando,
       funcao: peca.funcao,
       pasta: funcao?.pasta || undefined,
-      sessao: peca.agente === 'claude' ? amb.novoId() : undefined,
+      sessao: agente === 'claude' ? amb.novoId() : undefined,
       criadoPor: dono ? dono.id : undefined
     }
   })
