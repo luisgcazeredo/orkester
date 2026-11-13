@@ -10,7 +10,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { ipcMain, webContents } from 'electron'
 import { CANAIS_CODIGO, type DiffArquivo, type MudancaArquivo, type TextoArquivo } from '../shared/api'
-import { PASTAS_IGNORADAS, destinosDoAviso, pastaVigiavel, temCaraDeSegredo, valeSeguir } from '../shared/arquivos'
+import { destinosDoAviso, entradaIgnorada, pastaVigiavel, temCaraDeSegredo, valeSeguir } from '../shared/arquivos'
 import { dentroDeUmaRaiz, raizesDoQuadro } from './dados'
 
 /** Uma gravação costuma chegar em rajada (temporário, troca de nome, arquivo final): espera e junta. */
@@ -181,7 +181,7 @@ function varrer(pasta: string): MudancaArquivo[] {
       if (++vistos > LIMITE_VARREDURA) break
       const caminho = join(atual, entrada.name)
       if (entrada.isDirectory()) {
-        if (!PASTAS_IGNORADAS.includes(entrada.name.toLowerCase())) fila.push(caminho)
+        if (!entradaIgnorada(entrada.name)) fila.push(caminho)
         continue
       }
       if (!entrada.isFile()) continue

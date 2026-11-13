@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 // Node executa provas TypeScript diretamente e precisa da extensão; o bundler resolve a fonte normalmente.
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
-import { caminhoRelativo, destinosDoAviso, pastaVigiavel, temCaraDeSegredo, textoDoAnexo, textoDosAnexos, valeSeguir } from './arquivos.ts'
+import { caminhoRelativo, destinosDoAviso, entradaIgnorada, pastaVigiavel, temCaraDeSegredo, textoDoAnexo, textoDosAnexos, valeSeguir } from './arquivos.ts'
 
 // Caminhos crus (String.raw) porque é assim que o Windows entrega, com barra invertida e espaço no meio.
 const PASTA = String.raw`C:\Users\ana\Meus Projetos\orkester\app`
@@ -54,6 +54,21 @@ test('seguir: código sim; build, binário, temporário e segredo não', () => {
   assert.equal(valeSeguir('package-lock.json'), false)
   assert.equal(valeSeguir('.env'), false)
   assert.equal(valeSeguir(''), false)
+})
+
+test('release e .asar: nunca entra, em qualquer pasta', () => {
+  assert.equal(valeSeguir('release/win-unpacked/resources/app.asar'), false)
+  assert.equal(valeSeguir('release/win-unpacked/Orkester.exe'), false)
+  assert.equal(valeSeguir('qualquer/coisa/app.asar'), false)
+  assert.equal(valeSeguir('qualquer/coisa/app.asar/dentro/index.js'), false)
+  assert.equal(valeSeguir(String.raw`x\Default_App.ASAR\a.js`), false)
+  assert.equal(valeSeguir('src/release-notes.md'), true)
+  assert.equal(valeSeguir('docs/asar.md'), true)
+  assert.equal(entradaIgnorada('release'), true)
+  assert.equal(entradaIgnorada('Release'), true)
+  assert.equal(entradaIgnorada('app.asar'), true)
+  assert.equal(entradaIgnorada('app.asar.unpacked'), false)
+  assert.equal(entradaIgnorada('src'), false)
 })
 
 test('pastaVigiavel recusa casa, raiz e pastas de sistema, e aceita projeto', () => {

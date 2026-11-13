@@ -21,8 +21,19 @@ export const PASTAS_IGNORADAS = [
   'venv',
   'target',
   'bin',
-  'obj'
+  'obj',
+  'release'
 ]
+
+/**
+ * Regra única de "não entrar aqui", para a varredura, a vigia e (depois) o `.orkignore`: pasta de barulho
+ * (`PASTAS_IGNORADAS`) ou qualquer entrada terminada em `.asar`, em qualquer pasta. No Electron o `.asar`
+ * aparece como pasta para o `fs`, e entrar nele deixa o arquivo aberto pelo app (trava o build seguinte).
+ */
+export function entradaIgnorada(nome: string): boolean {
+  const n = nome.toLowerCase()
+  return n.endsWith('.asar') || PASTAS_IGNORADAS.includes(n)
+}
 
 /** Arquivo gerado que muda a toda hora e não diz nada sobre o trabalho do agente. */
 const BARULHENTOS = ['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'desktop.ini', 'thumbs.db', '.ds_store', '4913']
@@ -79,7 +90,7 @@ export function valeSeguir(relativo: string): boolean {
   const pedacos = partes(relativo)
   if (!pedacos.length) return false
   const nome = pedacos[pedacos.length - 1].toLowerCase()
-  if (pedacos.slice(0, -1).some((p) => PASTAS_IGNORADAS.includes(p.toLowerCase()))) return false
+  if (pedacos.slice(0, -1).some(entradaIgnorada) || nome.endsWith('.asar')) return false
   if (BARULHENTOS.includes(nome)) return false
   if (TEMPORARIOS.some((r) => r.test(nome))) return false
   if (EXTENSOES_BINARIAS.includes(nome.split('.').pop() ?? '')) return false

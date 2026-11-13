@@ -1,7 +1,7 @@
 {
   "name": "orkester",
   "productName": "Orkester",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "private": true,
   "description": "Quadro infinito para orquestrar agentes de código",
   "author": "Luís Azeredo",
@@ -14,7 +14,7 @@
     "provas": "node --test \"src/**/*.prova.mts\"",
     "autoteste": "set \"ELECTRON_RUN_AS_NODE=\" && electron-vite build && electron . --autoteste",
     "medir": "set \"ELECTRON_RUN_AS_NODE=\" && electron-vite build && electron . --medir",
-    "empacotar": "set \"ELECTRON_RUN_AS_NODE=\" && electron-vite build && electron-builder --win --x64 && node scripts/conferir-pacote.mjs && node scripts/conferir-saida.mjs",
+    "empacotar": "set \"ELECTRON_RUN_AS_NODE=\" && electron-vite build && node scripts/limpar-pacote.mjs && electron-builder --win --x64 && node scripts/conferir-pacote.mjs && node scripts/conferir-saida.mjs",
     "instalar": "npm run empacotar && node scripts/instalar.mjs"
   },
   "dependencies": {
