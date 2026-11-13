@@ -2,7 +2,7 @@ import { ipcMain, webContents, type WebContents } from 'electron'
 import { CANAIS_ROTINAS, type AvisoRotina } from '../shared/api'
 import type { Rotina } from '../shared/modelo'
 import { aplicarDisparo, rotinaValida, vencidas } from '../shared/rotinas'
-import { dispararNoTerminal } from './comandos'
+import { dispararNoTerminal } from './espera'
 import { donoDe, exigirDono } from './janelas'
 
 // O relógio das rotinas. Quem conta o tempo e digita é o processo principal, porque é ele que tem o processo
