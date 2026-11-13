@@ -81,7 +81,7 @@ export interface RetratoTerminal {
 }
 
 /** Por que os recados de um cartão estão esperando (ver main/caixa.ts). */
-export type MotivoDaFila = 'trabalhando' | 'pergunta' | 'digitando' | 'rascunho' | 'encerrado'
+export type MotivoDaFila = 'trabalhando' | 'pergunta' | 'digitando' | 'rascunho' | 'recado-antigo' | 'encerrado'
 
 /** A caixa de entrada de um cartão: quantos recados esperam para ser digitados nele, e por quê. */
 export interface ResumoDaCaixa {

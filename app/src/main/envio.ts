@@ -36,15 +36,46 @@ function distanciaDoPedido(tela: string, marca: string): number {
   return -1
 }
 
+/**
+ * Ambiente dos cartões do Claude: sem a sugestão de próxima mensagem ("fantasma" no campo). O binário (2.1.323) lê
+ * `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` e só o valor falso desliga; `false` é o que o leitor dele converte em
+ * booleano. Lido no código do binário; a confirmação por execução (turno longo) está na prova real.
+ */
+export const AMBIENTE_DO_CLAUDE: Record<string, string> = { CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false' }
+
 type EvidenciaDeEnvio = 'saiu' | 'ficou' | 'indeterminado'
 
-/** O sinal com que o Claude Code (❯) e o Codex (›) abrem o campo de entrada — e cada mensagem no histórico. */
-const SINAL_DO_CAMPO = /^\s*[❯›]\s?/
+/**
+ * O sinal com que o Claude Code (❯) e o Codex (›) abrem o campo de entrada — e cada mensagem no histórico —,
+ * no começo da linha **ou colado no fim da régua** (`────❯`). Medido em 13/11/2026 (Claude Code
+ * 2.1.323): a linha do campo vinha colada na régua, e sem isto o "campo" lido era o eco do pedido no histórico —
+ * daí `ficou` para um texto que tinha saído. A régua tem 10 ou mais `─`.
+ */
+const SINAL_NO_MEIO = /(?:^\s*|─{10,}\s*)[❯›]\s?/g
+
+/** Resposta do agente (`●`) ou fim de turno (`✻ … for 5s`): se vem depois de um `❯`, aquele `❯` é histórico. */
+const RESPOSTA_NA_LINHA = /^●|^\s*✻\s+\S+\s+for\s+\d/
+const RESPOSTA_NO_MEIO_DA_LINHA = /\s{2,}●\s|\s{2,}✻\s+\S+\s+for\s+\d/
+
+/**
+ * Junta as linhas que o xterm marcou como continuação (`isWrapped`) na linha de cima — **menos** as que começam com
+ * o sinal do campo (❯ ›) ou do rodapé (⏵): essas são linhas novas que só vieram marcadas assim porque a anterior
+ * (a régua) tem a largura inteira do terminal. Juntá-las escondia o campo dentro da régua.
+ */
+export function juntarLinhasDaTela(linhas: Array<{ texto: string; continuacao: boolean }>): string[] {
+  const saida: string[] = []
+  for (const { texto, continuacao } of linhas) {
+    if (continuacao && saida.length && !/^\s*[❯›⏵]/.test(texto)) saida[saida.length - 1] += texto
+    else saida.push(texto)
+  }
+  return saida
+}
 
 /**
  * O que está escrito no campo de entrada do agente, em minúsculas e sem quebras; null se a tela não mostra
- * um campo reconhecível. O campo começa na **última** linha que começa com ❯ (Claude) ou › (Codex) e vai
- * até o pé da tela (o histórico usa o mesmo sinal, mas o campo é sempre o de baixo).
+ * um campo reconhecível. O campo começa na **última** linha com ❯ (Claude) ou › (Codex) — no começo da linha ou
+ * colado no fim da régua — e vai até o pé da tela (o histórico usa o mesmo sinal, mas o campo é sempre o de baixo).
+ * Um ❯ seguido de resposta do agente (`●`) ou de fim de turno (`✻ … for 3s`) é histórico, não campo: devolve null.
  *
  * Por que (12/11/2026): a regra da posição a contar do pé errava com fichas longas no Claude Code 2.1.322 —
  * depois do envio, o texto inteiro aparece no histórico e às vezes cai na mesma altura em que estava no campo.
@@ -52,18 +83,19 @@ const SINAL_DO_CAMPO = /^\s*[❯›]\s?/
  */
 export function campoNaTela(tela: string): string | null {
   const linhas = tela.split('\n')
-  let i = -1
   for (let k = linhas.length - 1; k >= 0; k--) {
-    if (SINAL_DO_CAMPO.test(linhas[k])) {
-      i = k
-      break
-    }
+    const achados = [...linhas[k].matchAll(SINAL_NO_MEIO)]
+    if (!achados.length) continue
+    const ultimo = achados[achados.length - 1]
+    const resto = linhas[k].slice((ultimo.index ?? 0) + ultimo[0].length)
+    const embaixo = linhas.slice(k + 1)
+    if (RESPOSTA_NO_MEIO_DA_LINHA.test(resto) || embaixo.some((l) => RESPOSTA_NA_LINHA.test(l))) return null
+    // até o pé da tela, rodapé incluído: cortar na primeira linha em branco perdia o fim de uma ficha com
+    // parágrafos (o Codex mostra o texto inteiro no campo), e é pelo fim que o pedido é reconhecido. O rodapé
+    // não atrapalha: aqui só se pergunta se o pedido está no campo.
+    return limpar([resto, ...embaixo].join(' ')).toLowerCase()
   }
-  if (i < 0) return null
-  // até o pé da tela, rodapé incluído: cortar na primeira linha em branco perdia o fim de uma ficha com
-  // parágrafos (o Codex mostra o texto inteiro no campo), e é pelo fim que o pedido é reconhecido. O rodapé
-  // não atrapalha: aqui só se pergunta se o pedido está no campo.
-  return limpar([linhas[i].replace(SINAL_DO_CAMPO, ''), ...linhas.slice(i + 1)].join(' ')).toLowerCase()
+  return null
 }
 
 const campoTemPedido = (campo: string, marca: string): boolean =>
@@ -214,15 +246,17 @@ export async function confirmarEnvio(d: DependenciasDoEnvio): Promise<ResultadoD
   }
   // agente cuja tela nunca mostrou um campo reconhecível (outra versão, outro agente): vale a tela ter mudado
   if (!chegou && !viuCampo && telaMudou) chegou = true
-  // O pedido não apareceu no campo, mas a tela mexeu: pode ser um campo que esta leitura não reconhece. Segue
-  // para o Enter — num campo sem o pedido, Enter não faz nada, e a evidência abaixo decide.
-  if (!chegou && !telaMudou) return 'ficou'
+  // O pedido não apareceu no campo: **sem Enter**. Com o campo reconhecido mostrando outra coisa (a sugestão
+  // fantasma, o rascunho do usuário), a tela mexer não prova nada, e um Enter mandaria o que não é nosso (revisão
+  // 13/11/2026). O Enter de reserva por "a tela mudou" ficou só para o campo nunca reconhecido (acima).
+  if (!chegou) return 'ficou'
   // a colagem apareceu: deixa o agente terminar de desenhá-la antes do Enter (um Enter no meio se perde)
   const quieto = d.assentarMs ?? 1500
   if (quieto > 0) await esperarTelaParar(d, quieto, 60_000)
 
   const r = await apertarEnter(d, marca, quieto)
-  return r === 'sem-marca' ? 'incerto' : r // só a retomada tem `interromper`
+  // `sem-marca` aqui = `interromper` antes do 1º Enter (o usuário voltou ao campo): a colagem está lá, não foi enviada
+  return r === 'sem-marca' ? 'ficou' : r
 }
 
 /**

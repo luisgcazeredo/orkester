@@ -1,0 +1,5 @@
+                                                                                           ✻ Baked for 2s · done 10:42
+                                                                                           ❯ [ork · entrega de "Escriba"]                                                               registrado                                                                                                                                                                          ● O Escriba registrou a ordem combinada (comunicação → sua demanda → R3) e fica livre.
+  Continuo esperando a prova do Testador 1.5.1.
+                                                                                           ✻ Cooked for 1s · done 10:43                                                                                                                                                          ───────────────────────────────────────────────────────────────────────────────────────────❯
+───────────────────────────────────────────────────────────────────────────────────────────  ⏵⏵ auto mode on (shift+tab to cycle)

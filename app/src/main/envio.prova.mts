@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-const { evidenciaDeEnvio, confirmarEnvio, resultadoDaRotina, registroDoEnvio, campoNaTela, retomarEnvio } = await import(new URL('./envio.ts', import.meta.url).href)
+const { evidenciaDeEnvio, confirmarEnvio, resultadoDaRotina, registroDoEnvio, campoNaTela, retomarEnvio, marcaNoCampo, juntarLinhasDaTela, AMBIENTE_DO_CLAUDE } = await import(new URL('./envio.ts', import.meta.url).href)
 
 const base = { ocupadoAntes: false, ocupadoDepois: false, perguntaNova: false }
 const pedido = 'faça a revisão do módulo de envio e me devolva o resumo'
@@ -439,4 +440,154 @@ test('retomada (item 4): o usuário começa a digitar entre a última conferênc
   assert.equal(r, 'sem-marca')
   assert.deepEqual(escritos, [])
   assert.equal(chamadas, 2)
+})
+
+// ---- 1.5.2: ❯ colado na régua, eco no histórico e sugestão fantasma (telas reais de 13/11/2026) ----
+
+const fixture = (nome: string): string => readFileSync(new URL(`./fixtures/${nome}`, import.meta.url), 'utf8')
+const recadoEscriba = '[ork · entrega de "Escriba"]\nregistrado'
+const pedidoDoTestador = 'Rode no shell, em um único comando, exatamente: Start-Sleep -Seconds 60; "pronto-60". Não faça mais nada além disso e diga o resultado.'
+
+test('1.5.2 (a): tela real de 13:44:28 (eco do recado + resposta + ❯ colado na régua): o campo não tem o recado', () => {
+  const tela = fixture('tela-1344-eco-e-regua-colada.txt')
+  const campo = campoNaTela(tela)
+  assert.ok(campo !== null, 'o campo é reconhecido, colado na régua')
+  assert.doesNotMatch(campo, /registrado/)
+  assert.equal(marcaNoCampo(tela, recadoEscriba), false)
+})
+
+test('1.5.2 (a): tela real de 13:43:07 (sugestão fantasma no campo): o campo é a sugestão, sem o pedido', () => {
+  const tela = fixture('tela-1343-sugestao-fantasma.txt')
+  const campo = campoNaTela(tela)
+  assert.ok(campo !== null)
+  assert.match(campo, /^nothing — the task was a one-off/)
+  assert.equal(marcaNoCampo(tela, pedidoDoTestador), false)
+})
+
+test('1.5.2 (b): ❯ seguido de resposta (●) ou de fim de turno (✻) é histórico: campo não reconhecido, nunca "tem o pedido"', () => {
+  const eco = `❯ ${pedido}\n● resposta do agente\n  mais resposta`
+  assert.equal(campoNaTela(eco), null)
+  assert.equal(marcaNoCampo(eco, pedido), false)
+  assert.equal(campoNaTela(`❯ ${pedido}\n          ✻ Cooked for 1s · done 10:43`), null)
+  // a mesma linha, quando o xterm a juntou com a resposta
+  assert.equal(campoNaTela(`❯ ${pedido}${' '.repeat(40)}● resposta`), null)
+  // campo de verdade, com colagem de várias linhas que tem um marcador no meio: continua sendo campo
+  assert.equal(marcaNoCampo(`❯ ${pedido}\n  - item\n  ● destaque\n${regua}\n  ⏵⏵ auto mode on`, pedido), true)
+})
+
+test('1.5.2: evidência com a tela real depois do envio: o campo tinha o recado, agora só o rodapé → saiu', () => {
+  const antes = `histórico\n${regua}\n❯ ${recadoEscriba.replace('\n', ' ')}\n${regua}\n  ⏵⏵ auto mode on (shift+tab to cycle)`
+  assert.equal(marcaNoCampo(antes, recadoEscriba), true)
+  const depois = fixture('tela-1344-eco-e-regua-colada.txt')
+  assert.equal(evidenciaDeEnvio({ ...base, texto: recadoEscriba, antes, depois }), 'saiu')
+})
+
+test('1.5.2: régua com ❯ colado e o pedido de fato no campo → ficou', () => {
+  const tela = `❯ ${pedido}\n● resposta antiga\n  ✻ Cooked for 1s · done 10:43\n${regua}❯ ${pedido}\n${regua}  ⏵⏵ auto mode on`
+  assert.equal(marcaNoCampo(tela, pedido), true)
+  assert.equal(evidenciaDeEnvio({ ...base, texto: pedido, antes: tela, depois: tela }), 'ficou')
+})
+
+test('1.5.2: juntarLinhasDaTela junta a continuação de verdade, mas não esconde ❯ ou ⏵ dentro da régua', () => {
+  assert.deepEqual(
+    juntarLinhasDaTela([
+      { texto: 'uma frase que passou da ', continuacao: false },
+      { texto: 'largura', continuacao: true }
+    ]),
+    ['uma frase que passou da largura']
+  )
+  assert.deepEqual(
+    juntarLinhasDaTela([
+      { texto: regua, continuacao: false },
+      { texto: '❯ ', continuacao: true },
+      { texto: regua, continuacao: false },
+      { texto: '⏵⏵ auto mode on', continuacao: true }
+    ]),
+    [regua, '❯ ', regua, '⏵⏵ auto mode on']
+  )
+})
+
+test('1.5.2 (ii): eco do recado no histórico + campo vazio com sugestão fantasma → a retomada não aperta Enter', async () => {
+  for (const tela of [
+    `❯ ${pedido}\n● resposta\n✻ Cooked for 1s · done\n${regua}❯ Nothing — the task was a one-off.\n${regua}  ⏵⏵ auto mode on`,
+    `❯ ${pedido}\n● resposta\n✻ Cooked for 1s · done\n${regua}\n❯ \n${regua}\n  ⏵⏵ auto mode on`,
+    fixture('tela-1344-eco-e-regua-colada.txt')
+  ]) {
+    const escritos: string[] = []
+    const r = await retomarEnvio({
+      texto: tela.includes('registrado') ? recadoEscriba : pedido,
+      shell: false,
+      escrever: (d: string) => escritos.push(d),
+      tela: async () => tela,
+      emPergunta: async () => false,
+      esperar: async () => {},
+      ocupado: () => false,
+      assentarMs: 0
+    })
+    assert.equal(r, 'sem-marca')
+    assert.deepEqual(escritos, [], 'nenhum Enter')
+  }
+})
+
+test('1.5.2 (3): os cartões do Claude abrem com a sugestão de próxima mensagem desligada', () => {
+  assert.deepEqual(AMBIENTE_DO_CLAUDE, { CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false' })
+})
+
+// ---- 1.5.2 (revisão): primeiro envio nunca dá Enter sobre o que não é do app ----
+
+test('1º envio: sugestão fantasma no campo e a tela mudando (spinner) → ficou, 0 Enter', async () => {
+  const escritos: string[] = []
+  let n = 0
+  const r = await confirmarEnvio({
+    texto: pedido,
+    shell: false,
+    escreverColagem: () => {},
+    escrever: (d: string) => escritos.push(d),
+    // o campo reconhecido mostra só a sugestão; a linha de status muda a cada leitura
+    tela: async () => `histórico\n${regua}❯ Nothing — the task was a one-off.\n${regua}  ⏵⏵ auto mode on · ${++n}s`,
+    emPergunta: async () => false,
+    esperar: (ms: number) => new Promise<void>((res) => setTimeout(res, Math.min(ms, 2))),
+    ocupado: () => false,
+    prazoDaColagemMs: 40,
+    assentarMs: 0
+  })
+  assert.equal(r, 'ficou')
+  assert.deepEqual(escritos, [], 'nenhum Enter')
+})
+
+test('1º envio: o usuário digita durante a espera → interromper → 0 Enter e `ficou`', async () => {
+  const escritos: string[] = []
+  let colado = false
+  const r = await confirmarEnvio({
+    texto: pedido,
+    shell: false,
+    escreverColagem: () => void (colado = true),
+    escrever: (d: string) => escritos.push(d),
+    tela: async () => (colado ? campoClaude(pedido) : campoClaude('')),
+    emPergunta: async () => false,
+    esperar: (ms: number) => new Promise<void>((res) => setTimeout(res, Math.min(ms, 2))),
+    ocupado: () => false,
+    assentarMs: 0,
+    interromper: () => true
+  })
+  assert.equal(r, 'ficou')
+  assert.deepEqual(escritos, [], 'nenhum Enter')
+})
+
+test('1º envio: campo nunca reconhecido (shell/tela desconhecida) e a tela muda → o Enter de reserva continua', async () => {
+  const escritos: string[] = []
+  let colado = false
+  await confirmarEnvio({
+    texto: 'ls',
+    shell: true,
+    escreverColagem: () => void (colado = true),
+    escrever: (d: string) => escritos.push(d),
+    tela: async () => (colado ? 'PS> ls\narquivo' : 'PS> '),
+    emPergunta: async () => false,
+    esperar: (ms: number) => new Promise<void>((res) => setTimeout(res, Math.min(ms, 2))),
+    ocupado: () => false,
+    assentarMs: 0,
+    prazoDoEnterMs: 20
+  })
+  assert.equal(escritos[0], String.fromCharCode(13), 'o Enter de reserva vai')
 })

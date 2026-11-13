@@ -414,3 +414,43 @@ test('caixa: a entrega que chega fecha a pendência de quem entregou', async () 
   await m.caixa.rodada()
   assert.equal(m.caixa.pendenciaDe('testador'), undefined)
 })
+
+// ---- 1.5.2: `desistido` não trava a fila ----
+
+test('caixa 1.5.2 (i): desistiu e a marca está no campo de verdade → nada é colado por cima, nem depois de muito tempo; motivo próprio; "liberar" solta', async () => {
+  const m = mundo()
+  m.resultado('ficou')
+  m.marcaNoCampo(true)
+  m.caixa.enfileirar({ tipo: 'pedido', de: 'maestro', deNome: 'Maestro', para: 'testador', texto: 'primeiro' })
+  m.caixa.enfileirar({ tipo: 'pedido', de: 'maestro', deNome: 'Maestro', para: 'testador', texto: 'segundo' })
+  await m.caixa.rodada()
+  m.passar(RETOMADA_ESPERA + 1000)
+  await m.caixa.rodada() // desiste do primeiro
+  m.resultado('saiu')
+  const segundos = (): number => m.digitados.filter(([, t]) => t === 'segundo').length
+  for (const espera of [ESPERA_ENTRE_RECADOS, 61_000, 10 * 60_000]) {
+    m.passar(espera)
+    await m.caixa.rodada()
+    assert.equal(segundos(), 0, 'a marca continua no campo: nada por cima, sem prazo')
+    assert.equal(m.caixa.resumo('testador').motivo, 'recado-antigo')
+  }
+  m.caixa.liberar('testador') // o usuário clicou em "liberar"
+  await m.caixa.rodada()
+  assert.equal(segundos(), 1, 'liberado: o segundo entra')
+  assert.equal(m.caixa.resumo('testador').fila, 0)
+})
+
+test('caixa 1.5.2 (iii): dois recados na fila e o primeiro dá `ficou` falso → o segundo sai quando o campo não tem mais a marca', async () => {
+  const m = mundo()
+  m.resultado('ficou')
+  m.caixa.enfileirar({ tipo: 'pedido', de: 'maestro', deNome: 'Maestro', para: 'testador', texto: 'primeiro' })
+  m.caixa.enfileirar({ tipo: 'pedido', de: 'maestro', deNome: 'Maestro', para: 'testador', texto: 'segundo' })
+  await m.caixa.rodada()
+  m.passar(RETOMADA_ESPERA + 1000)
+  await m.caixa.rodada()
+  m.resultado('saiu')
+  m.marcaNoCampo(false) // a leitura certa do campo: o recado não está lá
+  m.passar(ESPERA_ENTRE_RECADOS)
+  await m.caixa.rodada()
+  assert.equal(m.digitados.filter(([, t]) => t === 'segundo').length, 1)
+})

@@ -9,7 +9,8 @@ import { Terminal as Espelho } from '@xterm/headless'
 import { SerializeAddon } from '@xterm/addon-serialize'
 import { CANAIS, type EspecTerminal, type RetratoTerminal } from '../shared/api'
 import { ambienteDoComando } from './comandos'
-import { ofertaDeAtualizacao, pularEstaMarcado } from './codex-regras'
+import { ofertaDeAtualizacao, resolverOferta } from './codex-regras'
+import { AMBIENTE_DO_CLAUDE, juntarLinhasDaTela } from './envio'
 import { entradaVazia, lerEntradaDoUsuario, type EntradaDoUsuario } from './caixa'
 import { donoDe, exigirDono } from './janelas'
 
@@ -134,7 +135,10 @@ function ambiente(s: Sessao): Record<string, string> {
   const { pastaBin, variaveis } = ambienteDoComando(s)
   const chavePath = Object.keys(env).find((k) => k.toLowerCase() === 'path') ?? 'PATH'
   env[chavePath] = `${pastaBin}${delimiter}${env[chavePath] ?? ''}`
-  return { ...env, ...variaveis, TERM: 'xterm-256color', COLORTERM: 'truecolor' }
+  // a sugestão de próxima mensagem ("fantasma") no campo do Claude embaralha a leitura do campo; desligada só no
+  // ambiente do cartão, sem tocar no ~/.claude do usuário
+  const doAgente = s.espec.agente === 'claude' ? AMBIENTE_DO_CLAUDE : {}
+  return { ...env, ...variaveis, ...doAgente, TERM: 'xterm-256color', COLORTERM: 'truecolor' }
 }
 
 function avisarVistas(s: Sessao, canal: string, valor: unknown): void {
@@ -304,18 +308,21 @@ function procurarConversaDoCodex(s: Sessao): string | null {
 
 /**
  * A oferta de atualização que o Codex mostra ao abrir (1.5.1): o app responde "pular" sozinho, sem gravar nada no
- * `config.toml` dele. Olha só os primeiros 40 s do processo e responde **uma vez**: desce uma opção (de "Update now"
- * para "Skip") e só aperta Enter se a opção marcada é mesmo a de pular — do outro lado do Enter está instalar.
- * Não bateu com o que se esperava: não faz nada, e a pergunta fica para o usuário.
+ * `config.toml` dele. Olha só os primeiros 40 s do processo e responde **uma vez** (`resolverOferta`): Esc, que o
+ * rodapé da própria oferta diz ser "skip"; sem isso, lê onde está o cursor e só aperta Enter com "Skip" marcado — do
+ * outro lado do Enter está instalar. Não bateu com o que se esperava: não faz nada, e a pergunta fica para o usuário.
  */
 function vigiarAtualizacaoDoCodex(s: Sessao, processo: pty.IPty): void {
   const olhar = async (): Promise<void> => {
     if (sessoes.get(s.id) !== s || s.processo !== processo) return
     if (Date.now() - s.iniciadoEm > 40_000) return
     if (ofertaDeAtualizacao(await telaDe(s, 20))) {
-      processo.write('\x1b[B')
-      await new Promise((r) => setTimeout(r, 400))
-      if (s.processo === processo && pularEstaMarcado(await telaDe(s, 20))) processo.write('\r')
+      await resolverOferta({
+        tela: () => telaDe(s, 20),
+        escrever: (dados) => processo.write(dados),
+        esperar: (ms) => new Promise((r) => setTimeout(r, ms)),
+        vivo: () => sessoes.get(s.id) === s && s.processo === processo
+      })
       return
     }
     setTimeout(() => void olhar(), 500)
@@ -518,11 +525,10 @@ export function telaDe(s: Sessao, linhas = 50): Promise<string> {
       const cru = (y: number): string => buffer.getLine(y)?.translateToString(false) ?? ''
       let fim = buffer.baseY + s.espelho.rows
       while (fim > 0 && !cru(fim - 1).trim()) fim--
-      const saida: string[] = []
-      for (let y = Math.max(0, fim - linhas); y < fim; y++) {
-        if (buffer.getLine(y)?.isWrapped && saida.length) saida[saida.length - 1] += cru(y)
-        else saida.push(cru(y))
-      }
+      const crua: Array<{ texto: string; continuacao: boolean }> = []
+      for (let y = Math.max(0, fim - linhas); y < fim; y++) crua.push({ texto: cru(y), continuacao: !!buffer.getLine(y)?.isWrapped })
+      // a linha do campo (❯) vem marcada como continuação da régua: `juntarLinhasDaTela` não a esconde dentro dela
+      const saida = juntarLinhasDaTela(crua)
       r(saida.map((l) => l.replace(/\s+$/, '')).join('\n'))
     })
   )

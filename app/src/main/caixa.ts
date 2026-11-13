@@ -111,6 +111,7 @@ export const TEXTO_DO_MOTIVO: Record<MotivoDeEspera, string> = {
   pergunta: 'ele está parado numa pergunta',
   digitando: 'o usuário está escrevendo nele',
   rascunho: 'há texto do usuário no campo de entrada, ainda não enviado',
+  'recado-antigo': 'um recado antigo, que o app deu por perdido, ainda está no campo de entrada',
   encerrado: 'o processo dele está encerrado'
 }
 
@@ -309,6 +310,8 @@ export interface Caixa {
   pendenciaDe(para: string): Pendencia | undefined
   /** quem pediu está esperando o fim agora mesmo (`ork pedir`/`ork esperar`): sem aviso enquanto isso */
   vigiar(para: string): () => void
+  /** o usuário clicou em "liberar": o recado antigo desistido deixa de segurar a fila */
+  liberar(id: string): void
   /** a sessão saiu do app: os recados para ela não têm mais destino */
   esquecer(id: string): void
 }
@@ -320,7 +323,11 @@ export function criarCaixa(d: DependenciasDaCaixa): Caixa {
   /** a pendência que o último aviso apagou, por destino */
   const ultimaPendencia = new Map<string, Pendencia>()
   const retomadas = new Map<string, Retomada>()
-  /** o texto do recado que desistiu por destino: enquanto ele estiver no campo, nada é colado por cima */
+  /**
+   * o texto do recado que desistiu por destino: enquanto ele estiver **no campo reconhecido**, nada é colado por
+   * cima (sem prazo: colar depois dele manda os dois numa mensagem só). O eco no histórico, que travava a fila na
+   * 1.5.1, já não conta: `campoNaTela` não o toma por campo. O clique em "liberar" também o solta.
+   */
   const desistidos = new Map<string, string>()
   const vigias = new Map<string, number>()
   const ultimoResumo = new Map<string, string>()
@@ -429,7 +436,7 @@ export function criarCaixa(d: DependenciasDaCaixa): Caixa {
     const desistido = desistidos.get(id)
     if (desistido !== undefined) {
       if (await d.marcaNoCampo(id, desistido)) {
-        motivos.set(id, 'rascunho')
+        motivos.set(id, 'recado-antigo')
         return avisarSeMudou(id)
       }
       desistidos.delete(id)
@@ -551,6 +558,9 @@ export function criarCaixa(d: DependenciasDaCaixa): Caixa {
         if (n > 0) vigias.set(para, n)
         else vigias.delete(para)
       }
+    },
+    liberar(id) {
+      desistidos.delete(id)
     },
     esquecer(id) {
       for (const item of [...(filas.get(id) ?? [])]) terminar(id, item, 'sem-destino')

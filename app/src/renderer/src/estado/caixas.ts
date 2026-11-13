@@ -44,5 +44,6 @@ export const MOTIVO_CURTO: Record<MotivoDaFila, string> = {
   pergunta: 'ele está numa pergunta',
   digitando: 'você está escrevendo aqui',
   rascunho: 'há texto seu no campo, ainda não enviado',
+  'recado-antigo': 'um recado antigo, que o app deu por perdido, ainda está no campo',
   encerrado: 'o processo está encerrado'
 }

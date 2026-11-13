@@ -3,9 +3,10 @@ import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-const { regrasDoCodex, acharGitDoPerfil, ofertaDeAtualizacao, pularEstaMarcado, GIT_SO_LEITURA } = await import(new URL('./codex-regras.ts', import.meta.url).href)
+const { regrasDoCodex, acharGitDoPerfil, ofertaDeAtualizacao, pularEstaMarcado, proximoPassoDaOferta, resolverOferta, GIT_SO_LEITURA } = await import(new URL('./codex-regras.ts', import.meta.url).href)
 
 const GIT = 'C:\\Users\\alguem\\AppData\\Local\\Programs\\Git\\cmd\\git.exe'
 
@@ -66,4 +67,71 @@ test('atualização ao abrir: reconhece a oferta; só aperta Enter com "Skip" ma
   assert.equal(pularEstaMarcado(oferta), false, 'marcado em Update now: não aperta')
   assert.equal(pularEstaMarcado(oferta.replace('› 1. Update now', '  1. Update now').replace('  2. Skip\n', '› 2. Skip\n')), true)
   assert.equal(pularEstaMarcado('sem opção marcada'), false)
+})
+
+// ---- 1.5.2: a oferta real (duas opções na mesma linha) e o Esc ----
+
+const ofertaReal = readFileSync(new URL('./fixtures/codex-oferta-skip-na-mesma-linha.txt', import.meta.url), 'utf8')
+const ofertaEmUpdate = ofertaReal.replace('›', ' ').replace('  1. Update now', '› 1. Update now')
+
+test('oferta real: o › está no meio da linha, na opção 2 (Skip) → marcado em pular; com o cursor em Update now → não', () => {
+  assert.equal(ofertaDeAtualizacao(ofertaReal), true)
+  assert.equal(pularEstaMarcado(ofertaReal), true)
+  assert.equal(pularEstaMarcado(ofertaEmUpdate), false)
+  assert.equal(proximoPassoDaOferta(ofertaReal, true), 'esc', 'o rodapé diz "esc skip"')
+  assert.equal(proximoPassoDaOferta(ofertaReal, false), 'enter', 'sem Esc, lê o cursor: em Skip → Enter')
+  assert.equal(proximoPassoDaOferta(ofertaEmUpdate, false), 'seta', 'em Update now → desce, nunca Enter')
+  assert.equal(proximoPassoDaOferta('nada a ver', true), 'nada')
+})
+
+function terminalDeMentira(inicial: string, aoEscrever: (dados: string, tela: { atual: string }) => void) {
+  const tela = { atual: inicial }
+  const escritos: string[] = []
+  const enterComUpdateMarcado: string[] = []
+  return {
+    escritos,
+    enterComUpdateMarcado,
+    d: {
+      tela: async () => tela.atual,
+      escrever: (dados: string) => {
+        if (dados === '\r' && !pularEstaMarcado(tela.atual)) enterComUpdateMarcado.push(tela.atual)
+        escritos.push(dados)
+        aoEscrever(dados, tela)
+      },
+      esperar: async () => {}
+    }
+  }
+}
+
+test('oferta: Esc resolve; nenhum Enter e nenhuma seta', async () => {
+  const t = terminalDeMentira(ofertaReal, (dados, tela) => {
+    if (dados === '\x1b') tela.atual = '› 1. Yes, continue\n  2. No'
+  })
+  assert.deepEqual(await resolverOferta(t.d), ['esc'])
+  assert.deepEqual(t.escritos, ['\x1b'])
+})
+
+test('oferta: Esc ignorado e cursor em Skip → só Esc e Enter', async () => {
+  const t = terminalDeMentira(ofertaReal, (dados, tela) => {
+    if (dados === '\r') tela.atual = 'pronto'
+  })
+  assert.deepEqual(await resolverOferta(t.d), ['esc', 'enter'])
+  assert.deepEqual(t.escritos, ['\x1b', '\r'])
+  assert.deepEqual(t.enterComUpdateMarcado, [])
+})
+
+test('oferta: Esc ignorado e cursor em Update now → seta, relê, e só então Enter; nunca Enter com Update now marcado', async () => {
+  const t = terminalDeMentira(ofertaEmUpdate, (dados, tela) => {
+    if (dados === '\x1b[B') tela.atual = ofertaReal
+    if (dados === '\r') tela.atual = 'pronto'
+  })
+  assert.deepEqual(await resolverOferta(t.d), ['esc', 'seta', 'enter'])
+  assert.deepEqual(t.escritos, ['\x1b', '\x1b[B', '\r'])
+  assert.deepEqual(t.enterComUpdateMarcado, [])
+  // a seta não move nada: não insiste, não aperta Enter
+  const preso = terminalDeMentira(ofertaEmUpdate, () => {})
+  const passos = await resolverOferta(preso.d)
+  assert.ok(!passos.includes('enter'))
+  assert.deepEqual(preso.enterComUpdateMarcado, [])
+  assert.ok(preso.escritos.filter((x) => x === '\x1b[B').length <= 1)
 })

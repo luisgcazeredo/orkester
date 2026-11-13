@@ -1,0 +1,12 @@
+● Resultado: pronto-60
+
+  Rodei com o PowerShell chamado pelo Bash (powershell -NoProfile -Command), porque o Bash
+  não entende Start-Sleep diretamente.
+
+✻ Worked for 1m 5s · done 10:42
+
+
+
+
+                                                                                           ───────────────────────────────────────────────────────────────────────────────────────────❯ Nothing — the task was a one-off and it's finished.
+───────────────────────────────────────────────────────────────────────────────────────────  ⏵⏵ auto mode on (shift+tab to cycle)

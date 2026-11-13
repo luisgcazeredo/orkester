@@ -79,8 +79,63 @@ export function ofertaDeAtualizacao(tela: string): boolean {
   return /update available/i.test(tela) && /update now/i.test(tela) && /skip/i.test(tela)
 }
 
-/** A opção marcada (linha com `›`/`❯`) é uma das de pular. Só então o Enter é seguro: o outro lado dele é instalar. */
+/**
+ * A opção marcada (a que tem `›`/`❯` na frente) é uma das de pular. Só então o Enter é seguro: o outro lado dele é
+ * instalar. O `›` pode estar **em qualquer ponto da linha** (13/11/2026: o Codex mostra duas opções na mesma linha,
+ * `1. Update now (…)      › 2. Skip`): vale o texto que vem depois dele, até a próxima opção numerada.
+ */
 export function pularEstaMarcado(tela: string): boolean {
-  const marcada = tela.split('\n').find((l) => /^\s*[❯›>]\s*\d?[.)]?\s/.test(l) && /\S/.test(l.replace(/^\s*[❯›>]/, '')))
-  return !!marcada && /skip/i.test(marcada) && !/update now/i.test(marcada)
+  for (const linha of tela.split('\n')) {
+    const m = /(?:^\s*>|[❯›])\s*\d[.)]\s+(.*)$/.exec(linha)
+    if (!m) continue
+    const opcao = m[1].split(/\s\d[.)]\s/)[0]
+    if (/\S/.test(opcao)) return /skip/i.test(opcao) && !/update now/i.test(opcao)
+  }
+  return false
+}
+
+export type PassoDaOferta = 'esc' | 'enter' | 'seta' | 'nada'
+
+/**
+ * O próximo passo diante da oferta. O rodapé diz `esc skip`: Esc é "pular" por definição do próprio Codex e nunca
+ * instala. Sem Esc (já tentado, ou o rodapé não diz), lê onde está o cursor: em pular → Enter; em "Update now" → desce
+ * uma opção e lê de novo. **Nunca Enter com "Update now" marcado.**
+ */
+export function proximoPassoDaOferta(tela: string, podeEsc: boolean): PassoDaOferta {
+  if (!ofertaDeAtualizacao(tela)) return 'nada'
+  if (podeEsc && /esc\s+skip/i.test(tela)) return 'esc'
+  if (pularEstaMarcado(tela)) return 'enter'
+  const marcadaEmUpdate = tela.split('\n').some((l) => /(?:^\s*>|[❯›])\s*\d[.)]\s+update now/i.test(l))
+  return marcadaEmUpdate ? 'seta' : 'nada'
+}
+
+/** Responde à oferta: no máximo uma vez Esc, uma vez a seta, uma vez Enter. Devolve os passos dados (para a prova). */
+export async function resolverOferta(d: {
+  tela: () => Promise<string>
+  escrever: (dados: string) => void
+  esperar: (ms: number) => Promise<void>
+  /** false = o processo não é mais o mesmo: para sem escrever */
+  vivo?: () => boolean
+}): Promise<PassoDaOferta[]> {
+  const dados: PassoDaOferta[] = []
+  let podeEsc = true
+  let podeSeta = true
+  for (let volta = 0; volta < 4; volta++) {
+    if (d.vivo && !d.vivo()) break
+    const passo = proximoPassoDaOferta(await d.tela(), podeEsc)
+    if (passo === 'nada' || (passo === 'seta' && !podeSeta)) break
+    dados.push(passo)
+    if (passo === 'esc') {
+      podeEsc = false
+      d.escrever('\x1b')
+    } else if (passo === 'seta') {
+      podeSeta = false
+      d.escrever('\x1b[B')
+    } else {
+      d.escrever('\r')
+      break
+    }
+    await d.esperar(500)
+  }
+  return dados
 }

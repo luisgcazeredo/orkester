@@ -441,7 +441,9 @@ async function digitarPedido(s: Sessao, texto: string): Promise<ResultadoDoEnvio
     tela: () => telaDe(s, 24),
     emPergunta: async () => (await situacao(s)) === 'pergunta',
     esperar,
-    ocupado: (tela) => OCUPADO.test(tela)
+    ocupado: (tela) => OCUPADO.test(tela),
+    // o usuário começou a escrever no campo durante as esperas: nenhum Enter (mandaria o rascunho dele)
+    interromper: () => motivoDeEspera('livre', s.usuario, Date.now()) !== null
   })
 }
 
@@ -1570,6 +1572,7 @@ export function registrarComandos(): void {
     const s = typeof id === 'string' ? sessaoPorId(id) : undefined
     if (!s || donoDe(s.espacoId) !== evento.sender.id) return
     esquecerRascunho(s.id)
+    caixa.liberar(s.id)
     void caixa.rodada()
   })
 
