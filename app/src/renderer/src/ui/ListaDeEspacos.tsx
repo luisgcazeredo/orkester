@@ -41,7 +41,7 @@ function NovoEspaco({ aoFechar }: { aoFechar: () => void }) {
   )
 }
 
-export function BarraLateral() {
+export function ListaDeEspacos() {
   const espacos = usarLoja((e) => e.espacos)
   const espacoAberto = usarLoja((e) => e.espaco)
   const emOutras = usarLoja((e) => e.emOutrasJanelas)

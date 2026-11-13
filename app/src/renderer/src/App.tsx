@@ -19,24 +19,16 @@ import {
   selecionarTudo,
   usarLoja
 } from './estado/loja'
+import { Casca, Dialogos } from './casca/Casca'
+import { irParaPagina, paginaAtiva, registrarPagina } from './casca/paginas'
 import { cancelarGestos, emGesto } from './quadro/arrasto'
-import { Quadro } from './quadro/Quadro'
-import { DialogoNovoAndar, VistaAndares } from './ui/Andares'
 import { colar, copiarSelecao } from './ui/area'
-import { abrirAtalhos, Atalhos } from './ui/Atalhos'
-import { BarraSelecao } from './ui/BarraSelecao'
-import { BarraFerramentas } from './ui/BarraFerramentas'
+import { abrirAtalhos } from './ui/Atalhos'
 import { BarraExplorador } from './ui/BarraExplorador'
-import { BarraLateral } from './ui/BarraLateral'
-import { BotaoLateral, CantoInferior, CantoSuperior, enquadrarTudo, zoomPeloCentro } from './ui/Controles'
-import { MenuContexto, menuAberto } from './ui/MenuContexto'
-import { abrirPaleta, Paleta } from './ui/Paleta'
-import { Perguntas } from './ui/Perguntas'
-import { Funcoes } from './ui/Funcoes'
-import { Configuracoes } from './ui/Configuracoes'
-import { Partituras } from './ui/Partituras'
-import { Rotinas } from './ui/Rotinas'
-import { Presets } from './ui/Presets'
+import { enquadrarTudo, zoomPeloCentro } from './ui/Controles'
+import { ListaDeEspacos } from './ui/ListaDeEspacos'
+import { abrirPaleta } from './ui/Paleta'
+import { menuAberto } from './ui/MenuContexto'
 
 function digitando(): boolean {
   return !!document.activeElement?.closest('input, textarea, [contenteditable], [data-teclado]')
@@ -103,12 +95,10 @@ function atalhos(e: KeyboardEvent): void {
 }
 
 export function App() {
-  const carregado = usarLoja((e) => e.carregado)
   const temEspaco = usarLoja((e) => e.espaco !== null)
   const tema = usarLoja((e) => e.preferencias.tema)
   const lateralAberta = usarLoja((e) => e.lateralAberta)
   const ferramenta = usarLoja((e) => e.ferramenta)
-  const erroAoSalvar = usarLoja((e) => e.erroAoSalvar)
   const nomeDoEspaco = usarLoja((e) => e.espaco?.nome)
 
   // Com várias janelas, a barra de tarefas e o Alt+Tab mostram qual espaço está em cada uma — e a versão
@@ -123,38 +113,16 @@ export function App() {
     void iniciar()
     window.addEventListener('keydown', atalhos)
     window.ork.aoPedirFechar(salvarParaFechar)
-    if (window.ork.autoteste) window.__teste = { loja }
+    if (window.ork.autoteste) window.__teste = { loja, casca: { registrarPagina, irParaPagina, paginaAtiva } }
     return () => window.removeEventListener('keydown', atalhos)
   }, [])
 
   return (
     <div className={`app tema-${tema} ${lateralAberta ? '' : 'sem-lateral'} ferramenta-${ferramenta}`}>
-      {lateralAberta && <BarraLateral />}
-      <main className="area">
-        {carregado && temEspaco && <Quadro />}
-        {temEspaco && <VistaAndares />}
-        <BotaoLateral />
-        <BarraFerramentas />
-        <CantoSuperior />
-        {temEspaco && <CantoInferior />}
-        {carregado && temEspaco && <BarraSelecao />}
-        {erroAoSalvar && (
-          <div className="pilula aviso-erro" title={erroAoSalvar}>
-            Não consegui salvar. Tento de novo na próxima mudança.
-          </div>
-        )}
-      </main>
+      {lateralAberta && <ListaDeEspacos />}
+      <Casca />
       {temEspaco && <BarraExplorador />}
-      <MenuContexto />
-      <DialogoNovoAndar />
-      <Perguntas />
-      <Atalhos />
-      <Paleta />
-      <Presets />
-      <Funcoes />
-      <Partituras />
-      <Configuracoes />
-      <Rotinas />
+      <Dialogos />
     </div>
   )
 }

@@ -4,7 +4,7 @@
  * É seguro só porque tudo que cruza módulos é função chamada em runtime. Regra: no topo de um módulo de estado/
  * (const com chamada, new, IIFE, registro) nada vem de outro módulo de estado/; só coisas locais ou de fora.
  */
-export { NADA, quantosSelecionados, lerEstado, usarLoja, planoDe, planoAtual, andarAtual, pastaDoPlano, salvarAgora, salvarParaFechar, desfazer, refazer } from './nucleo'
+export { NADA, quantosSelecionados, lerEstado, usarLoja, planoDe, planoAtual, andarAtual, pastaDoPlano, salvarAgora, salvarParaFechar, desfazer, refazer, escreverPaginaAtiva } from './nucleo'
 export type { Ferramenta, Alvo, Selecao, EstadoUI, StatusDoAviso } from './nucleo'
 export { iniciar, abrirNovaJanela, abrirEspaco, criarEspaco, renomearEspaco, apagarEspaco, prepararLeitura, alternarExplorador, adicionarRaizExplorador, removerRaizExplorador, alternarPastaExplorador, alternarLateral, definirTema, alternarLinhasDoCodigo, definirFuncoes, definirPartituras, salvarPartitura, subirPartitura, chaveDoAviso, anotarAvisoDoPrimeiroPedido, dispensarAvisoDoPrimeiroPedido, entregarPrimeiroPedido } from './espacos'
 export { rotinasDoEspaco, criarRotina, mudarRotina, apagarRotina, alternarPausaDaRotina, testarRotina } from './rotinas'

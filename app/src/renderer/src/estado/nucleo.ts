@@ -46,6 +46,8 @@ export interface EstadoUI {
   emOutrasJanelas: string[]
   /** Explorador de arquivos da direita: aberto, as pastas que ele mostra e as que estão abertas nele. */
   explorador: { aberto: boolean; raizes: string[]; expandidas: string[] }
+  /** Página da casca em tela (id do registro em casca/paginas). Só em memória; o único escritor é irParaPagina. */
+  paginaAtiva: string
 }
 
 /** `ficou`: escrito no campo e não enviado. `incerto`: pode ter saído. `nao-pronto`/`sem-sessao`: nada foi digitado. `erro`: o canal com o processo principal falhou. */
@@ -67,7 +69,8 @@ export let estado: EstadoUI = {
   avisosDoPrimeiroPedido: {},
   vistaAndares: false,
   emOutrasJanelas: [],
-  explorador: { aberto: false, raizes: [], expandidas: [] }
+  explorador: { aberto: false, raizes: [], expandidas: [] },
+  paginaAtiva: 'quadro'
 }
 
 export const ouvintes = new Set<() => void>()
@@ -106,6 +109,11 @@ export function definir(parcial: Partial<EstadoUI>): void {
     ajustarVigiasDeCodigo()
   }
   ouvintes.forEach((o) => o())
+}
+
+/** Escreve só a página ativa da casca (o único chamador é irParaPagina, em casca/paginas). */
+export function escreverPaginaAtiva(id: string): void {
+  definir({ paginaAtiva: id })
 }
 
 // ---------- plano à mostra (térreo ou andar) ----------
