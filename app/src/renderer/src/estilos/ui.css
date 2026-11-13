@@ -1,554 +1,3 @@
-/* ------------------------------------------------------------------ identidade
- *
- * Visual próprio do Orkester (06/11/2026). Quem manda aqui é a marca: o azul das peças do símbolo
- * (#4060e8) é o destaque do app, e o azul claro do núcleo (#98a8f8) é o realce. O escuro é grafite —
- * quase preto com um fio de azul —, não cinza neutro: num app que fica aberto o dia inteiro, cinza puro
- * cansa e some com o contraste dos cartões.
- *
- * Três camadas de profundidade, e só três: o **quadro** (o fundo de tudo), o **painel** (cartão, menu,
- * diálogo, barra lateral) e o **painel alto** (cabeçalho de cartão, pílula, campo). Cada uma se separa da
- * de baixo por uma borda fina, não por sombra forte — sombra aqui serve para dizer "isto flutua sobre o
- * quadro", e nada mais.
- *
- * Nada neste arquivo é medido de outro produto.
- */
-.tema-escuro {
-  --quadro-fundo: #141519;
-  --grade: #262a36;
-  --painel: #1b1d23;
-  --painel-alto: #212531;
-  --borda: #2a2e38;
-  --borda-suave: #23262f;
-  --lateral-fundo: #16181d;
-  --lateral-borda: #22252d;
-  --lateral-filtro: #1e212a;
-  --lateral-ativo: rgba(64, 96, 232, 0.18);
-  --hover: rgba(255, 255, 255, 0.055);
-  --texto: #e7e9f0;
-  --texto-suave: #878e9f;
-  --pilula-fundo: #1b1d23;
-  --pilula-borda: #2a2e38;
-  --terminal-cabecalho: #212531;
-  --terminal-corpo: #16181d;
-  --terminal-borda: #2a2e38;
-  --terminal-texto: #d6d9e3;
-  --corda: #3d4252;
-  --cartao: #1b1d23;
-  --sombra: 0 18px 46px rgba(0, 0, 0, 0.55);
-  --sombra-leve: 0 6px 18px rgba(0, 0, 0, 0.4);
-  color-scheme: dark;
-}
-
-.tema-claro {
-  --quadro-fundo: #f6f7fa;
-  --grade: #dde0ea;
-  --painel: #ffffff;
-  --painel-alto: #f2f3f8;
-  --borda: #e3e6ef;
-  --borda-suave: #edeff5;
-  --lateral-fundo: #f1f2f7;
-  --lateral-borda: #e3e6ef;
-  --lateral-filtro: #ffffff;
-  --lateral-ativo: rgba(64, 96, 232, 0.12);
-  --hover: rgba(18, 24, 44, 0.05);
-  --texto: #171a21;
-  --texto-suave: #6a7183;
-  --pilula-fundo: #ffffff;
-  --pilula-borda: #e3e6ef;
-  --terminal-cabecalho: #f2f3f8;
-  --terminal-corpo: #ffffff;
-  --terminal-borda: #e3e6ef;
-  --terminal-texto: #23262e;
-  --corda: #a9afc0;
-  --cartao: #ffffff;
-  --sombra: 0 16px 40px rgba(20, 25, 45, 0.13);
-  --sombra-leve: 0 4px 14px rgba(20, 25, 45, 0.08);
-  color-scheme: light;
-}
-
-:root {
-  --destaque: #4060e8;
-  --destaque-claro: #98a8f8;
-  --destaque-forte: #3250d8;
-  /* o agente está vivo; é a única cor "de estado" que aparece o tempo todo, então é discreta */
-  --vivo: #35c46b;
-  --perigo: #ff453a;
-  --atencao: #f0a33a;
-  /* o post-it é papel: a cor dele não muda com o tema, e o texto nele é sempre escuro */
-  --postit-texto: #2a2a2a;
-  --postit-mini: #fff3a0;
-  /* pasta no explorador e nas árvores */
-  --pasta: #5ea0ff;
-  /* diff: entrou e saiu */
-  --entrou: #35c46b;
-  --saiu: #ff453a;
-
-  /* raios: quatro degraus e a pílula. Fora daqui, nenhum número solto. */
-  --raio-micro: 4px;
-  --raio-pequeno: 7px;
-  --raio: 10px;
-  --raio-grande: 14px;
-  --raio-pilula: 999px;
-
-  /* espaçamento em múltiplos de 4: o ritmo do app inteiro */
-  --espaco-1: 4px;
-  --espaco-2: 8px;
-  --espaco-3: 12px;
-  --espaco-4: 16px;
-  --espaco-5: 24px;
-
-  --fonte-interface: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
-  --fonte-mono: 'Cascadia Mono', Consolas, 'DejaVu Sans Mono', monospace;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-html,
-body,
-#raiz {
-  height: 100%;
-  margin: 0;
-}
-
-body {
-  font-family: var(--fonte-interface);
-  font-size: 13px;
-  overflow: hidden;
-  user-select: none;
-}
-
-button {
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-}
-
-.app {
-  display: flex;
-  height: 100%;
-  background: var(--quadro-fundo);
-  color: var(--texto);
-}
-
-/* ---------- barra lateral ---------- */
-
-.lateral {
-  width: 300px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  padding: var(--espaco-3) var(--espaco-2);
-  background: var(--lateral-fundo);
-  border-right: 1px solid var(--lateral-borda);
-}
-
-/* a marca abre a barra: o símbolo na cor do app e o nome, sem caixa e sem fundo */
-.marca {
-  display: flex;
-  align-items: center;
-  gap: var(--espaco-2);
-  padding: var(--espaco-1) var(--espaco-2) var(--espaco-4);
-  color: var(--destaque);
-}
-
-.marca span {
-  color: var(--texto);
-  font-size: 16px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-}
-
-.lateral-topo {
-  display: flex;
-  align-items: center;
-  gap: var(--espaco-2);
-}
-
-.filtro {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 34px;
-  padding: 0 var(--espaco-3);
-  border: 1px solid var(--borda-suave);
-  border-radius: var(--raio);
-  background: var(--lateral-filtro);
-  color: var(--texto-suave);
-}
-
-.filtro:focus-within {
-  border-color: var(--destaque);
-}
-
-.filtro input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--texto);
-  font: inherit;
-  font-size: 14px;
-}
-
-.botao-icone {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: var(--raio-pequeno);
-  background: transparent;
-}
-
-.botao-icone:hover {
-  background: var(--hover);
-}
-
-.lateral-titulo {
-  margin: 20px 10px 8px;
-  font-size: 11.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--texto-suave);
-}
-
-.lista-espacos {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  overflow-y: auto;
-}
-
-.linha-espaco {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 36px;
-  padding: 0 10px;
-  border-radius: var(--raio-pequeno);
-  font-size: 15px;
-  cursor: default;
-}
-
-.linha-espaco:hover {
-  background: var(--hover);
-}
-
-.linha-espaco.ativo {
-  background: var(--lateral-ativo);
-}
-
-.espaco-nome {
-  flex: 1;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.renomear {
-  flex: 1;
-  min-width: 0;
-  border: 1px solid var(--destaque);
-  border-radius: var(--raio-pequeno);
-  background: var(--quadro-fundo);
-  color: var(--texto);
-  font: inherit;
-  padding: 2px 6px;
-  outline: 0;
-}
-
-.selo {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12.5px;
-  color: var(--texto-suave);
-}
-
-/* ---------- área e quadro ---------- */
-
-.area {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.quadro {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  background-color: var(--quadro-fundo);
-  /* pontinhos, não linhas: a grade orienta sem desenhar uma malha por cima do trabalho */
-  background-image: radial-gradient(circle at 1px 1px, var(--grade) 1.2px, transparent 1.3px);
-  touch-action: none;
-}
-
-.mundo {
-  position: absolute;
-  left: 0;
-  top: 0;
-  transform-origin: 0 0;
-}
-
-/* com outra ferramenta ou a barra de espaço, o quadro inteiro recebe o gesto (desenhar por cima, arrastar) */
-.app:not(.ferramenta-selecionar) .mundo,
-.app:not(.ferramenta-selecionar) .mundo *,
-.mundo.so-arrastar,
-.mundo.so-arrastar * {
-  pointer-events: none !important;
-}
-
-.camada-svg {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 1px;
-  height: 1px;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.camada-cordas {
-  z-index: 0;
-}
-
-.toque * {
-  pointer-events: stroke;
-  cursor: pointer;
-}
-
-.contorno-selecao {
-  fill: none;
-  stroke: var(--destaque);
-  stroke-width: 1.5;
-  stroke-dasharray: 5 4;
-}
-
-/* ---------- nós ---------- */
-
-.no {
-  position: absolute;
-}
-
-/* Seleção, alça e portas ficam do mesmo tamanho na tela em qualquer zoom (divididos por --zoom). */
-.no.selecionado::after {
-  content: '';
-  position: absolute;
-  inset: calc(-4px / var(--zoom, 1));
-  border: calc(1.5px / var(--zoom, 1)) solid var(--destaque);
-  border-radius: calc(17px / var(--zoom, 1));
-  box-shadow: 0 0 0 calc(3px / var(--zoom, 1)) color-mix(in srgb, var(--destaque) 22%, transparent);
-  pointer-events: none;
-}
-
-.alca-redimensionar {
-  position: absolute;
-  right: calc(-7px / var(--zoom, 1));
-  bottom: calc(-7px / var(--zoom, 1));
-  width: calc(12px / var(--zoom, 1));
-  height: calc(12px / var(--zoom, 1));
-  border-radius: calc(3px / var(--zoom, 1));
-  background: var(--destaque);
-  border: calc(2px / var(--zoom, 1)) solid var(--quadro-fundo);
-  cursor: nwse-resize;
-  z-index: 2;
-}
-
-/* terminal */
-.no-terminal {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--terminal-borda);
-  border-radius: var(--raio-grande);
-  background: var(--terminal-corpo);
-  box-shadow: var(--sombra);
-}
-
-.terminal-cabecalho,
-.terminal-rodape {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 9px;
-  background: var(--terminal-cabecalho);
-  color: var(--texto);
-  cursor: grab;
-}
-
-.terminal-cabecalho {
-  height: 28px;
-  border-radius: 13px 13px 0 0;
-  border-bottom: 1px solid var(--borda-suave);
-  font-size: 11.5px;
-  font-weight: 600;
-}
-
-.terminal-indice {
-  margin-left: 2px;
-  padding: 0 5px;
-  border-radius: var(--raio-micro);
-  background: var(--hover);
-  color: var(--texto-suave);
-  font-size: 10px;
-  font-weight: 600;
-}
-
-.terminal-rodape {
-  height: 22px;
-  border-radius: 0 0 13px 13px;
-  border-top: 1px solid var(--borda-suave);
-  font-size: 11px;
-  color: var(--texto-suave);
-}
-
-.terminal-alternar {
-  margin-left: auto;
-}
-
-.terminal-corpo {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  padding: 6px 4px 4px 10px;
-  font-family: var(--fonte-mono);
-  font-size: 13px;
-  color: var(--terminal-texto);
-  overflow: hidden;
-}
-
-/* do tamanho do cartão; o xterm dentro dela é desenhado no tamanho real do zoom e desfeito por um scale */
-.terminal-caixa {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-.terminal-xterm {
-  position: absolute;
-  left: 0;
-  top: 0;
-  transform-origin: 0 0;
-}
-
-.terminal-xterm .xterm-viewport {
-  background: transparent !important;
-}
-
-.terminal-escudo {
-  position: absolute;
-  inset: 0;
-  cursor: grab;
-}
-
-.terminal-descarregado {
-  padding: 8px 2px;
-  font-size: 11.5px;
-  color: var(--texto-suave);
-}
-
-.terminal-saiu {
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
-  border-radius: var(--raio-pequeno);
-  background: var(--terminal-cabecalho);
-  color: var(--texto);
-  font-family: var(--fonte-interface);
-  font-size: 12px;
-}
-
-.terminal-saiu button {
-  margin-left: auto;
-  padding: 3px 10px;
-  border: 0;
-  border-radius: var(--raio-pequeno);
-  background: var(--destaque);
-  color: #fff;
-  font: inherit;
-  cursor: pointer;
-}
-
-.terminal-selo {
-  padding: 0 5px;
-  border-radius: var(--raio-micro);
-  background: var(--hover);
-  color: var(--texto-suave);
-  font-size: 9.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.terminal-selo-aviso {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  border: 1px solid var(--perigo);
-  background: transparent;
-  color: var(--perigo);
-  cursor: pointer;
-}
-
-/* caixa de entrada: recados de agentes esperando a vez de entrar neste terminal */
-.terminal-selo-caixa {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  border: 1px solid var(--destaque-claro);
-  background: transparent;
-  color: var(--destaque-claro);
-  cursor: pointer;
-}
-
-.terminal-selo-caixa.terminal-selo-aviso {
-  border-color: var(--perigo);
-  color: var(--perigo);
-}
-
-.porta {
-  position: absolute;
-  top: 50%;
-  width: calc(12px / var(--zoom, 1));
-  height: calc(12px / var(--zoom, 1));
-  margin-top: calc(-6px / var(--zoom, 1));
-  border-radius: 50%;
-  background: var(--quadro-fundo);
-  border: calc(2px / var(--zoom, 1)) solid var(--corda);
-  opacity: 0;
-  cursor: crosshair;
-  transition: opacity 0.12s;
-  z-index: 3;
-}
-
-.porta-esquerda {
-  left: calc(-7px / var(--zoom, 1));
-}
-
-.porta-direita {
-  right: calc(-7px / var(--zoom, 1));
-}
-
-.no-terminal:hover .porta,
-.no-terminal.selecionado .porta {
-  opacity: 1;
-}
-
-.porta:hover {
-  border-color: var(--destaque);
-}
-
 /* ---------- rotinas ---------- */
 .rotinas {
   display: flex;
@@ -731,7 +180,7 @@ button {
 }
 
 .postit-vazio {
-  color: rgba(0, 0, 0, 0.35);
+  color: var(--postit-vazio);
   margin: 0;
 }
 
@@ -942,7 +391,7 @@ button {
 .portal-visor {
   flex: 1;
   width: 100%;
-  background: #fff;
+  background: var(--portal-fundo);
 }
 
 body.em-gesto webview {
@@ -966,8 +415,8 @@ body.em-gesto webview {
 .portal-escudo span {
   padding: 5px 12px;
   border-radius: var(--raio-pilula);
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
+  background: var(--portal-escudo-fundo);
+  color: var(--texto-sobre-cor);
   font-size: 12px;
   opacity: 0;
   transition: opacity 0.15s;
@@ -1107,7 +556,7 @@ body.em-gesto webview {
 /* a ferramenta em uso é a única coisa preenchida com a cor da marca: não há dúvida de onde você está */
 .ferramenta.ativa {
   background: var(--destaque);
-  color: #fff;
+  color: var(--texto-sobre-cor);
 }
 
 .ferramenta:hover:not(:disabled):not(.ativa) {
@@ -1485,7 +934,7 @@ body.em-gesto webview {
 }
 
 .mini-visivel {
-  fill: rgba(0, 122, 255, 0.08);
+  fill: var(--mini-visivel-fundo);
   stroke: var(--destaque);
   stroke-width: 1.2;
 }
@@ -1594,7 +1043,7 @@ body.em-gesto webview {
   position: absolute;
   border: 1.5px solid var(--texto);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--borracha-cursor-fundo);
   pointer-events: none;
   z-index: 5;
 }
@@ -1630,7 +1079,7 @@ body.em-gesto webview {
 .menu-item:hover:not(:disabled),
 .menu-item.aberto {
   background: var(--destaque);
-  color: #fff;
+  color: var(--texto-sobre-cor);
 }
 
 .menu-item:disabled {
@@ -1644,7 +1093,7 @@ body.em-gesto webview {
 
 .menu-item.perigo:hover:not(:disabled) {
   background: var(--perigo);
-  color: #fff;
+  color: var(--texto-sobre-cor);
 }
 
 .menu-icone {
@@ -1684,7 +1133,7 @@ body.em-gesto webview {
 .menu-amostra {
   width: 20px;
   height: 20px;
-  border: 1px solid rgba(128, 128, 128, 0.35);
+  border: 1px solid var(--amostra-borda);
   border-radius: 50%;
 }
 
@@ -1722,7 +1171,7 @@ body.em-gesto webview {
   place-items: center;
   border-radius: var(--raio-pilula);
   background: var(--destaque);
-  color: #fff;
+  color: var(--texto-sobre-cor);
   font-size: 11px;
 }
 
@@ -1766,7 +1215,7 @@ body.em-gesto webview {
 .pilula-andar.ativa {
   border-color: var(--destaque);
   background: var(--destaque);
-  color: #fff;
+  color: var(--texto-sobre-cor);
 }
 
 .pilula-andar.novo {
@@ -1847,7 +1296,7 @@ body.em-gesto webview {
   border: 1px solid color-mix(in srgb, var(--texto) 18%, transparent);
   border-radius: var(--raio-grande);
   background: color-mix(in srgb, var(--pilula-fundo) 72%, transparent);
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--sombra-plano-3d);
   cursor: pointer;
   transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.15s, background 0.15s;
   transform-origin: center;
@@ -1927,7 +1376,7 @@ body.em-gesto webview {
 .dialogo-acoes .perigo {
   border-color: var(--perigo);
   background: var(--perigo);
-  color: #fff;
+  color: var(--texto-sobre-cor);
 }
 
 .aviso-erro {
@@ -1947,7 +1396,7 @@ body.em-gesto webview {
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(8, 9, 12, 0.55);
+  background: var(--dialogo-veu);
   z-index: 100;
 }
 
@@ -2026,7 +1475,7 @@ body.em-gesto webview {
 .dialogo-acoes .primario {
   border-color: var(--destaque);
   background: var(--destaque);
-  color: #fff;
+  color: var(--texto-sobre-cor);
   font-weight: 600;
 }
 
@@ -2106,7 +1555,7 @@ body.em-gesto .barra-selecao {
   place-items: center;
   border-radius: var(--raio-pilula);
   background: var(--destaque);
-  color: #fff;
+  color: var(--texto-sobre-cor);
   font-size: 11px;
 }
 
@@ -2192,7 +1641,7 @@ kbd {
 .paleta-fundo {
   place-items: start center;
   padding-top: 12vh;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--paleta-veu);
 }
 
 .paleta {
@@ -2240,7 +1689,7 @@ kbd {
 
 .paleta-item.ativo {
   background: var(--destaque);
-  color: #fff;
+  color: var(--texto-sobre-cor);
 }
 
 .paleta-rotulo {
@@ -2287,7 +1736,7 @@ kbd {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  background: #fff;
+  background: var(--portal-fundo);
   outline: none;
   cursor: default;
 }
@@ -2327,7 +1776,7 @@ kbd {
   border: 1px solid var(--destaque);
   border-radius: var(--raio-pequeno);
   background: var(--destaque);
-  color: #fff;
+  color: var(--texto-sobre-cor);
 }
 
 .botao-mini.ativo {
@@ -2464,7 +1913,7 @@ kbd {
 }
 
 .codigo-linha.menos {
-  background: rgba(255, 59, 48, 0.14);
+  background: var(--diff-saiu-fundo);
   box-shadow: inset 2px 0 0 var(--saiu);
 }
 
@@ -2656,36 +2105,6 @@ kbd {
   gap: 6px;
   padding: 5px 10px;
   font-size: 12px;
-}
-
-
-/* ---------- realce de sintaxe: cores do Dark+ e do Light+ do VS Code ---------- */
-/* Os nomes das classes vêm do highlight.js; os valores, dos temas do VS Code. */
-
-.tema-escuro {
-  --cod-texto: #d4d4d4;
-  --cod-comentario: #6a9955;
-  --cod-palavra: #569cd6;
-  --cod-controle: #c586c0;
-  --cod-texto-literal: #ce9178;
-  --cod-numero: #b5cea8;
-  --cod-funcao: #dcdcaa;
-  --cod-tipo: #4ec9b0;
-  --cod-variavel: #9cdcfe;
-  --cod-regex: #d16969;
-}
-
-.tema-claro {
-  --cod-texto: #000000;
-  --cod-comentario: #008000;
-  --cod-palavra: #0000ff;
-  --cod-controle: #af00db;
-  --cod-texto-literal: #a31515;
-  --cod-numero: #098658;
-  --cod-funcao: #795e26;
-  --cod-tipo: #267f99;
-  --cod-variavel: #001080;
-  --cod-regex: #811f3f;
 }
 
 .codigo-linhas {
@@ -2892,7 +2311,7 @@ textarea:focus-visible,
   border: 1px solid var(--destaque);
   border-radius: var(--raio-pequeno);
   background: var(--destaque);
-  color: #fff;
+  color: var(--texto-sobre-cor);
   font-weight: 600;
   white-space: nowrap;
 }

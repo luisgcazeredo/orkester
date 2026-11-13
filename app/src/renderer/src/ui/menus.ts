@@ -105,24 +105,13 @@ import { abrirAtalhos } from './Atalhos'
 import { abrirRotinas } from './Rotinas'
 import { colar, copiarSelecao } from './area'
 import { alternarRecolhido } from '../nos/Codigo'
+import { CORES_DE_CARTAO } from '../estado/coresDeDados'
 import { ICONE_AGENTE } from '../nos/icones'
 import { COR_POSTIT } from '../nos/PostIt'
 import { abrirNovoAndar, apagarAndarComConfirmacao, juntarAndar } from './acoesAndar'
 import { enquadrarTudo } from './Controles'
 import type { ItemMenu } from './MenuContexto'
 import { avisar, confirmar, perguntarTexto } from './Perguntas'
-
-const CORES_CARTAO: Array<{ cor: string | null; nome: string }> = [
-  { cor: null, nome: 'Sem cor' },
-  { cor: '#007AFF', nome: 'Azul' },
-  { cor: '#AF52DE', nome: 'Roxo' },
-  { cor: '#FF2D55', nome: 'Rosa' },
-  { cor: '#FF3B30', nome: 'Vermelho' },
-  { cor: '#FF9500', nome: 'Laranja' },
-  { cor: '#FFCC00', nome: 'Amarelo' },
-  { cor: '#34C759', nome: 'Verde' },
-  { cor: '#8E8E93', nome: 'Cinza' }
-]
 
 const NOMES_POSTIT: Record<NoPostIt['cor'], string> = {
   amarelo: 'Amarelo',
@@ -386,7 +375,7 @@ function linhaDeCores(no: No): ItemMenu {
   }
   return {
     cores: {
-      valores: CORES_CARTAO.map((v) => (v.cor === null && no.tipo === 'texto' ? { ...v, nome: 'Cor padrão' } : v)),
+      valores: CORES_DE_CARTAO.map((v) => (v.cor === null && no.tipo === 'texto' ? { ...v, nome: 'Cor padrão' } : v)),
       atual: no.cor ?? null,
       escolher: (c) => definirCorNo(no.id, c ?? undefined)
     }
@@ -409,7 +398,7 @@ export function linhaDeCoresDaSelecao(): ItemMenu {
   const cores = new Set([...nos.map((n) => n.cor ?? null), ...desenhos.map((d) => d.cor)])
   return {
     cores: {
-      valores: CORES_CARTAO,
+      valores: CORES_DE_CARTAO,
       atual: cores.size === 1 ? [...cores][0] : undefined,
       escolher: definirCorSelecao
     }
@@ -671,7 +660,7 @@ export function itensDoDesenho({ id, cor: corAtual, grupo }: Desenho): ItemMenu[
       submenu: [
         {
           cores: {
-            valores: CORES_CARTAO.filter((v) => v.cor !== null),
+            valores: CORES_DE_CARTAO.filter((v) => v.cor !== null),
             atual: corAtual,
             escolher: (c) => c && definirCorDesenho(id, c)
           }

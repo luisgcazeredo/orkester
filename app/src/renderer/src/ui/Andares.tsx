@@ -10,10 +10,10 @@ import { itensDoAndar } from './menus'
 import { avisar } from './Perguntas'
 
 export const COR_ESTADO: Record<EstadoAndar, string> = {
-  trabalhando: '#4060e8',
-  travado: '#f0a33a',
-  revisao: '#a06ae8',
-  pronto: '#35c46b'
+  trabalhando: 'var(--destaque)',
+  travado: 'var(--atencao)',
+  revisao: 'var(--estado-revisao)',
+  pronto: 'var(--vivo)'
 }
 
 /** Térreo + andares, de baixo para cima, no formato que a pilha desenha. */
@@ -88,14 +88,14 @@ function NumerosAndar({ andar }: { andar: Andar | null }) {
 // ---------- miniatura de um plano (o que aparece em cada andar da pilha) ----------
 
 const COR_MINI: Record<No['tipo'], string> = {
-  terminal: '#1a1a1e',
-  postit: '#fff3a0',
+  terminal: 'var(--mini-terminal)',
+  postit: 'var(--postit-mini)',
   texto: 'transparent',
-  arquivo: '#d8d8dc',
-  pasta: '#d8d8dc',
-  codigo: '#2b2b32',
-  portal: '#ffffff',
-  imagem: '#8e8e93',
+  arquivo: 'var(--mini-arquivo)',
+  pasta: 'var(--mini-arquivo)',
+  codigo: 'var(--mini-codigo)',
+  portal: 'var(--portal-fundo)',
+  imagem: 'var(--mini-imagem)',
   banda: 'transparent'
 }
 
@@ -118,15 +118,14 @@ function Miniatura({ plano, largura, altura }: { plano: Plano; largura: number; 
             width={n.largura * escala}
             height={n.altura * escala}
             rx={4}
-            fill={COR_MINI[n.tipo]}
-            stroke={n.cor && n.tipo !== 'postit' && n.tipo !== 'texto' ? n.cor : 'rgba(128,128,128,0.45)'}
+            style={{ fill: COR_MINI[n.tipo], stroke: n.cor && n.tipo !== 'postit' && n.tipo !== 'texto' ? n.cor : 'var(--mini-borda)' }}
             strokeWidth={1}
           />
           {(n.tipo === 'terminal' || n.tipo === 'pasta' || n.tipo === 'portal') && (
-            <rect width={n.largura * escala} height={Math.max(3, 24 * escala)} rx={3} fill={n.cor ?? '#3a3a3e'} opacity={0.9} />
+            <rect width={n.largura * escala} height={Math.max(3, 24 * escala)} rx={3} style={{ fill: n.cor ?? 'var(--mini-cabecalho)' }} opacity={0.9} />
           )}
           {n.tipo === 'texto' && (
-            <rect y={(n.altura * escala) / 3} width={n.largura * escala} height={Math.max(2, (n.altura * escala) / 3)} rx={1} fill={n.cor ?? '#9a9aa0'} />
+            <rect y={(n.altura * escala) / 3} width={n.largura * escala} height={Math.max(2, (n.altura * escala) / 3)} rx={1} style={{ fill: n.cor ?? 'var(--mini-texto)' }} />
           )}
         </g>
       ))}

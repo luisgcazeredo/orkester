@@ -24,7 +24,7 @@ import { dividirHtmlPorLinhas, escaparHtml, linguaDe } from '../../../shared/rea
 
 // Realce de sintaxe no cartão de código. O highlight.js entra pelo núcleo, com as línguas escolhidas uma por
 // uma: o pacote inteiro são 5 MB de 190 línguas, e isto são as que aparecem aqui. As cores são as do tema
-// Dark+ e Light+ do VS Code, nos estilos (`.hljs-*` em estilos.css).
+// Dark+ e Light+ do VS Code, nos estilos (`.hljs-*` em estilos/ui.css).
 
 for (const [nome, lingua] of Object.entries({
   bash,

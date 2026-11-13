@@ -50,7 +50,7 @@ function Editor() {
           const Icone = ICONE_AGENTE[p.agente]
           return (
             <div key={p.id} className="preset-linha" data-preset={p.id}>
-              <Icone size={15} color={COR_AGENTE[p.agente]} />
+              <Icone size={15} style={{ color: COR_AGENTE[p.agente] }} />
               <input className="preset-nome" value={p.nome} placeholder="Nome" onChange={(e) => mudar(p.id, { nome: e.target.value })} />
               <select value={p.agente} onChange={(e) => mudar(p.id, { agente: e.target.value as Agente })} title="Tipo de agente">
                 {AGENTES.map(([valor, rotulo]) => (

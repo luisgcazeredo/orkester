@@ -73,7 +73,7 @@ export const PecaTerminal = memo(function PecaTerminal({ no, selecionado, pastaD
   return (
     <MolduraNo no={no} selecionado={selecionado}>
       <header className="terminal-cabecalho" data-arrasta>
-        <Icone size={13} color={COR_AGENTE[no.agente]} strokeWidth={2.2} />
+        <Icone size={13} style={{ color: COR_AGENTE[no.agente] }} strokeWidth={2.2} />
         <span className="terminal-nome">{no.nome}</span>
         <span className="terminal-indice">{indice}</span>
         {no.criadoPor && <span className="terminal-selo" title="Aberto por um agente pelo ork">agente</span>}

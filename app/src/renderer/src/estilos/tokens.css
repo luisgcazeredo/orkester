@@ -1,0 +1,158 @@
+/* ------------------------------------------------------------------ identidade
+ *
+ * Visual próprio do Orkester (06/11/2026). Quem manda aqui é a marca: o azul das peças do símbolo
+ * (#4060e8) é o destaque do app, e o azul claro do núcleo (#98a8f8) é o realce. O escuro é grafite —
+ * quase preto com um fio de azul —, não cinza neutro: num app que fica aberto o dia inteiro, cinza puro
+ * cansa e some com o contraste dos cartões.
+ *
+ * Três camadas de profundidade, e só três: o **quadro** (o fundo de tudo), o **painel** (cartão, menu,
+ * diálogo, barra lateral) e o **painel alto** (cabeçalho de cartão, pílula, campo). Cada uma se separa da
+ * de baixo por uma borda fina, não por sombra forte — sombra aqui serve para dizer "isto flutua sobre o
+ * quadro", e nada mais.
+ *
+ * Nada neste arquivo é medido de outro produto.
+ */
+.tema-escuro {
+  --quadro-fundo: #141519;
+  --grade: #262a36;
+  --painel: #1b1d23;
+  --painel-alto: #212531;
+  --borda: #2a2e38;
+  --borda-suave: #23262f;
+  --lateral-fundo: #16181d;
+  --lateral-borda: #22252d;
+  --lateral-filtro: #1e212a;
+  --lateral-ativo: rgba(64, 96, 232, 0.18);
+  --hover: rgba(255, 255, 255, 0.055);
+  --texto: #e7e9f0;
+  --texto-suave: #878e9f;
+  --pilula-fundo: #1b1d23;
+  --pilula-borda: #2a2e38;
+  --terminal-cabecalho: #212531;
+  --terminal-corpo: #16181d;
+  --terminal-borda: #2a2e38;
+  --terminal-texto: #d6d9e3;
+  --corda: #3d4252;
+  --cartao: #1b1d23;
+  --sombra: 0 18px 46px rgba(0, 0, 0, 0.55);
+  --sombra-leve: 0 6px 18px rgba(0, 0, 0, 0.4);
+  /* realce de sintaxe: cores do Dark+ e do Light+ do VS Code (nomes das classes do highlight.js) */
+  --cod-texto: #d4d4d4;
+  --cod-comentario: #6a9955;
+  --cod-palavra: #569cd6;
+  --cod-controle: #c586c0;
+  --cod-texto-literal: #ce9178;
+  --cod-numero: #b5cea8;
+  --cod-funcao: #dcdcaa;
+  --cod-tipo: #4ec9b0;
+  --cod-variavel: #9cdcfe;
+  --cod-regex: #d16969;
+  color-scheme: dark;
+}
+
+.tema-claro {
+  --quadro-fundo: #f6f7fa;
+  --grade: #dde0ea;
+  --painel: #ffffff;
+  --painel-alto: #f2f3f8;
+  --borda: #e3e6ef;
+  --borda-suave: #edeff5;
+  --lateral-fundo: #f1f2f7;
+  --lateral-borda: #e3e6ef;
+  --lateral-filtro: #ffffff;
+  --lateral-ativo: rgba(64, 96, 232, 0.12);
+  --hover: rgba(18, 24, 44, 0.05);
+  --texto: #171a21;
+  --texto-suave: #6a7183;
+  --pilula-fundo: #ffffff;
+  --pilula-borda: #e3e6ef;
+  --terminal-cabecalho: #f2f3f8;
+  --terminal-corpo: #ffffff;
+  --terminal-borda: #e3e6ef;
+  --terminal-texto: #23262e;
+  --corda: #a9afc0;
+  --cartao: #ffffff;
+  --sombra: 0 16px 40px rgba(20, 25, 45, 0.13);
+  --sombra-leve: 0 4px 14px rgba(20, 25, 45, 0.08);
+  /* realce de sintaxe: cores do Dark+ e do Light+ do VS Code (nomes das classes do highlight.js) */
+  --cod-texto: #000000;
+  --cod-comentario: #008000;
+  --cod-palavra: #0000ff;
+  --cod-controle: #af00db;
+  --cod-texto-literal: #a31515;
+  --cod-numero: #098658;
+  --cod-funcao: #795e26;
+  --cod-tipo: #267f99;
+  --cod-variavel: #001080;
+  --cod-regex: #811f3f;
+  color-scheme: light;
+}
+
+:root {
+  --destaque: #4060e8;
+  --destaque-claro: #98a8f8;
+  --destaque-forte: #3250d8;
+  /* o agente está vivo; é a única cor "de estado" que aparece o tempo todo, então é discreta */
+  --vivo: #35c46b;
+  --perigo: #ff453a;
+  --atencao: #f0a33a;
+  /* o post-it é papel: a cor dele não muda com o tema, e o texto nele é sempre escuro */
+  --postit-texto: #2a2a2a;
+  --postit-mini: #fff3a0;
+  /* pasta no explorador e nas árvores */
+  --pasta: #5ea0ff;
+  /* diff: entrou e saiu */
+  --entrou: #35c46b;
+  --saiu: #ff453a;
+
+  /* cores fixas que não mudam com o tema (o valor é o mesmo nos dois): texto sobre cor cheia, véus, o branco do portal */
+  --texto-sobre-cor: #fff;
+  --postit-vazio: rgba(0, 0, 0, 0.35);
+  --portal-fundo: #fff;
+  --portal-escudo-fundo: rgba(0, 0, 0, 0.55);
+  --mini-visivel-fundo: rgba(0, 122, 255, 0.08);
+  --borracha-cursor-fundo: rgba(255, 255, 255, 0.08);
+  --amostra-borda: rgba(128, 128, 128, 0.35);
+  --sombra-plano-3d: 0 30px 60px rgba(0, 0, 0, 0.25);
+  --dialogo-veu: rgba(8, 9, 12, 0.55);
+  --paleta-veu: rgba(0, 0, 0, 0.25);
+  --diff-saiu-fundo: rgba(255, 59, 48, 0.14);
+
+  /* o papel de cada tom de post-it: como o post-it, não muda com o tema */
+  --postit-amarelo: #FFF9C4;
+  --postit-rosa: #FFD9E2;
+  --postit-azul: #D8EAFF;
+  --postit-verde: #DAF5D7;
+  --postit-roxo: #E9DDFF;
+  /* a cor de marca de cada agente (ícone no cartão, na barra e nos presets) */
+  --agente-claude: #D97757;
+  --agente-codex: #7B9CFF;
+  --agente-shell: #A0A0A4;
+  /* o estado de um andar que não é o destaque, o atenção ou o vivo */
+  --estado-revisao: #a06ae8;
+  /* miniatura dos andares: a cor de cada tipo de cartão, em escala pequena */
+  --mini-terminal: #1a1a1e;
+  --mini-arquivo: #d8d8dc;
+  --mini-codigo: #2b2b32;
+  --mini-imagem: #8e8e93;
+  --mini-borda: rgba(128, 128, 128, 0.45);
+  --mini-cabecalho: #3a3a3e;
+  --mini-texto: #9a9aa0;
+
+  /* raios: quatro degraus e a pílula. Fora daqui, nenhum número solto. */
+  --raio-micro: 4px;
+  --raio-pequeno: 7px;
+  --raio: 10px;
+  --raio-grande: 14px;
+  --raio-pilula: 999px;
+
+  /* espaçamento em múltiplos de 4: o ritmo do app inteiro */
+  --espaco-1: 4px;
+  --espaco-2: 8px;
+  --espaco-3: 12px;
+  --espaco-4: 16px;
+  --espaco-5: 24px;
+
+  --fonte-interface: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --fonte-mono: 'Cascadia Mono', Consolas, 'DejaVu Sans Mono', monospace;
+}

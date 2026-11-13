@@ -28,6 +28,7 @@ import {
 } from '../shared/modelo'
 import { CANAIS_DADOS } from '../shared/api'
 import { juntarPreferencias, type PreferenciasParciais } from '../shared/preferencias'
+import { TEMA_PADRAO, temaValido } from '../shared/temas'
 import { SESSAO_VAZIA, sessaoValida, type Sessao } from '../shared/janelas'
 import { MAX_NOME_DA_PARTITURA, MAX_PARTITURAS, MAX_PECAS, MAX_TEXTO_DA_PECA } from '../shared/quadro/partituras'
 import { MAX_ROTINAS, rotinaValida } from '../shared/rotinas'
@@ -393,7 +394,7 @@ function partiturasValidas(partituras: unknown): boolean {
 
 /** Presets: o comando é digitado no PowerShell quando o terminal abre, então é uma linha só e curta. */
 /** As preferências de fábrica: valem na primeira vez e quando o arquivo não dá para ler. */
-const PREFERENCIAS_PADRAO: Preferencias = { versao: 1, tema: 'escuro', presets: PRESETS_PADRAO, corPostItPadrao: 'amarelo' }
+const PREFERENCIAS_PADRAO: Preferencias = { versao: 1, tema: TEMA_PADRAO, presets: PRESETS_PADRAO, corPostItPadrao: 'amarelo' }
 
 /** O que está gravado agora — a base com que a gravação de cada janela é juntada. */
 function lerPreferencias(): Preferencias {
@@ -403,7 +404,7 @@ function lerPreferencias(): Preferencias {
 function preferenciasValidas(p: Preferencias): boolean {
   return (
     p?.versao === 1 &&
-    (p.tema === 'escuro' || p.tema === 'claro') &&
+    temaValido(p.tema) &&
     typeof p.corPostItPadrao === 'string' &&
     partiturasValidas(p.partituras) &&
     Array.isArray(p.presets) &&

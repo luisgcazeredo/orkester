@@ -19,12 +19,12 @@ import { resumoDaPartitura } from '../../../shared/quadro/partituras'
 import { adicionarNo, definirEstiloDesenho, escolherFerramenta, planoAtual, usarLoja, type Ferramenta } from '../estado/loja'
 import { anexarArquivoEm, arvoreEm, portalEm } from './menus'
 import { centroDaTela } from '../quadro/geometria'
+import { CORES_DE_DESENHO } from '../estado/coresDeDados'
 import { COR_AGENTE, ICONE_AGENTE } from '../nos/icones'
 import { abrirFuncoes } from './Funcoes'
 import { abrirPresets } from './Presets'
 import { abrirPartituras, subirPartituraNoCentro } from './Partituras'
 
-const CORES_DESENHO = ['#FF3B30', '#FF9500', '#FFCC00', '#34C759', '#007AFF', '#AF52DE', '#8E8E93']
 const FORMAS: Array<[PincelDesenho, LucideIcon, string]> = [
   ['lapis', Pencil, 'Lápis'],
   ['retangulo', Square, 'Retângulo'],
@@ -144,7 +144,7 @@ export function BarraFerramentas() {
                       adicionarNo({ tipo: 'terminal', preset: p }, x, y)
                     }}
                   >
-                    <Icone size={15} color={COR_AGENTE[p.agente]} />
+                    <Icone size={15} style={{ color: COR_AGENTE[p.agente] }} />
                     {p.nome}
                   </button>
                 )
@@ -190,7 +190,7 @@ export function BarraFerramentas() {
                         adicionarNo({ tipo: 'terminal', preset, funcao: f }, x, y)
                       }}
                     >
-                      <Icone size={15} color={COR_AGENTE[preset.agente]} />
+                      <Icone size={15} style={{ color: COR_AGENTE[preset.agente] }} />
                       {f.nome}
                     </button>
                   )
@@ -265,7 +265,7 @@ export function BarraFerramentas() {
             </button>
           ))}
           <span className="divisoria" />
-          {CORES_DESENHO.map((cor) => (
+          {CORES_DE_DESENHO.map((cor) => (
             <button
               key={cor}
               className={`amostra ${estilo.cor === cor ? 'ativa' : ''}`}

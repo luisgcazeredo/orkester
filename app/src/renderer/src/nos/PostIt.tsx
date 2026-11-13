@@ -4,11 +4,11 @@ import { definirNota, editar } from '../estado/loja'
 import { MolduraNo, type Marca } from '../quadro/MolduraNo'
 
 export const COR_POSTIT: Record<NoPostIt['cor'], string> = {
-  amarelo: '#FFF9C4',
-  rosa: '#FFD9E2',
-  azul: '#D8EAFF',
-  verde: '#DAF5D7',
-  roxo: '#E9DDFF'
+  amarelo: 'var(--postit-amarelo)',
+  rosa: 'var(--postit-rosa)',
+  azul: 'var(--postit-azul)',
+  verde: 'var(--postit-verde)',
+  roxo: 'var(--postit-roxo)'
 }
 
 const TAREFA = /^(\s*)- \[( |x|X)\] (.*)$/

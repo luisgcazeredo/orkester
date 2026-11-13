@@ -1,0 +1,197 @@
+/* ---------- barra lateral ---------- */
+
+.lateral {
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--espaco-3) var(--espaco-2);
+  background: var(--lateral-fundo);
+  border-right: 1px solid var(--lateral-borda);
+}
+
+/* a marca abre a barra: o símbolo na cor do app e o nome, sem caixa e sem fundo */
+.marca {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: var(--espaco-1) var(--espaco-2) var(--espaco-4);
+  color: var(--destaque);
+}
+
+.marca span {
+  color: var(--texto);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.lateral-topo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.filtro {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio);
+  background: var(--lateral-filtro);
+  color: var(--texto-suave);
+}
+
+.filtro:focus-within {
+  border-color: var(--destaque);
+}
+
+.filtro input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  font-size: 14px;
+}
+
+.botao-icone {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+}
+
+.botao-icone:hover {
+  background: var(--hover);
+}
+
+.lateral-titulo {
+  margin: 20px 10px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--texto-suave);
+}
+
+.lista-espacos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+}
+
+.linha-espaco {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--raio-pequeno);
+  font-size: 15px;
+  cursor: default;
+}
+
+.linha-espaco:hover {
+  background: var(--hover);
+}
+
+.linha-espaco.ativo {
+  background: var(--lateral-ativo);
+}
+
+.espaco-nome {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.renomear {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--destaque);
+  border-radius: var(--raio-pequeno);
+  background: var(--quadro-fundo);
+  color: var(--texto);
+  font: inherit;
+  padding: 2px 6px;
+  outline: 0;
+}
+
+.selo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--texto-suave);
+}
+
+/* ---------- área e quadro ---------- */
+
+.area {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.quadro {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background-color: var(--quadro-fundo);
+  /* pontinhos, não linhas: a grade orienta sem desenhar uma malha por cima do trabalho */
+  background-image: radial-gradient(circle at 1px 1px, var(--grade) 1.2px, transparent 1.3px);
+  touch-action: none;
+}
+
+.mundo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+/* com outra ferramenta ou a barra de espaço, o quadro inteiro recebe o gesto (desenhar por cima, arrastar) */
+.app:not(.ferramenta-selecionar) .mundo,
+.app:not(.ferramenta-selecionar) .mundo *,
+.mundo.so-arrastar,
+.mundo.so-arrastar * {
+  pointer-events: none !important;
+}
+
+.camada-svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.camada-cordas {
+  z-index: 0;
+}
+
+.toque * {
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.contorno-selecao {
+  fill: none;
+  stroke: var(--destaque);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}

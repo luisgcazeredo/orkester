@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from 'react'
 import { type Andar, type Espaco, type PincelDesenho, type Plano, type Preferencias, PRESETS_PADRAO, type ResumoEspaco } from '../../../shared/modelo'
 import { ajustarVigiasDeCodigo } from './codigo'
+import { COR_DO_TRACO_PADRAO } from './coresDeDados'
+import { TEMA_PADRAO } from '../../../shared/temas'
 import { chaveDoAviso, existeTerminal } from './espacos'
 import { sincronizarRotinas } from './rotinas'
 import { fechadosPorAgente, sincronizarTerminais } from './terminais'
@@ -58,10 +60,10 @@ export let estado: EstadoUI = {
   espacos: [],
   espaco: null,
   notas: {},
-  preferencias: { versao: 1, tema: 'escuro', presets: PRESETS_PADRAO, corPostItPadrao: 'amarelo' },
+  preferencias: { versao: 1, tema: TEMA_PADRAO, presets: PRESETS_PADRAO, corPostItPadrao: 'amarelo' },
   lateralAberta: true,
   ferramenta: 'selecionar',
-  estiloDesenho: { ferramenta: 'lapis', cor: '#FF3B30' },
+  estiloDesenho: { ferramenta: 'lapis', cor: COR_DO_TRACO_PADRAO },
   selecao: NADA,
   editando: null,
   miniMapa: false,

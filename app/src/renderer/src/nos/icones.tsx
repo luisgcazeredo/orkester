@@ -8,7 +8,7 @@ export const ICONE_AGENTE: Record<Agente, LucideIcon> = {
 }
 
 export const COR_AGENTE: Record<Agente, string> = {
-  claude: '#D97757',
-  codex: '#7B9CFF',
-  shell: '#A0A0A4'
+  claude: 'var(--agente-claude)',
+  codex: 'var(--agente-codex)',
+  shell: 'var(--agente-shell)'
 }

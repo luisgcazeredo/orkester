@@ -1,5 +1,6 @@
 import { type CorPostIt, type Funcao, type No, type PresetAgente } from '../../../shared/modelo'
 import { proximoZ } from '../../../shared/quadro/geometria'
+import { TOM_DO_POSTIT } from './coresDeDados'
 import { entregarPrimeiroPedido } from './espacos'
 import { definir, estado, mudarPlano, NADA, planoAtual, registrarHistorico } from './nucleo'
 
@@ -138,17 +139,6 @@ export function enviarParaTras(): void {
 
 export function definirCorNo(id: string, cor: string | undefined): void {
   atualizarNo(id, { cor } as Partial<No>)
-}
-
-/** Tom de post-it que corresponde a cada cor de cartão (as que não têm tom deixam o post-it como está). */
-const TOM_DO_POSTIT: Record<string, CorPostIt> = {
-  '#007AFF': 'azul',
-  '#AF52DE': 'roxo',
-  '#FF2D55': 'rosa',
-  '#FF3B30': 'rosa',
-  '#FF9500': 'amarelo',
-  '#FFCC00': 'amarelo',
-  '#34C759': 'verde'
 }
 
 /** Pinta a seleção inteira: cartões, textos e traços. Post-it ganha o tom pastel correspondente. */

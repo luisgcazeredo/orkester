@@ -1,3 +1,4 @@
+import type { Tema } from './temas.ts'
 // O que fica salvo em disco. Toda mudança de formato sobe a `versao` e ganha uma migração.
 
 export type Agente = 'claude' | 'codex' | 'shell'
@@ -371,7 +372,8 @@ export interface ResultadoGit {
   arquivos?: string[]
 }
 
-export type Tema = 'escuro' | 'claro'
+/** O id de um tema: derivado do registro em `temas.ts`. Os valores já gravados, 'escuro' e 'claro', continuam válidos. */
+export type { Tema } from './temas.ts'
 
 export interface Preferencias {
   versao: 1

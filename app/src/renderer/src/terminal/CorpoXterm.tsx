@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Terminal, type ITheme } from '@xterm/xterm'
+import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
-import type { Tema } from '../../../shared/modelo'
 import { usarLoja } from '../estado/loja'
 import { corrigirEscalaDoMouse } from './escalaDoMouse'
+import { TEMAS_XTERM } from './temaXterm'
 
 // O corpo de um cartão de terminal: um xterm ligado ao processo, que mora no processo principal. Montar liga
 // (o processo manda o retrato da tela e passa a mandar a saída); desmontar só desliga, o processo continua.
@@ -17,22 +17,6 @@ import { corrigirEscalaDoMouse } from './escalaDoMouse'
 const FONTE = 13
 /** O xterm desenha com este tanto de resolução a mais. 2 = nítido até 200% de zoom, sem redesenhar nunca. */
 const QUALIDADE = 2
-
-const TEMAS: Record<Tema, ITheme> = {
-  escuro: { background: '#1A1A1E', foreground: '#E6E6E6', cursor: '#E6E6E6', cursorAccent: '#1A1A1E', selectionBackground: '#264F78' },
-  claro: {
-    background: '#FFFFFF',
-    foreground: '#2A2A2E',
-    cursor: '#2A2A2E',
-    cursorAccent: '#FFFFFF',
-    selectionBackground: '#ADD6FF',
-    // as cores claras do padrão somem no fundo branco
-    white: '#6E6E73',
-    brightWhite: '#3A3A3C',
-    yellow: '#A16C00',
-    brightYellow: '#8A5A00'
-  }
-}
 
 interface Props {
   id: string
@@ -56,7 +40,7 @@ export function CorpoXterm({ id, ativo }: Props) {
       cursorBlink: true,
       allowProposedApi: true,
       scrollback: 5000,
-      theme: TEMAS[tema]
+      theme: TEMAS_XTERM[tema]
     })
     const ajuste = new FitAddon()
     terminal.loadAddon(ajuste)
@@ -145,7 +129,7 @@ export function CorpoXterm({ id, ativo }: Props) {
   }, [id])
 
   useEffect(() => {
-    if (termRef.current) termRef.current.terminal.options.theme = TEMAS[tema]
+    if (termRef.current) termRef.current.terminal.options.theme = TEMAS_XTERM[tema]
   }, [tema])
 
   // Ativo, o cartão é dono do teclado. Focar uma só vez não basta: no mesmo clique que o selecionou, o

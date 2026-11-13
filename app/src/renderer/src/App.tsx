@@ -19,6 +19,7 @@ import {
   selecionarTudo,
   usarLoja
 } from './estado/loja'
+import { classeDoTema } from '../../shared/temas'
 import { Casca, Dialogos } from './casca/Casca'
 import { irParaPagina, paginaAtiva, registrarPagina } from './casca/paginas'
 import { cancelarGestos, emGesto } from './quadro/arrasto'
@@ -104,7 +105,7 @@ export function App() {
   }, [])
 
   return (
-    <div className={`app tema-${tema} ${lateralAberta ? '' : 'sem-lateral'} ferramenta-${ferramenta}`}>
+    <div className={`app ${classeDoTema(tema)} ${lateralAberta ? '' : 'sem-lateral'} ferramenta-${ferramenta}`}>
       {lateralAberta && <ListaDeEspacos />}
       <Casca />
       {temEspaco && <BarraExplorador />}
