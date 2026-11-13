@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, Menu, screen, session, shell, type Rectangle } from 'electron'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { CANAIS_APP } from '../shared/api'
 import { registrarAndares } from './andares'
 import { pararRotinas, registrarRotinas } from './rotinas'
@@ -34,6 +34,10 @@ if (autoteste) app.commandLine.appendSwitch('disable-features', 'CalculateNative
 // E o autoteste usa um perfil do Chromium só dele: com o app instalado aberto, os dois disputavam o mesmo
 // perfil e a rodada morria sem dizer nada — ficava um log vazio, que já custou rodadas para entender.
 if (autoteste) app.setPath('userData', join(tmpdir(), 'orkester-autoteste-chromium'))
+// Com ORK_DADOS (cópia de teste, conferir-saida) o perfil do Chromium vai junto da pasta de dados: a trava de
+// instância única é por perfil, então outra pasta de dados é outra instância e não cede a vez ao app instalado.
+// Sem ORK_DADOS nada muda: o perfil padrão segue único e o app do Luís continua com uma instância só.
+if (!autoteste && process.env.ORK_DADOS) app.setPath('userData', resolve(process.env.ORK_DADOS, 'chromium'))
 const ehWeb = (endereco: string): boolean => {
   try {
     return ['https:', 'http:'].includes(new URL(endereco).protocol)
