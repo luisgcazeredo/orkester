@@ -115,6 +115,12 @@ export function evidenciaDeEnvio(p: {
   return 'indeterminado'
 }
 
+/** A marca deste texto (o fim dele, ou a colagem resumida) está no campo de entrada que a tela mostra. */
+export function marcaNoCampo(tela: string, texto: string): boolean {
+  const campo = campoNaTela(tela)
+  return campo !== null && campoTemPedido(campo, marcaDoPedido(texto))
+}
+
 export type ResultadoDoEnvio = 'saiu' | 'ficou' | 'incerto'
 
 type DependenciasDoEnvio = {
@@ -136,6 +142,8 @@ type DependenciasDoEnvio = {
   assentarMs?: number
   /** quantos Enter no máximo (padrão 6: o Codex recém-aberto chegou a precisar de 4) */
   tentativasDeEnter?: number
+  /** só na retomada: true = o usuário voltou ao campo (ou o destino ocupou); não aperta mais Enter */
+  interromper?: () => boolean
 }
 
 /**
@@ -148,7 +156,7 @@ type DependenciasDoEnvio = {
  * 1.4.5, todos viraram linhas em branco. Por isso o teto é longo: enquanto a tela muda, o texto ainda está
  * chegando, e Enter nenhum vai.
  */
-async function esperarTelaParar(d: DependenciasDoEnvio, quieto: number, teto: number): Promise<void> {
+async function esperarTelaParar(d: Pick<DependenciasDoEnvio, 'tela' | 'esperar'>, quieto: number, teto: number): Promise<void> {
   let anterior = await d.tela()
   let mudouEm = Date.now()
   for (const limite = Date.now() + teto; Date.now() < limite; ) {
@@ -213,6 +221,32 @@ export async function confirmarEnvio(d: DependenciasDoEnvio): Promise<ResultadoD
   const quieto = d.assentarMs ?? 1500
   if (quieto > 0) await esperarTelaParar(d, quieto, 60_000)
 
+  const r = await apertarEnter(d, marca, quieto)
+  return r === 'sem-marca' ? 'incerto' : r // só a retomada tem `interromper`
+}
+
+/**
+ * Retoma um envio que deu `ficou` (1.5.1): a colagem foi escrita e o agente a mostrou tarde demais, depois de o
+ * prazo acabar. **Só aperta Enter com a marca do recado no campo de entrada** — sem campo reconhecível, ou com
+ * outro texto lá (o do usuário), não faz nada e devolve `sem-marca`. Quem chama garante que o usuário não tem
+ * rascunho e que o destino está livre.
+ */
+export async function retomarEnvio(d: Omit<DependenciasDoEnvio, 'escreverColagem'>): Promise<ResultadoDoEnvio | 'sem-marca'> {
+  if (d.shell) return 'sem-marca'
+  const marca = marcaDoPedido(d.texto)
+  const noCampo = (tela: string): boolean => {
+    const campo = campoNaTela(tela)
+    return campo !== null && campoTemPedido(campo, marca)
+  }
+  if (!noCampo(await d.tela())) return 'sem-marca'
+  const quieto = d.assentarMs ?? 1500
+  if (quieto > 0) await esperarTelaParar(d, quieto, 15_000)
+  // a tela mexeu enquanto se esperava: confere de novo antes de apertar
+  if (!noCampo(await d.tela()) || d.interromper?.()) return 'sem-marca'
+  return apertarEnter(d, marca, quieto)
+}
+
+async function apertarEnter(d: Omit<DependenciasDoEnvio, 'escreverColagem'>, marca: string, quieto: number): Promise<ResultadoDoEnvio | 'sem-marca'> {
   let ultima: ResultadoDoEnvio = 'incerto'
   let antesDoPrimeiro: string | undefined
   // Enter de novo é seguro: o texto não é reescrito, e Enter num campo vazio não faz nada no Claude nem no
@@ -244,6 +278,9 @@ export async function confirmarEnvio(d: DependenciasDoEnvio): Promise<ResultadoD
     antesDoPrimeiro ??= antesDesteEnter
     const antes = d.shell ? antesDesteEnter : antesDoPrimeiro
     const perguntavaAntes = await d.emPergunta()
+    // última conferência do usuário, imediatamente antes de CADA Enter (inclusive o primeiro): a leitura da tela e da
+    // pergunta acima levam centenas de ms, e o usuário pode ter começado a digitar nelas
+    if (d.interromper?.()) return tentativa === 1 ? 'sem-marca' : 'incerto'
     d.escrever('\r')
     ultima = 'incerto'
     for (const limite = Date.now() + (d.prazoDoEnterMs ?? 5000); Date.now() < limite; await d.esperar(150)) {

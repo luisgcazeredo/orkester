@@ -17,9 +17,10 @@ import { abrirJanela, donoDe } from './janelas'
 import { abrirCorreio, pastaDoCorreio } from './correio'
 import { AJUDA, SKILL } from './manual'
 import { extrairLeituraDeContexto, extrairLeituraDoRodape } from './contexto'
-import { confirmarEnvio, registroDoEnvio, resultadoDaRotina, type ResultadoDoEnvio } from './envio'
+import { acharGitDoPerfil, regrasDoCodex } from './codex-regras'
+import { confirmarEnvio, marcaNoCampo, retomarEnvio, registroDoEnvio, resultadoDaRotina, type ResultadoDoEnvio } from './envio'
 import { validarChamada, type NomeDeVerbo } from './verbos'
-import { criarCaixa, motivoDeEspera, TEXTO_DO_MOTIVO, type FimDoRecado, type MotivoDeEspera, type TipoDeRecado } from './caixa'
+import { criarCaixa, janelaDeDialogo, motivoDeEspera, tirarCitacoes, TEXTO_DO_MOTIVO, type FimDoRecado, type MotivoDeEspera, type TipoDeRecado } from './caixa'
 import {
   aceitaColagem,
   cordasDoEspaco,
@@ -204,24 +205,13 @@ function instalarComando(): void {
  * O que sobra para ela é o atrito: sem ela, cada `ork` do agente pára pedindo aprovação na tela, e um
  * quadro trabalhando sozinho trava. Em troca, os comandos `ork` rodam fora do sandbox — e o `ork` alcança
  * outros cartões, inclusive um shell. É uma escolha de conveniência contra isolamento, do dono do app;
- * apagar o arquivo devolve as perguntas e não quebra nada. A regra é só para o programa `ork`.
+ * apagar o arquivo devolve as perguntas e não quebra nada. As regras (o `ork` e a leitura de git) estão em
+ * `codex-regras.ts`.
  */
 function liberarOrkNoCodex(): void {
   const casa = process.env.CODEX_HOME || join(homedir(), '.codex')
   if (!existsSync(casa)) return
-  const regra = [
-    '# Escrito pelo Orkester. Deixa o agente usar o `ork` — o comando com que ele fala com o app que o',
-    '# abriu. Sem esta regra o Codex recusa o comando dentro do sandbox e o agente fica mudo.',
-    '# Vale só para o `ork`: qualquer outro comando continua passando pelas suas regras de sempre.',
-    'prefix_rule(',
-    '    pattern = ["ork"],',
-    '    decision = "allow",',
-    '    justification = "ork: o comando do Orkester, o app que abriu este terminal",',
-    '    match = ["ork quem", "ork quadro"],',
-    '    not_match = ["git ork"],',
-    ')',
-    ''
-  ].join('\n')
+  const regra = regrasDoCodex(acharGitDoPerfil(process.env, homedir(), existsSync))
   try {
     const pasta = join(casa, 'rules')
     mkdirSync(pasta, { recursive: true })
@@ -287,7 +277,7 @@ type Situacao = 'encerrado' | 'trabalhando' | 'pergunta' | 'livre'
  * o Codex atualizou sem querer em 28/10); linhas demais tratam uma citação velha como pergunta e travam à toa.
  */
 function ultimasLinhasComTexto(tela: string, quantidade = 6): string {
-  return tela.split('\n').filter((linha) => linha.trim()).slice(-quantidade).join('\n')
+  return janelaDeDialogo(tela, quantidade)
 }
 
 function situacaoNaTela(s: Sessao, tela: string): Situacao {
@@ -297,7 +287,7 @@ function situacaoNaTela(s: Sessao, tela: string): Situacao {
   if (Date.now() - s.ultimaSaida < 1200) return 'trabalhando'
   // shell: livre só com o prompt no fim (um comando quieto, como um Start-Sleep, ainda está rodando)
   if (s.espec.agente === 'shell') return PROMPT_LIVRE.test(tela.split('\n').pop() ?? '') ? 'livre' : 'trabalhando'
-  return OCUPADO.test(tela) ? 'trabalhando' : 'livre'
+  return OCUPADO.test(tirarCitacoes(tela)) ? 'trabalhando' : 'livre'
 }
 
 async function situacao(s: Sessao): Promise<Situacao> {
@@ -532,16 +522,37 @@ const caixa = criarCaixa({
     if ((await situacao(s)) === 'pergunta') return 'ficou'
     return digitarPedido(s, texto)
   },
+  retomar: async (id, texto) => {
+    const s = sessaoPorId(id)
+    if (!s?.processo) return 'sem-marca'
+    return retomarEnvio({
+      texto: texto.replace(/\r\n?/g, '\n').trimEnd(),
+      shell: s.espec.agente === 'shell',
+      escrever: (dados) => escreverNoProcesso(s, dados),
+      tela: () => telaDe(s, 24),
+      emPergunta: async () => (await situacao(s)) === 'pergunta',
+      esperar,
+      ocupado: (tela) => OCUPADO.test(tela),
+      // o usuário voltou a escrever no campo (ou o destino ficou ocupado/numa pergunta): nenhum Enter a mais
+      interromper: () => motivoDeEspera('livre', s.usuario, Date.now()) !== null || Date.now() - s.ultimaSaida < 1200
+    })
+  },
+  marcaNoCampo: async (id, texto) => {
+    const s = sessaoPorId(id)
+    return !!s?.processo && marcaNoCampo(await telaDe(s, 24), texto.replace(/\r\n?/g, '\n').trimEnd())
+  },
   mudou: (id, resumo) => {
     const s = sessaoPorId(id)
     const dono = s ? donoDe(s.espacoId) : undefined
     const janela = dono !== undefined ? webContents.fromId(dono) : undefined
     if (janela && !janela.isDestroyed()) janela.send(CANAIS.caixa, id, resumo)
   },
-  registrar: (recado, fim) => {
+  registrar: (recado, fim, tela) => {
     const para = sessaoPorId(recado.para) ?? null
     const de = recado.de ? sessaoPorId(recado.de) : undefined
-    if (para) registrar(de ?? para, para, `caixa-${recado.tipo}-${fim}`, recado.texto)
+    // `ficou`/`incerto`: junto do recado vão as últimas linhas do destino (o registro corta em 4000 letras)
+    const texto = tela === undefined ? recado.texto : `${recado.texto.slice(0, 2400)}\n[tela do destino]\n${tela.slice(-1400)}`
+    if (para) registrar(de ?? para, para, `caixa-${recado.tipo}-${fim}`, texto)
   }
 })
 
@@ -1017,6 +1028,8 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
       return s
     })
     registrar(eu, alvo, 'teclas', teclas.join(' '))
+    // respondeu à parada do agente: o próximo aviso dele volta a valer (no máximo um por parada)
+    caixa.reabrirPendencia(eu.id, alvo.id)
     for (const s of sequencias) {
       escreverNoProcesso(alvo, s)
       await esperar(120)

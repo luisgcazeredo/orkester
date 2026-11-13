@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-const { evidenciaDeEnvio, confirmarEnvio, resultadoDaRotina, registroDoEnvio, campoNaTela } = await import(new URL('./envio.ts', import.meta.url).href)
+const { evidenciaDeEnvio, confirmarEnvio, resultadoDaRotina, registroDoEnvio, campoNaTela, retomarEnvio } = await import(new URL('./envio.ts', import.meta.url).href)
 
 const base = { ocupadoAntes: false, ocupadoDepois: false, perguntaNova: false }
 const pedido = 'faça a revisão do módulo de envio e me devolva o resumo'
@@ -352,4 +352,91 @@ test('3: primeiro pedido — ficou e incerto geram alerta e comando próprios; s
   assert.equal(incerto.comando, 'primeiro-pedido-incerto')
   assert.match(incerto.alerta ?? '', /pode ter saído/)
   assert.deepEqual(registroDoEnvio('primeiro-pedido', 'saiu'), { comando: 'primeiro-pedido', alerta: null })
+})
+
+// ---- 1.5.1: `ficou` retomado (a colagem aparece depois do prazo) ----
+
+const campoClaude = (texto: string): string => `histórico\n❯ ${texto}\n  ? for shortcuts`
+const enviadoClaude = `❯ ${pedido}\n● pensando\n❯ \n  esc to interrupt`
+
+test('retomada (i): colagem que só aparece depois do prazo → ficou sem Enter; a retomada aperta o Enter e sai', async () => {
+  let colagemVisivel = false // o agente segura a colagem e só a mostra depois do prazo da primeira tentativa
+  const escritos: string[] = []
+  let colagens = 0
+  const base = {
+    texto: pedido,
+    shell: false,
+    escrever: (d: string) => escritos.push(d),
+    tela: async () => (escritos.length ? enviadoClaude : colagemVisivel ? campoClaude(pedido) : campoClaude('')),
+    emPergunta: async () => false,
+    esperar: (ms: number) => new Promise<void>((r) => setTimeout(r, Math.min(ms, 2))),
+    ocupado: (t: string) => /esc to interrupt/.test(t),
+    assentarMs: 0,
+    prazoDoEnterMs: 30
+  }
+  assert.equal(await confirmarEnvio({ ...base, escreverColagem: () => void colagens++, prazoDaColagemMs: 20 }), 'ficou')
+  assert.deepEqual(escritos, [], 'sem Enter enquanto a colagem não apareceu')
+  colagemVisivel = true // 70 s depois, a colagem aparece
+  assert.equal(await retomarEnvio(base), 'saiu')
+  assert.deepEqual(escritos, ['\r'], 'um Enter só')
+  assert.equal(colagens, 1, 'e nenhuma colagem nova')
+})
+
+test('retomada: sem a marca no campo (campo vazio, texto do usuário, shell) nenhum Enter vai', async () => {
+  for (const tela of [campoClaude(''), campoClaude('outra coisa que o usuário escreveu'), 'sem campo nenhum']) {
+    const escritos: string[] = []
+    const r = await retomarEnvio({
+      texto: pedido,
+      shell: false,
+      escrever: (d: string) => escritos.push(d),
+      tela: async () => tela,
+      emPergunta: async () => false,
+      esperar: async () => {},
+      ocupado: () => false,
+      assentarMs: 0
+    })
+    assert.equal(r, 'sem-marca')
+    assert.deepEqual(escritos, [])
+  }
+  const escritos: string[] = []
+  const shell = await retomarEnvio({ texto: pedido, shell: true, escrever: (d: string) => escritos.push(d), tela: async () => campoClaude(pedido), emPergunta: async () => false, esperar: async () => {}, ocupado: () => false })
+  assert.equal(shell, 'sem-marca')
+  assert.deepEqual(escritos, [])
+})
+
+test('retomada: o usuário volta ao campo durante a espera → nenhum Enter', async () => {
+  const escritos: string[] = []
+  const r = await retomarEnvio({
+    texto: pedido,
+    shell: false,
+    escrever: (d: string) => escritos.push(d),
+    tela: async () => campoClaude(pedido),
+    emPergunta: async () => false,
+    esperar: async () => {},
+    ocupado: () => false,
+    assentarMs: 0,
+    interromper: () => true
+  })
+  assert.equal(r, 'sem-marca')
+  assert.deepEqual(escritos, [])
+})
+
+test('retomada (item 4): o usuário começa a digitar entre a última conferência e o Enter → o Enter não vai, nem o primeiro', async () => {
+  const escritos: string[] = []
+  let chamadas = 0
+  const r = await retomarEnvio({
+    texto: pedido,
+    shell: false,
+    escrever: (d: string) => escritos.push(d),
+    tela: async () => campoClaude(pedido),
+    emPergunta: async () => false,
+    esperar: async () => {},
+    ocupado: () => false,
+    assentarMs: 0,
+    // a 1a conferência (antes de apertar) passa; a que vem logo antes do Enter já vê o usuário
+    interromper: () => ++chamadas >= 2
+  })
+  assert.equal(r, 'sem-marca')
+  assert.deepEqual(escritos, [])
+  assert.equal(chamadas, 2)
 })

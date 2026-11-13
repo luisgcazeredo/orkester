@@ -9,6 +9,7 @@ import { Terminal as Espelho } from '@xterm/headless'
 import { SerializeAddon } from '@xterm/addon-serialize'
 import { CANAIS, type EspecTerminal, type RetratoTerminal } from '../shared/api'
 import { ambienteDoComando } from './comandos'
+import { ofertaDeAtualizacao, pularEstaMarcado } from './codex-regras'
 import { entradaVazia, lerEntradaDoUsuario, type EntradaDoUsuario } from './caixa'
 import { donoDe, exigirDono } from './janelas'
 
@@ -176,6 +177,7 @@ function iniciarProcesso(s: Sessao): void {
   const linha = deVerdade ? linhaDeComando(s.espec) : ''
   if (linha) processo.write(`${linha}\r`)
   if (s.espec.agente === 'codex' && !s.espec.sessao) vigiarConversaDoCodex(s, processo)
+  if (deVerdade && s.espec.agente === 'codex') vigiarAtualizacaoDoCodex(s, processo)
 }
 
 function criarSessao(espacoId: string, espec: EspecTerminal): Sessao {
@@ -298,6 +300,27 @@ function procurarConversaDoCodex(s: Sessao): string | null {
     }
   }
   return null
+}
+
+/**
+ * A oferta de atualização que o Codex mostra ao abrir (1.5.1): o app responde "pular" sozinho, sem gravar nada no
+ * `config.toml` dele. Olha só os primeiros 40 s do processo e responde **uma vez**: desce uma opção (de "Update now"
+ * para "Skip") e só aperta Enter se a opção marcada é mesmo a de pular — do outro lado do Enter está instalar.
+ * Não bateu com o que se esperava: não faz nada, e a pergunta fica para o usuário.
+ */
+function vigiarAtualizacaoDoCodex(s: Sessao, processo: pty.IPty): void {
+  const olhar = async (): Promise<void> => {
+    if (sessoes.get(s.id) !== s || s.processo !== processo) return
+    if (Date.now() - s.iniciadoEm > 40_000) return
+    if (ofertaDeAtualizacao(await telaDe(s, 20))) {
+      processo.write('\x1b[B')
+      await new Promise((r) => setTimeout(r, 400))
+      if (s.processo === processo && pularEstaMarcado(await telaDe(s, 20))) processo.write('\r')
+      return
+    }
+    setTimeout(() => void olhar(), 500)
+  }
+  setTimeout(() => void olhar(), 500)
 }
 
 /** O Codex só cria o arquivo da conversa depois da primeira mensagem: procura a cada 5 s, por até 30 min. */
