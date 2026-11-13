@@ -12,7 +12,7 @@ for (const nome of ['win-unpacked', 'win-unpacked.tmp']) {
     rmSync(join(release, nome), { recursive: true, force: true, maxRetries: 3, retryDelay: 300 })
   } catch (erro) {
     if (erro?.code === 'EBUSY' || erro?.code === 'EPERM') {
-      console.error('feche o Orkester: um arquivo do pacote está em uso')
+      console.error('feche o Orkester (ou o que estiver usando o pacote): um arquivo do pacote está em uso')
       console.error(`(${erro.code}: ${erro.path ?? join(release, nome)})`)
       process.exit(1)
     }

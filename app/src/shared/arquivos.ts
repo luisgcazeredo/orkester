@@ -1,6 +1,8 @@
 // Regras puras sobre arquivos: o que vale acompanhar quando o agente escreve, o que tem cara de segredo e
 // como um anexo entra na linha do prompt. Puro de propósito: é o que as provas conseguem testar fora do app.
 
+import ignore from 'ignore'
+
 type AgenteAnexo = 'claude' | 'codex' | 'shell'
 
 /** Pastas que não interessam: barulho de build, de dependência e de ferramenta. */
@@ -26,13 +28,60 @@ export const PASTAS_IGNORADAS = [
 ]
 
 /**
- * Regra única de "não entrar aqui", para a varredura, a vigia e (depois) o `.orkignore`: pasta de barulho
- * (`PASTAS_IGNORADAS`) ou qualquer entrada terminada em `.asar`, em qualquer pasta. No Electron o `.asar`
- * aparece como pasta para o `fs`, e entrar nele deixa o arquivo aberto pelo app (trava o build seguinte).
+ * Padrões do app, na sintaxe do `.gitignore`: as pastas acima e os recados que os agentes trocam entre si
+ * (não são trabalho, são tráfego). O `.orkignore` vem depois e pode religar qualquer um com `!` (ex.: `!release/`).
+ * `time/` inteiro não: lá moram os papéis do time (`01-maestro.md`…), que são trabalho.
  */
-export function entradaIgnorada(nome: string): boolean {
-  const n = nome.toLowerCase()
-  return n.endsWith('.asar') || PASTAS_IGNORADAS.includes(n)
+export const PADROES_DO_APP: readonly string[] = [
+  ...PASTAS_IGNORADAS.map((p) => `${p}/`),
+  '*.log',
+  '.claude/',
+  '.contexto/',
+  // recados: só `.md`, só na raiz e em `time/` (`src/pages/entrega-pedido.tsx` é código, não recado)
+  ...['ENTREGA-*.md', 'entrega-*.md', '*-entrega.md', 'tarefa-*.md', 'handoff-*.md'].flatMap((n) => [`/${n}`, `/time/${n}`]),
+  'time/evidencia-*',
+  'time/resultado-*'
+]
+
+/** O filtro do que o Orkester acompanha numa pasta. Caminhos relativos à pasta vigiada, com / ou \. */
+export interface Filtro {
+  /** Vale entrar nesta subpasta? A varredura testa isto ANTES de pôr a pasta na fila: a trava vem daqui. */
+  desce(relPasta: string): boolean
+  /** Vale acompanhar este arquivo? */
+  segue(relArquivo: string): boolean
+}
+
+/**
+ * Ordem: (1) regra fixa, que nenhum `!` desliga: nada dentro de (nem) entrada `.asar` (o Electron a abre como
+ * pasta e o arquivo fica preso ao app) e segredo; (2) padrões do app; (3) `.orkignore`.
+ * Arquivo binário, temporário e lockfile também são sempre recusados (não há texto para mostrar).
+ */
+export function criarFiltro(textoOrkignore?: string): Filtro {
+  const lib = ignore()
+  lib.add(PADROES_DO_APP as string[])
+  if (textoOrkignore) lib.add(textoOrkignore)
+  const barrado = (pedacos: string[], dir: boolean): boolean => {
+    if (!pedacos.length) return true
+    if (pedacos.some((p) => p.toLowerCase().endsWith('.asar'))) return true
+    if (pedacos.some((p) => p === '..' || p === '.')) return true
+    try {
+      return lib.ignores(pedacos.join('/') + (dir ? '/' : ''))
+    } catch {
+      return true // caminho que a biblioteca não aceita: na dúvida, não acompanha
+    }
+  }
+  return {
+    desce: (rel) => !barrado(partes(rel), true),
+    segue(rel) {
+      const pedacos = partes(rel)
+      if (barrado(pedacos, false)) return false
+      const nome = pedacos[pedacos.length - 1].toLowerCase()
+      if (BARULHENTOS.includes(nome)) return false
+      if (TEMPORARIOS.some((r) => r.test(nome))) return false
+      if (EXTENSOES_BINARIAS.includes(nome.split('.').pop() ?? '')) return false
+      return !temCaraDeSegredo(nome)
+    }
+  }
 }
 
 /** Arquivo gerado que muda a toda hora e não diz nada sobre o trabalho do agente. */
@@ -85,16 +134,12 @@ export function caminhoRelativo(pasta: string, caminho: string): string | null {
   return alvo.slice(raiz.length).join('/')
 }
 
-/** Vale seguir este arquivo (caminho relativo à pasta vigiada)? */
+let filtroPadrao: Filtro | null = null
+
+/** Vale seguir este arquivo, só com as regras do app (sem `.orkignore`)? */
 export function valeSeguir(relativo: string): boolean {
-  const pedacos = partes(relativo)
-  if (!pedacos.length) return false
-  const nome = pedacos[pedacos.length - 1].toLowerCase()
-  if (pedacos.slice(0, -1).some(entradaIgnorada) || nome.endsWith('.asar')) return false
-  if (BARULHENTOS.includes(nome)) return false
-  if (TEMPORARIOS.some((r) => r.test(nome))) return false
-  if (EXTENSOES_BINARIAS.includes(nome.split('.').pop() ?? '')) return false
-  return !temCaraDeSegredo(nome)
+  filtroPadrao ??= criarFiltro()
+  return filtroPadrao.segue(relativo)
 }
 
 /**

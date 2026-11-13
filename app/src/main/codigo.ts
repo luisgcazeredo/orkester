@@ -5,12 +5,12 @@
 // o que aconteceu com o rodapé de contexto do Claude Code). O sistema de arquivos não mente e serve para
 // qualquer agente. O preço: dois cartões na mesma pasta veem as mesmas mudanças — um andar separa as pastas.
 import { execFile } from 'node:child_process'
-import { closeSync, existsSync, openSync, readSync, readdirSync, statSync, watch, type Dirent, type FSWatcher } from 'node:fs'
+import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, statSync, watch, type Dirent, type FSWatcher } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { ipcMain, webContents } from 'electron'
 import { CANAIS_CODIGO, type DiffArquivo, type MudancaArquivo, type TextoArquivo } from '../shared/api'
-import { destinosDoAviso, entradaIgnorada, pastaVigiavel, temCaraDeSegredo, valeSeguir } from '../shared/arquivos'
+import { caminhoRelativo, criarFiltro, destinosDoAviso, pastaVigiavel, temCaraDeSegredo, type Filtro } from '../shared/arquivos'
 import { dentroDeUmaRaiz, raizesDoQuadro } from './dados'
 
 /** Uma gravação costuma chegar em rajada (temporário, troca de nome, arquivo final): espera e junta. */
@@ -22,6 +22,7 @@ const LIMITE_PATCH = 200 * 1024
 /** Varredura da primeira vez: para aqui mesmo que a pasta seja enorme. */
 const LIMITE_VARREDURA = 20_000
 const VALIDADE_VARREDURA = 5000
+const NOME_ORKIGNORE = '.orkignore'
 
 interface Assinatura {
   /** Caminho exatamente como a janela escreveu: é a chave com que o preload entrega o aviso. */
@@ -35,6 +36,8 @@ interface Vigia {
   assinaturas: Assinatura[]
   recentes: MudancaArquivo[]
   pendentes: Set<string>
+  /** Regras do app + `.orkignore` da pasta; recompilado quando o `.orkignore` muda. */
+  filtro: Filtro
   relogio: NodeJS.Timeout | null
   /** Última varredura da pasta, para quando ninguém gravou nada ainda. */
   varredura: { em: number; lista: MudancaArquivo[] } | null
@@ -50,6 +53,17 @@ function pastaPermitida(pasta: string): boolean {
   if (typeof pasta !== 'string' || !pasta) return false
   const alvo = resolve(pasta)
   return raizesDoQuadro().some((raiz) => resolve(raiz) === alvo)
+}
+
+/** Filtro da pasta: padrões do app e, se existir, o `.orkignore` dela (sintaxe do .gitignore). */
+function filtroDa(pasta: string): Filtro {
+  let texto: string | undefined
+  try {
+    texto = readFileSync(join(pasta, NOME_ORKIGNORE), 'utf8')
+  } catch {
+    texto = undefined // sem `.orkignore`: vale só o do app
+  }
+  return criarFiltro(texto)
 }
 
 function anotar(vigia: Vigia, caminho: string): void {
@@ -96,7 +110,14 @@ function fecharObservador(vigia: Vigia): void {
 function abrirObservador(vigia: Vigia): void {
   try {
     vigia.observador = watch(vigia.pasta, { recursive: true }, (_tipo, nome) => {
-      if (!nome || !valeSeguir(String(nome))) return
+      if (!nome) return
+      if (String(nome).toLowerCase() === NOME_ORKIGNORE) {
+        // mudou a regra: recompila e esquece a varredura, que foi feita com a regra velha
+        vigia.filtro = filtroDa(vigia.pasta)
+        vigia.varredura = null
+        return
+      }
+      if (!vigia.filtro.segue(String(nome))) return
       vigia.pendentes.add(join(vigia.pasta, String(nome)))
       if (!vigia.relogio) vigia.relogio = setTimeout(() => descarregar(vigia), ESPERA)
     })
@@ -124,7 +145,7 @@ function vigiar(janela: number, pasta: string): void {
   const chave = chaveDa(pasta)
   let vigia = vigias.get(chave)
   if (!vigia) {
-    vigia = { pasta, observador: null, assinaturas: [], recentes: [], pendentes: new Set(), relogio: null, varredura: null }
+    vigia = { pasta, observador: null, assinaturas: [], recentes: [], pendentes: new Set(), filtro: filtroDa(pasta), relogio: null, varredura: null }
     vigias.set(chave, vigia)
     abrirObservador(vigia)
   }
@@ -165,7 +186,7 @@ function pararDeVigiar(janela: number, pasta: string): void {
  * Primeira vez: ninguém gravou nada desde que o cartão abriu, mas o agente já trabalhou antes. Varre a pasta
  * pela data de modificação para o cartão ter o que mostrar na hora.
  */
-function varrer(pasta: string): MudancaArquivo[] {
+function varrer(pasta: string, filtro: Filtro): MudancaArquivo[] {
   const achados: MudancaArquivo[] = []
   let vistos = 0
   const fila = [pasta]
@@ -181,11 +202,11 @@ function varrer(pasta: string): MudancaArquivo[] {
       if (++vistos > LIMITE_VARREDURA) break
       const caminho = join(atual, entrada.name)
       if (entrada.isDirectory()) {
-        if (!entradaIgnorada(entrada.name)) fila.push(caminho)
+        if (filtro.desce(caminho.slice(pasta.length + 1))) fila.push(caminho)
         continue
       }
       if (!entrada.isFile()) continue
-      if (!valeSeguir(caminho.slice(pasta.length + 1))) continue
+      if (!filtro.segue(caminho.slice(pasta.length + 1))) continue
       try {
         const info = statSync(caminho)
         if (info.size > 0) achados.push({ pasta, caminho, em: info.mtimeMs })
@@ -202,17 +223,28 @@ function recentes(pasta: string): MudancaArquivo[] {
   // de 20 mil entradas a cada chamada, e ela é síncrona (trava o processo principal).
   if (!pastaPermitida(pasta) || !pastaVigiavel(pasta, homedir())) return []
   const vigia = vigias.get(chaveDa(pasta))
-  const gravados = vigia?.recentes ?? []
+  // o `.orkignore` pode ter mudado depois da gravação: o que já foi anotado também passa pelo filtro de agora
+  const gravados = (vigia?.recentes ?? []).filter((g) => {
+    const rel = caminhoRelativo(pasta, g.caminho)
+    return rel !== null && vigia!.filtro.segue(rel)
+  })
   const agora = Date.now()
   if (vigia && (!vigia.varredura || agora - vigia.varredura.em > VALIDADE_VARREDURA)) {
-    vigia.varredura = { em: agora, lista: varrer(pasta) }
+    vigia.varredura = { em: agora, lista: varrer(pasta, vigia.filtro) }
   }
-  const varridos = vigia?.varredura?.lista ?? varrer(pasta)
+  const varridos = vigia?.varredura?.lista ?? varrer(pasta, filtroDa(pasta))
   const novos = varridos.filter((v) => !gravados.some((g) => g.caminho === v.caminho)).map((m) => ({ ...m, pasta }))
   return [...gravados, ...novos].sort((a, b) => b.em - a.em).slice(0, QUANTOS_RECENTES)
 }
 
 /** Lê o começo do arquivo. Binário e segredo não passam. */
+/** O filtro da pasta, para quem precisa perguntar por um arquivo só (ex.: `ork arvore mostrar`). */
+export function arquivoAcompanhado(pasta: string, caminho: string): boolean {
+  const rel = caminhoRelativo(pasta, caminho)
+  if (rel === null) return true // fora da pasta do agente: o filtro dela não se aplica
+  return (vigias.get(chaveDa(pasta))?.filtro ?? filtroDa(pasta)).segue(rel)
+}
+
 function ler(caminho: string): TextoArquivo {
   const vazio = { caminho, conteudo: '', truncado: false }
   if (typeof caminho !== 'string' || !caminho) return { ...vazio, erro: 'caminho inválido' }

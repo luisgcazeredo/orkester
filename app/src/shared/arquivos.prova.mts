@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 // Node executa provas TypeScript diretamente e precisa da extensão; o bundler resolve a fonte normalmente.
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
-import { caminhoRelativo, destinosDoAviso, entradaIgnorada, pastaVigiavel, temCaraDeSegredo, textoDoAnexo, textoDosAnexos, valeSeguir } from './arquivos.ts'
+import { caminhoRelativo, criarFiltro, destinosDoAviso, pastaVigiavel, temCaraDeSegredo, textoDoAnexo, textoDosAnexos, valeSeguir } from './arquivos.ts'
 
 // Caminhos crus (String.raw) porque é assim que o Windows entrega, com barra invertida e espaço no meio.
 const PASTA = String.raw`C:\Users\ana\Meus Projetos\orkester\app`
@@ -44,7 +44,7 @@ test('segredo: nome de credencial sim, código com "token" no meio da palavra n�
 test('seguir: código sim; build, binário, temporário e segredo não', () => {
   assert.equal(valeSeguir('src/main/codigo.ts'), true)
   assert.equal(valeSeguir('docs/README.md'), true)
-  assert.equal(valeSeguir('.claude/agents/n8n.md'), true)
+  assert.equal(valeSeguir('.claude/agents/n8n.md'), false) // pasta de ferramenta, ignorada desde a 1.5.5
   assert.equal(valeSeguir(String.raw`src\main\codigo.ts`), true)
   assert.equal(valeSeguir('node_modules/react/index.js'), false)
   assert.equal(valeSeguir('.git/index'), false)
@@ -64,11 +64,61 @@ test('release e .asar: nunca entra, em qualquer pasta', () => {
   assert.equal(valeSeguir(String.raw`x\Default_App.ASAR\a.js`), false)
   assert.equal(valeSeguir('src/release-notes.md'), true)
   assert.equal(valeSeguir('docs/asar.md'), true)
-  assert.equal(entradaIgnorada('release'), true)
-  assert.equal(entradaIgnorada('Release'), true)
-  assert.equal(entradaIgnorada('app.asar'), true)
-  assert.equal(entradaIgnorada('app.asar.unpacked'), false)
-  assert.equal(entradaIgnorada('src'), false)
+})
+
+const NL = String.fromCharCode(10)
+
+test('filtro: release e .asar nunca descem, nem com "!" no .orkignore', () => {
+  for (const f of [criarFiltro(), criarFiltro(['!release/', '!*.asar', '!**/app.asar/'].join(NL))]) {
+    assert.equal(f.desce('a/app.asar'), false)
+    assert.equal(f.desce('Default_App.ASAR'), false)
+    assert.equal(f.segue('a/app.asar/x.js'), false)
+    assert.equal(f.segue('a/app.asar'), false)
+  }
+  assert.equal(criarFiltro().desce('release'), false)
+  assert.equal(criarFiltro().desce('release/win-unpacked'), false)
+  assert.equal(criarFiltro().desce('src'), true)
+})
+
+test('filtro: o segredo não volta com "!" no .orkignore', () => {
+  const f = criarFiltro(['!.env', '!*.pem'].join(NL))
+  assert.equal(f.segue('.env'), false)
+  assert.equal(f.segue('chaves/a.pem'), false)
+})
+
+test('filtro: recados do time e ruído saem; papéis do time e código ficam', () => {
+  const f = criarFiltro()
+  for (const r of [
+    '.contexto/a.md', 'x.log', 'logs/y.log', 'ENTREGA-y.md', 'entrega-1.md', 'tarefa-y.md', 'time/handoff-z.md', 'time/tarefa-3.md', '.contexto/154-entrega.md', 'time/evidencia-1.txt', 'time/resultado-2.md', '.claude/settings.json'
+  ]) {
+    assert.equal(f.segue(r), false, r)
+  }
+  for (const r of ['time/01-maestro.md', 'src/main/codigo.ts', 'docs/README.md', 'src/entrega.ts', 'src/pages/entrega-pedido.tsx', 'tarefa-api/x.ts', 'notas/formato-de-entrega.md', 'a/handoff-x.md', 'ordem/entrega-1.md']) {
+    assert.equal(f.segue(r), true, r)
+  }
+  assert.equal(f.desce('.contexto'), false)
+  assert.equal(f.desce('time'), true)
+})
+
+test('filtro: .orkignore muda o resultado, com a sintaxe do .gitignore', () => {
+  const f = criarFiltro(['# meu', 'docs/', '*.md', '!LEIAME.md', '!release/'].join(NL))
+  assert.equal(f.desce('docs'), false)
+  assert.equal(f.segue('docs/a.ts'), false)
+  assert.equal(f.segue('notas.md'), false)
+  assert.equal(f.segue('LEIAME.md'), true)
+  assert.equal(f.desce('release'), true) // religou um padrão do app
+  assert.equal(f.segue('release/build.ts'), true)
+  assert.equal(criarFiltro().desce('docs'), true)
+  assert.equal(criarFiltro().segue('docs/a.ts'), true)
+  assert.equal(criarFiltro().desce('release'), false)
+})
+
+test('filtro: barra invertida, vazio e caminho estranho', () => {
+  const f = criarFiltro('docs/')
+  assert.equal(f.segue(['docs', 'a.ts'].join(String.fromCharCode(92))), false)
+  assert.equal(f.segue(''), false)
+  assert.equal(f.segue('../fora.ts'), false)
+  assert.equal(f.desce(''), false)
 })
 
 test('pastaVigiavel recusa casa, raiz e pastas de sistema, e aceita projeto', () => {

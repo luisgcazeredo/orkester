@@ -13,6 +13,7 @@ import { usuarioPorChave } from './chaves'
 import { nodeServe } from '../shared/node-do-sistema'
 import type { PedidoNoQuadro } from '../shared/quadro/agente'
 import { criarEspacoDoAgente, PASTA_DADOS, resumosDosEspacos } from './dados'
+import { arquivoAcompanhado } from './codigo'
 import { abrirJanela, donoDe } from './janelas'
 import { abrirCorreio, pastaDoCorreio } from './correio'
 import { AJUDA, SKILL } from './manual'
@@ -1217,6 +1218,10 @@ const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
       if (!arquivos.length) throw new Error('diga os arquivos: ork arvore mostrar <arquivo>... [--arvore "Nome"]')
       const sumido = arquivos.find((a) => !existsSync(a))
       if (sumido) throw new Error(`esse arquivo não existe: ${sumido}`)
+      const ignorado = arquivos.find((a) => !arquivoAcompanhado(eu.espec.pasta, a))
+      if (ignorado) {
+        throw new Error(`o Orkester não mostra esse arquivo (segredo, binário, recado ou barrado por .orkignore): ${ignorado}`)
+      }
     }
     await abrirJanelaPronta(eu.espacoId)
     const r = await pedirAJanela({ tipo: 'arvore', espacoId: eu.espacoId, id: eu.id, acao, nome, arquivos })
