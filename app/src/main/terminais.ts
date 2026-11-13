@@ -10,7 +10,7 @@ import { SerializeAddon } from '@xterm/addon-serialize'
 import { CANAIS, type EspecTerminal, type RetratoTerminal } from '../shared/api'
 import { ambienteDoComando } from './comandos'
 import { ofertaDeAtualizacao, resolverOferta } from './codex-regras'
-import { AMBIENTE_DO_CLAUDE, juntarLinhasDaTela } from './envio'
+import { AMBIENTE_DO_CLAUDE, juntarLinhasDaTela, tuiDoCodexPronta } from './envio'
 import { entradaVazia, lerEntradaDoUsuario, type EntradaDoUsuario } from './caixa'
 import { donoDe, exigirDono } from './janelas'
 
@@ -59,6 +59,10 @@ export interface Sessao {
   fim: ReturnType<typeof setTimeout> | null
   /** O que o usuário anda digitando neste cartão: a caixa de entrada não entrega por cima disso. */
   usuario: EntradaDoUsuario
+  /** O app digitou o comando de um agente neste processo: se a tela voltar ao prompt do PowerShell, o agente saiu. */
+  lancouAgente?: boolean
+  /** Codex: resolve quando a oferta de atualização foi pulada (ou não veio); a ficha só é olhada depois disso. */
+  puloDaAtualizacao?: Promise<void>
 }
 
 const sessoes = new Map<string, Sessao>()
@@ -179,9 +183,11 @@ function iniciarProcesso(s: Sessao): void {
   // ORK_AGENTES_DE_VERDADE, e só nos que ela abre pelo `ork`
   const deVerdade = !AUTOTESTE || s.espec.agente === 'shell' || (!!process.env.ORK_AGENTES_DE_VERDADE && !!s.espec.criadoPor)
   const linha = deVerdade ? linhaDeComando(s.espec) : ''
+  s.lancouAgente = !!linha && s.espec.agente !== 'shell'
+  s.puloDaAtualizacao = undefined
   if (linha) processo.write(`${linha}\r`)
   if (s.espec.agente === 'codex' && !s.espec.sessao) vigiarConversaDoCodex(s, processo)
-  if (deVerdade && s.espec.agente === 'codex') vigiarAtualizacaoDoCodex(s, processo)
+  if (deVerdade && s.espec.agente === 'codex') s.puloDaAtualizacao = vigiarAtualizacaoDoCodex(s, processo)
 }
 
 function criarSessao(espacoId: string, espec: EspecTerminal): Sessao {
@@ -312,22 +318,34 @@ function procurarConversaDoCodex(s: Sessao): string | null {
  * rodapé da própria oferta diz ser "skip"; sem isso, lê onde está o cursor e só aperta Enter com "Skip" marcado — do
  * outro lado do Enter está instalar. Não bateu com o que se esperava: não faz nada, e a pergunta fica para o usuário.
  */
-function vigiarAtualizacaoDoCodex(s: Sessao, processo: pty.IPty): void {
-  const olhar = async (): Promise<void> => {
-    if (sessoes.get(s.id) !== s || s.processo !== processo) return
-    if (Date.now() - s.iniciadoEm > 40_000) return
-    if (ofertaDeAtualizacao(await telaDe(s, 20))) {
-      await resolverOferta({
-        tela: () => telaDe(s, 20),
-        escrever: (dados) => processo.write(dados),
-        esperar: (ms) => new Promise((r) => setTimeout(r, ms)),
-        vivo: () => sessoes.get(s.id) === s && s.processo === processo
-      })
-      return
+function vigiarAtualizacaoDoCodex(s: Sessao, processo: pty.IPty): Promise<void> {
+  // Resolve quando não há mais o que esperar: oferta respondida, TUI já pronta (a oferta vem antes dela e não volta),
+  // processo trocado ou 40 s. `aguardarPronto` espera esta promessa antes de olhar a ficha (1.5.3): o pulo nunca
+  // corre em paralelo com a espera de pronto, e colar na oferta instala o Codex.
+  return new Promise<void>((fim) => {
+    const olhar = async (): Promise<void> => {
+      if (sessoes.get(s.id) !== s || s.processo !== processo) return fim()
+      if (Date.now() - s.iniciadoEm > 40_000) return fim()
+      let tela: string
+      try {
+        tela = await telaDe(s, 20)
+      } catch {
+        return fim() // sem tela não há o que pular, e quem espera a promessa não pode ficar pendurado
+      }
+      if (ofertaDeAtualizacao(tela)) {
+        await resolverOferta({
+          tela: () => telaDe(s, 20),
+          escrever: (dados) => processo.write(dados),
+          esperar: (ms) => new Promise((r) => setTimeout(r, ms)),
+          vivo: () => sessoes.get(s.id) === s && s.processo === processo
+        })
+        return fim()
+      }
+      if (tuiDoCodexPronta(tela)) return fim()
+      setTimeout(() => void olhar(), 500)
     }
     setTimeout(() => void olhar(), 500)
-  }
-  setTimeout(() => void olhar(), 500)
+  })
 }
 
 /** O Codex só cria o arquivo da conversa depois da primeira mensagem: procura a cada 5 s, por até 30 min. */

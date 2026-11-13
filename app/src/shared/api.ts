@@ -19,7 +19,7 @@ import type { PreferenciasParciais } from './preferencias'
 /** O que o processo principal precisa para manter o processo de um cartão de terminal. */
 
 /** Por que um agente recém-aberto não ficou pronto para receber o primeiro pedido. */
-type MotivoNaoPronto = 'confirmar' | 'desconhecido' | 'tempo' | 'encerrado'
+type MotivoNaoPronto = 'confirmar' | 'desconhecido' | 'tempo' | 'encerrado' | 'saiu'
 
 /**
  * O que aconteceu com o primeiro pedido de um cartão.

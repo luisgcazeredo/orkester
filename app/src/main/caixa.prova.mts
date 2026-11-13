@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-const { lerEntradaDoUsuario, entradaVazia, motivoDeEspera, decidirPendencia, criarCaixa, textoDoRecado, textoDoAviso, tirarCitacoes, semEcoDeFerramenta, janelaDeDialogo, RETOMADA_ESPERA, SILENCIO_DO_USUARIO, PARADO_PARA_AVISO, ESPERA_ENTRE_RECADOS } = await import(
+const { lerEntradaDoUsuario, entradaVazia, motivoDeEspera, decidirPendencia, criarCaixa, textoDoRecado, textoDoAviso, tirarCitacoes, semEcoDeFerramenta, janelaDeDialogo, RETOMADA_ESPERA, SILENCIO_DO_USUARIO, PARADO_PARA_AVISO, ESPERA_ENTRE_RECADOS, SEGUNDO_PLANO_PARA_AVISO } = await import(
   new URL('./caixa.ts', import.meta.url).href
 )
 
@@ -107,6 +107,7 @@ function mundo() {
   let resultado = 'saiu'
   let retomada = 'sem-marca'
   let marcaNoCampo = false
+  const segundoPlano = new Set<string>()
   const retomadas: string[] = []
   const registrosComTela: Array<[string, string | undefined]> = []
   const caixa = criarCaixa({
@@ -116,6 +117,7 @@ function mundo() {
     usuario: (id: string) => usuarios.get(id) ?? entradaVazia(),
     nome: (id: string) => (situacoes.has(id) ? id[0].toUpperCase() + id.slice(1) : null),
     shell: () => false,
+    segundoPlano: async (id: string) => segundoPlano.has(id),
     tela: async () => 'ultima linha',
     digitar: async (id: string, texto: string) => {
       digitados.push([id, texto])
@@ -144,7 +146,8 @@ function mundo() {
     retomada: (r: string) => (retomada = r),
     marcaNoCampo: (v: boolean) => (marcaNoCampo = v),
     retomadas,
-    registrosComTela
+    registrosComTela,
+    segundoPlano
   }
 }
 
@@ -453,4 +456,227 @@ test('caixa 1.5.2 (iii): dois recados na fila e o primeiro dá `ficou` falso →
   m.passar(ESPERA_ENTRE_RECADOS)
   await m.caixa.rodada()
   assert.equal(m.digitados.filter(([, t]) => t === 'segundo').length, 1)
+})
+
+// ---- 1.5.3: avisos velhos, prioridade e comando em segundo plano ----
+
+const avisoSobre = (m: ReturnType<typeof mundo>, sobre: string, texto = 'aviso') =>
+  m.caixa.enfileirar({ tipo: 'aviso', de: null, deNome: 'Orkester', para: 'maestro', texto, sobre })
+
+test('caixa 1.5.3 (a): 3 avisos na fila do Maestro sobre X; X some; a entrega nova é a 1ª e os avisos terminam cancelado', async () => {
+  const m = mundo()
+  m.situacoes.set('x', 'livre')
+  m.situacoes.set('maestro', 'trabalhando')
+  const avisos = [avisoSobre(m, 'x', 'a1'), avisoSobre(m, 'x', 'a2'), avisoSobre(m, 'x', 'a3')]
+  await m.caixa.rodada()
+  m.situacoes.delete('x') // o agente foi fechado
+  m.caixa.esquecer('x') // o que o app faz ao fechar o cartão
+  const entrega = m.caixa.enfileirar({ tipo: 'entrega', de: 'testador', deNome: 'Testador', para: 'maestro', texto: 'feito' })
+  m.situacoes.set('maestro', 'livre')
+  await m.caixa.rodada()
+  assert.deepEqual(await Promise.all(avisos.map((a) => a.fim)), ['cancelado', 'cancelado', 'cancelado'])
+  assert.equal(await entrega.fim, 'entregue')
+  assert.deepEqual(m.digitados.map(([para, texto]) => [para, /feito/.test(texto)]), [['maestro', true]], 'só a entrega foi digitada')
+})
+
+test('caixa 1.5.3 (a): sem o `esquecer` o aviso sobre agente que sumiu também é cancelado na rodada', async () => {
+  const m = mundo()
+  m.situacoes.set('y', 'livre')
+  m.situacoes.set('maestro', 'trabalhando')
+  const aviso = avisoSobre(m, 'y')
+  m.situacoes.delete('y')
+  await m.caixa.rodada()
+  assert.equal(await aviso.fim, 'cancelado')
+  m.situacoes.set('maestro', 'livre')
+  await m.caixa.rodada()
+  assert.equal(m.digitados.length, 0)
+})
+
+test('caixa 1.5.3 (a): aviso sobre Y; Y volta a trabalhar (de vez, 3 s seguidos) → o aviso não é digitado; um eco de 1 s não basta', async () => {
+  const m = mundo()
+  m.situacoes.set('y', 'livre')
+  m.situacoes.set('maestro', 'trabalhando')
+  const aviso = avisoSobre(m, 'y')
+  let fim: string | null = null
+  void aviso.fim.then((f: string) => (fim = f))
+  // um instante de "trabalhando" (eco do usuário clicando no cartão) e volta a livre: o aviso continua valendo
+  m.situacoes.set('y', 'trabalhando')
+  await m.caixa.rodada()
+  m.passar(1000)
+  m.situacoes.set('y', 'livre')
+  await m.caixa.rodada()
+  await Promise.resolve()
+  assert.equal(fim, null, 'um eco não cancela')
+  // agora ele volta a trabalhar e fica
+  m.situacoes.set('y', 'trabalhando')
+  await m.caixa.rodada()
+  m.passar(3500)
+  await m.caixa.rodada()
+  assert.equal(await aviso.fim, 'cancelado')
+  m.situacoes.set('maestro', 'livre')
+  await m.caixa.rodada()
+  assert.equal(m.digitados.length, 0, 'o aviso velho não foi digitado')
+})
+
+test('caixa 1.5.3 (a): aviso que ainda vale (agente parado) é digitado; aviso de "encerrou" não envelhece', async () => {
+  const m = mundo()
+  m.situacoes.set('y', 'livre')
+  const valido = avisoSobre(m, 'y', 'ainda vale')
+  await m.caixa.rodada()
+  assert.equal(await valido.fim, 'entregue')
+  // "encerrou" é o fato de o agente ter saído: sem `sobre`, vai mesmo com o agente já fora do app
+  const m2 = mundo()
+  m2.caixa.enfileirar({ tipo: 'pedido', de: 'maestro', deNome: 'Maestro', para: 'testador', texto: 'x' })
+  await m2.caixa.rodada()
+  m2.situacoes.set('testador', 'trabalhando')
+  await m2.caixa.rodada()
+  m2.situacoes.delete('testador')
+  m2.passar(1000)
+  await m2.caixa.rodada()
+  assert.ok(m2.digitados.some(([para, texto]) => para === 'maestro' && /saiu/.test(texto)), 'o Maestro soube que ele saiu')
+})
+
+test('caixa 1.5.3 (a): entregas e pedidos passam na frente de avisos na mesma fila, mantendo a ordem entre si', async () => {
+  const m = mundo()
+  m.situacoes.set('y', 'livre')
+  m.situacoes.set('maestro', 'trabalhando')
+  avisoSobre(m, 'y', 'aviso-1')
+  m.caixa.enfileirar({ tipo: 'entrega', de: 'testador', deNome: 'Testador', para: 'maestro', texto: 'entrega-1' })
+  m.caixa.enfileirar({ tipo: 'pedido', de: 'testador', deNome: 'Testador', para: 'maestro', texto: 'pedido-1' })
+  m.situacoes.set('maestro', 'livre')
+  for (let i = 0; i < 3; i++) {
+    await m.caixa.rodada()
+    m.passar(ESPERA_ENTRE_RECADOS + 100)
+  }
+  const ordem = m.digitados.map(([, t]) => (/entrega-1/.test(t) ? 'entrega' : /pedido-1/.test(t) ? 'pedido' : 'aviso'))
+  assert.deepEqual(ordem, ['entrega', 'pedido', 'aviso'])
+})
+
+test('pendência 1.5.3 (b): "1 shell still running" no rodapé: não avisa em 20 s, nem em 9 min; sem o rodapé, avisa', () => {
+  const p = { de: 'm', para: 't', desde: 0, trabalhou: true, paradoDesde: 0 }
+  // sem o rodapé, 20 s parado = aviso
+  let r = decidirPendencia(p, 'livre', 1000)
+  r = decidirPendencia(r.pendencia, 'livre', 1000 + PARADO_PARA_AVISO)
+  assert.equal(r.avisar, 'parou')
+  // com o rodapé, não
+  r = decidirPendencia(p, 'livre', 1000, true)
+  assert.equal(r.avisar, null)
+  r = decidirPendencia(r.pendencia, 'livre', 1000 + PARADO_PARA_AVISO, true)
+  assert.equal(r.avisar, null, '20 s com comando em segundo plano não é "parou"')
+  r = decidirPendencia(r.pendencia, 'livre', 1000 + 9 * 60_000, true)
+  assert.equal(r.avisar, null)
+  // teto: 10 min com o comando, avisa com o texto próprio
+  r = decidirPendencia(r.pendencia, 'livre', 1000 + SEGUNDO_PLANO_PARA_AVISO, true)
+  assert.equal(r.avisar, 'segundo-plano')
+  assert.match(textoDoAviso('Testador', 'segundo-plano', 'x'), /10 min.*comando em segundo plano/)
+  // o comando acabou: o relógio de "parou" começa do zero (não herda os minutos de espera)
+  r = decidirPendencia(p, 'livre', 5000, true)
+  r = decidirPendencia(r.pendencia, 'livre', 5000 + 8 * 60_000, false)
+  assert.equal(r.avisar, null, 'acabou o comando: conta de novo desde agora')
+  r = decidirPendencia(r.pendencia, 'livre', 5000 + 8 * 60_000 + PARADO_PARA_AVISO, false)
+  assert.equal(r.avisar, 'parou')
+  // voltar a trabalhar zera o tempo em segundo plano
+  r = decidirPendencia(decidirPendencia(p, 'livre', 1, true).pendencia, 'trabalhando', 2, true)
+  assert.equal(r.pendencia.segundoPlanoDesde, 0)
+})
+
+test('caixa 1.5.3 (b): com o rodapé de segundo plano o Maestro não recebe "parou"; sem ele, recebe', async () => {
+  for (const comComando of [true, false]) {
+    const m = mundo()
+    m.caixa.enfileirar({ tipo: 'pedido', de: 'maestro', deNome: 'Maestro', para: 'testador', texto: 'rode o build' })
+    await m.caixa.rodada()
+    m.situacoes.set('testador', 'trabalhando')
+    await m.caixa.rodada()
+    m.situacoes.set('testador', 'livre')
+    if (comComando) m.segundoPlano.add('testador')
+    m.passar(1000)
+    await m.caixa.rodada()
+    m.passar(PARADO_PARA_AVISO + 1000)
+    await m.caixa.rodada()
+    const aviso = m.digitados.find(([para]) => para === 'maestro')
+    assert.equal(!!aviso, !comComando, comComando ? 'esperando o comando: sem aviso' : 'parado de verdade: avisa')
+  }
+})
+
+// ---- 1.5.3 (ajuste): o aviso cancelado por "voltou a trabalhar" rearma a pendência (M1) ----
+
+test('caixa 1.5.3 M1: aviso "parou" cancelado porque o agente voltou a trabalhar → parou de novo, sai aviso novo', async () => {
+  const m = mundo()
+  m.situacoes.set('maestro', 'trabalhando') // o aviso fica na fila, sem ser digitado
+  m.caixa.enfileirar({ tipo: 'pedido', de: 'maestro', deNome: 'Maestro', para: 'testador', texto: 'teste tudo' })
+  await m.caixa.rodada()
+  m.situacoes.set('testador', 'trabalhando')
+  m.passar(1000)
+  await m.caixa.rodada()
+  m.situacoes.set('testador', 'livre')
+  m.passar(1000)
+  await m.caixa.rodada()
+  m.passar(PARADO_PARA_AVISO)
+  await m.caixa.rodada()
+  assert.equal(m.caixa.pendenciaDe('testador'), undefined, 'o aviso entrou na fila e a pendência fechou')
+  // X acorda e trabalha 3 s seguidos: o aviso é cancelado
+  m.situacoes.set('testador', 'trabalhando')
+  await m.caixa.rodada()
+  m.passar(3500)
+  await m.caixa.rodada()
+  assert.ok(m.caixa.pendenciaDe('testador'), 'a pendência voltou: quem pediu ainda espera a entrega')
+  // para de novo, sem entregar: 20 s livre e o aviso novo sai
+  m.situacoes.set('testador', 'livre')
+  await m.caixa.rodada()
+  m.passar(PARADO_PARA_AVISO)
+  await m.caixa.rodada()
+  m.situacoes.set('maestro', 'livre')
+  await m.caixa.rodada()
+  const avisos = m.digitados.filter(([para]) => para === 'maestro')
+  assert.equal(avisos.length, 1, 'exatamente um aviso (o velho foi cancelado)')
+  assert.match(avisos[0][1], /"Testador" terminou o que você pediu/)
+})
+
+test('caixa 1.5.3 M1: o mesmo vale para o aviso "segundo-plano"', async () => {
+  const m = mundo()
+  m.situacoes.set('maestro', 'trabalhando')
+  m.caixa.enfileirar({ tipo: 'pedido', de: 'maestro', deNome: 'Maestro', para: 'testador', texto: 'rode o build' })
+  await m.caixa.rodada()
+  m.situacoes.set('testador', 'trabalhando')
+  m.passar(1000)
+  await m.caixa.rodada()
+  m.situacoes.set('testador', 'livre')
+  m.segundoPlano.add('testador')
+  m.passar(1000)
+  await m.caixa.rodada()
+  m.passar(SEGUNDO_PLANO_PARA_AVISO + 1000)
+  await m.caixa.rodada()
+  assert.equal(m.caixa.pendenciaDe('testador'), undefined, 'o aviso de 10 min entrou na fila')
+  m.segundoPlano.delete('testador')
+  m.situacoes.set('testador', 'trabalhando')
+  await m.caixa.rodada()
+  m.passar(3500)
+  await m.caixa.rodada()
+  assert.ok(m.caixa.pendenciaDe('testador'), 'a pendência voltou')
+  m.situacoes.set('testador', 'livre')
+  await m.caixa.rodada()
+  m.passar(PARADO_PARA_AVISO)
+  await m.caixa.rodada()
+  m.situacoes.set('maestro', 'livre')
+  await m.caixa.rodada()
+  const avisos = m.digitados.filter(([para]) => para === 'maestro')
+  assert.equal(avisos.length, 1)
+  assert.match(avisos[0][1], /terminou o que você pediu/)
+})
+
+test('pendência 1.5.3 S4: o rodapé de segundo plano piscando não zera o relógio de 10 min; fora de verdade por 5 s zera', () => {
+  const p = { de: 'm', para: 't', desde: 0, trabalhou: true, paradoDesde: 0 }
+  let r = decidirPendencia(p, 'livre', 1000, true)
+  // pisca: some por uma rodada, volta
+  r = decidirPendencia(r.pendencia, 'livre', 60_000, false)
+  r = decidirPendencia(r.pendencia, 'livre', 62_000, true)
+  r = decidirPendencia(r.pendencia, 'livre', 300_000, false)
+  r = decidirPendencia(r.pendencia, 'livre', 301_000, true)
+  r = decidirPendencia(r.pendencia, 'livre', 1000 + SEGUNDO_PLANO_PARA_AVISO, true)
+  assert.equal(r.avisar, 'segundo-plano', 'o relógio de 10 min sobreviveu às piscadas')
+  // fora por 5 s seguidos: zera (o comando acabou)
+  let q = decidirPendencia(p, 'livre', 1000, true)
+  q = decidirPendencia(q.pendencia, 'livre', 60_000, false)
+  q = decidirPendencia(q.pendencia, 'livre', 66_000, false)
+  assert.equal(q.pendencia.segundoPlanoDesde, 0)
 })

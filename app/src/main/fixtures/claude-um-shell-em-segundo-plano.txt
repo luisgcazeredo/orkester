@@ -1,0 +1,6 @@
+● Rodando o build em segundo plano; aviso quando acabar.
+
+────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle) · 1 shell still running

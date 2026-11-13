@@ -38,7 +38,7 @@ for (const status of ['saiu', 'ficou', 'incerto']) {
   })
 }
 
-for (const motivo of ['confirmar', 'desconhecido', 'tempo', 'encerrado']) {
+for (const motivo of ['confirmar', 'desconhecido', 'tempo', 'encerrado', 'saiu']) {
   test(`nao-pronto com motivo ${motivo}: nada é digitado`, async () => {
     const { dep, registros, chamadas } = montar({ pronto: motivo })
     assert.deepEqual(await primeiroPedidoDoCartao(dep), { status: 'nao-pronto', motivo })

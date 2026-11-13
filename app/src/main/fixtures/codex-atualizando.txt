@@ -1,0 +1,5 @@
+prova-codex
+
+  >_ OpenAI Codex (v0.167.2)
+
+  Updating Codex via `npm install -g @openai/codex`...

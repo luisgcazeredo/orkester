@@ -358,3 +358,94 @@ export function registroDoEnvio(origem: 'rotina' | 'primeiro-pedido', r: Resulta
   }
   return { comando: `${origem}-nao-enviado`, alerta: `${origem}: o texto ficou escrito no campo de entrada e NÃO foi enviado` }
 }
+
+// ---------- a tela do agente recém-aberto, sem Electron (1.5.3) ----------
+
+/** As últimas `quantas` linhas com texto, sem espaços no fim. */
+const ultimasComTexto = (tela: string, quantas: number): string[] =>
+  tela
+    .split('\n')
+    .map((l) => l.replace(/\s+$/, ''))
+    .filter((l) => l.trim())
+    .slice(-quantas)
+
+/**
+ * A oferta de atualização do Codex e o que vem dela: colar **nesta tela instala o Codex** (13/11/2026: a ficha caiu na
+ * oferta e o Codex rodou `npm install -g @openai/codex` sozinho). Nada é colado nem apertado enquanto estiver aí.
+ */
+const TELA_DE_ATUALIZACAO = /update available|updating codex|update ran successfully|update now|enter continue|press enter to continue|npm install -g @openai\/codex/i
+
+/** O campo do Codex pronto: o placeholder dele ou o "N% context left" do rodapé. */
+const MARCA_DO_CODEX_PRONTO = /ask codex|\bcontext left\b|for shortcuts/i
+
+/** A última linha com texto é o prompt do PowerShell: o agente saiu (ou nunca abriu). */
+export function agenteSaiuParaOShell(tela: string): boolean {
+  const ultima = ultimasComTexto(tela, 1)[0] ?? ''
+  return /^PS .*>\s*$/.test(ultima)
+}
+
+/**
+ * A TUI do Codex está desenhada e pronta para receber colagem: o campo visível e **nenhum** sinal da oferta de
+ * atualização nas últimas linhas (a parte de cima da TUI pode citar "update available" no histórico; o que vale é o pé).
+ */
+export function tuiDoCodexPronta(tela: string): boolean {
+  const pe = ultimasComTexto(tela, 8).join('\n')
+  if (TELA_DE_ATUALIZACAO.test(pe) || agenteSaiuParaOShell(tela)) return false
+  return MARCA_DO_CODEX_PRONTO.test(ultimasComTexto(tela, 12).join('\n'))
+}
+
+/** Há uma tela de atualização do Codex no pé (oferta, instalando ou "Update ran successfully"). */
+export function telaDeAtualizacaoDoCodex(tela: string): boolean {
+  return TELA_DE_ATUALIZACAO.test(ultimasComTexto(tela, 8).join('\n'))
+}
+
+/**
+ * O rodapé do Claude Code diz que há comando em segundo plano (`1 shell`, `2 shells`, `1 monitor`, `still running`):
+ * ele está livre para digitar, mas só **esperando** o comando. Só o pé da tela conta (3 linhas).
+ */
+export function emSegundoPlano(tela: string): boolean {
+  return /\b\d+\s+(?:shell|monitor|background task|local agent)s?\b|still running/i.test(ultimasComTexto(tela, 3).join('\n'))
+}
+
+/**
+ * Rodapés e perguntas de diálogo (confiança na pasta, servidores MCP, permissão de ferramenta, atualização,
+ * sim/não). Olhando só o fim da tela: o texto da conversa pode citar essas palavras.
+ */
+export const DIALOGO =
+  /enter to confirm|enter confirm|esc not now|↑\/↓ choose|esc to cancel|esc to reject|enter continue|press enter to continue|update now|update available|new version available|atualiza[çc][ãa]o dispon[íi]vel|updating codex|update ran successfully|trust this folder|do you trust|do you want to proceed|\(y\/n\)|\[y\/n\]/i
+/** Agente desenhado e esperando o primeiro pedido (Claude Code e Codex). */
+const PRONTO = /for shortcuts|context left|ask codex|try "write a test for <filepath>"|auto mode on \(shift\+tab to cycle\)/i
+
+export type EstadoDeProntidao = 'pronto' | 'confirmar' | 'saiu' | 'desconhecido' | 'esperar'
+
+/**
+ * Uma leitura da tela de um agente recém-aberto (já parada há ≥3 s): pode receber a ficha? Pura, para ter prova.
+ * - `saiu`: o app abriu o agente e a tela voltou ao prompt do PowerShell. Nada é colado, nenhum Enter num shell.
+ * - `confirmar`: diálogo no pé (confiança, MCP, **oferta de atualização do Codex**): nada é colado nem apertado.
+ * - `pronto`: Claude, a marca de pronto; **Codex, a TUI pronta (campo, sem oferta) em duas leituras iguais seguidas**
+ *   (`anterior` é a leitura de antes; devolvida em `anterior` para a próxima chamada).
+ * - `desconhecido`: parada há mais de 6 s numa tela que não reconheço (09/11/2026: digitar em cima dela já perdeu pedido).
+ */
+export function lerProntidao(p: {
+  agente: 'claude' | 'codex' | 'shell'
+  lancouAgente: boolean
+  tela: string
+  /** `DIALOGO` no pé da tela (`janelaDeDialogo`, de caixa.ts: sem eco de ferramenta nem citações) */
+  emDialogo: boolean
+  anterior: string | null
+  quietoMs: number
+}): { estado: EstadoDeProntidao; anterior: string | null } {
+  const { tela } = p
+  if (p.lancouAgente && p.agente !== 'shell' && agenteSaiuParaOShell(tela)) return { estado: 'saiu', anterior: null }
+  if (p.emDialogo) return { estado: 'confirmar', anterior: null }
+  if (p.agente === 'codex') {
+    if (tuiDoCodexPronta(tela)) return p.anterior === tela ? { estado: 'pronto', anterior: tela } : { estado: 'esperar', anterior: tela }
+  } else if (PRONTO.test(tela)) {
+    return { estado: 'pronto', anterior: null }
+  }
+  // Quieto, sem a marca de pronto e sem diálogo conhecido: uma tela que eu não sei ler. Reconhecer mais frases ajuda,
+  // mas nunca vai acabar — cada versão de cada agente inventa uma tela nova. A regra que não envelhece: **não se
+  // digita numa tela que não foi reconhecida**, e quem pediu fica sabendo.
+  if (p.quietoMs > 6000 && tela.trim() && !agenteSaiuParaOShell(tela)) return { estado: 'desconhecido', anterior: null }
+  return { estado: 'esperar', anterior: null }
+}

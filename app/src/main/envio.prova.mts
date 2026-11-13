@@ -591,3 +591,93 @@ test('1º envio: campo nunca reconhecido (shell/tela desconhecida) e a tela muda
   })
   assert.equal(escritos[0], String.fromCharCode(13), 'o Enter de reserva vai')
 })
+
+// ---- 1.5.3: a tela do agente recém-aberto ----
+
+const { agenteSaiuParaOShell, tuiDoCodexPronta, telaDeAtualizacaoDoCodex, emSegundoPlano, lerProntidao, DIALOGO } = await import(new URL('./envio.ts', import.meta.url).href)
+const { janelaDeDialogo } = await import(new URL('./caixa.ts', import.meta.url).href)
+const tela153 = (nome: string): string => readFileSync(new URL(`./fixtures/${nome}`, import.meta.url), 'utf8')
+const ler = (tela: string, agente = 'codex', anterior: string | null = null, extra: Record<string, unknown> = {}) =>
+  lerProntidao({ agente, lancouAgente: true, tela, emDialogo: DIALOGO.test(janelaDeDialogo(tela)), anterior, quietoMs: 3500, ...extra })
+
+test('1.5.3 Codex: a oferta de atualização na tela NÃO é pronto: nada é colado nem apertado, em nenhuma leitura', () => {
+  const oferta = tela153('codex-oferta-skip-na-mesma-linha.txt')
+  assert.equal(tuiDoCodexPronta(oferta), false)
+  assert.equal(telaDeAtualizacaoDoCodex(oferta), true)
+  let anterior: string | null = null
+  for (let i = 0; i < 5; i++) {
+    const l = ler(oferta, 'codex', anterior)
+    assert.equal(l.estado, 'confirmar', 'a oferta devolve "confirmar" (quem pediu decide), nunca "pronto"')
+    anterior = l.anterior
+  }
+})
+
+test('1.5.3 Codex: "Updating Codex…" (já instalando) também não é pronto', () => {
+  const tela = tela153('codex-atualizando.txt')
+  assert.equal(tuiDoCodexPronta(tela), false)
+  assert.equal(ler(tela).estado, 'confirmar')
+})
+
+test('1.5.3 Codex: a TUI pronta só vale em duas leituras iguais seguidas', () => {
+  const tela = tela153('codex-tui-pronta.txt')
+  assert.equal(tuiDoCodexPronta(tela), true)
+  const a = ler(tela)
+  assert.equal(a.estado, 'esperar', 'a 1ª leitura não basta')
+  assert.equal(ler(tela, 'codex', a.anterior).estado, 'pronto')
+  // a tela mudou entre as leituras (ainda desenhando): recomeça
+  const b = ler(`${tela}\n  .`, 'codex', a.anterior)
+  assert.equal(b.estado, 'esperar')
+})
+
+test('1.5.3 Codex: o campo sem oferta mas com a oferta ainda no pé (o pulo não terminou) não é pronto', () => {
+  const tela = `${tela153('codex-tui-pronta.txt')}\n  Update available · 0.167.2 → 0.169.0\n  enter continue · esc skip`
+  assert.equal(tuiDoCodexPronta(tela), false)
+})
+
+test('1.5.3 Claude: continua pronto pela marca de sempre, numa leitura', () => {
+  assert.equal(ler(tela153('claude-um-shell-em-segundo-plano.txt'), 'claude').estado, 'pronto')
+})
+
+test('1.5.3 agente que saiu para o PowerShell: "saiu", sem colar nem Enter (Codex e Claude)', () => {
+  const tela = tela153('powershell-depois-do-codex.txt')
+  assert.equal(agenteSaiuParaOShell(tela), true)
+  assert.equal(ler(tela, 'codex').estado, 'saiu')
+  assert.equal(ler(tela, 'claude').estado, 'saiu')
+  // um cartão em que o app não abriu agente nenhum (PowerShell puro) não é "saiu"
+  assert.notEqual(ler(tela, 'claude', null, { lancouAgente: false }).estado, 'saiu')
+  // e a TUI viva não é shell
+  assert.equal(agenteSaiuParaOShell(tela153('codex-tui-pronta.txt')), false)
+})
+
+test('1.5.3 tela desconhecida parada há mais de 6 s continua "desconhecido"; antes disso, espera', () => {
+  const tela = 'um menu que nunca vi\n1. algo\n2. outra coisa'
+  assert.equal(ler(tela, 'claude', null, { quietoMs: 3500 }).estado, 'esperar')
+  assert.equal(ler(tela, 'claude', null, { quietoMs: 7000 }).estado, 'desconhecido')
+})
+
+test('1.5.3 rodapé do Claude com comando em segundo plano: "1 shell still running" conta; sem rodapé, não', () => {
+  assert.equal(emSegundoPlano(tela153('claude-um-shell-em-segundo-plano.txt')), true)
+  assert.equal(emSegundoPlano('● pronto\n❯\n  ⏵⏵ bypass permissions on (shift+tab to cycle) · 2 shells'), true)
+  assert.equal(emSegundoPlano('● pronto\n❯\n  ⏵⏵ bypass permissions on (shift+tab to cycle)'), false)
+  // a conversa citando "shell" bem acima do pé não conta
+  assert.equal(emSegundoPlano('o 1 shell still running da conversa\n\n\n● x\n❯\n  ⏵⏵ bypass permissions on'), false)
+})
+
+// ---- 1.5.3 (ajuste): Codex pronto com "for shortcuts"; diálogo de compactar do Claude é pergunta ----
+
+test('1.5.3 S1 Codex: "for shortcuts" no campo também conta como pronto, desde que não haja tela de atualização no pé', () => {
+  const tela = '  OpenAI Codex\n\n› Write tests\n\n  ? for shortcuts\n'
+  assert.equal(tuiDoCodexPronta(tela), true)
+  assert.equal(tuiDoCodexPronta(`${tela}\n  Update available · 0.167.2 → 0.169.0\n  enter continue · esc skip`), false)
+})
+
+test('1.5.3 diálogo do Claude Code "We recommend compacting earlier" é pergunta: nada é colado nem apertado', () => {
+  const tela = tela153('claude-dialogo-compactar.txt')
+  assert.equal(DIALOGO.test(janelaDeDialogo(tela)), true)
+  assert.equal(ler(tela, 'claude').estado, 'confirmar')
+  // só o rodapé do diálogo, em qualquer das duas formas
+  assert.equal(DIALOGO.test('  ↑/↓ choose · enter confirm · esc not now'), true)
+  assert.equal(DIALOGO.test('  enter confirm · esc not now'), true)
+  // o campo normal do Claude, com o rodapé de pronto, não é diálogo
+  assert.equal(DIALOGO.test(janelaDeDialogo(tela153('claude-um-shell-em-segundo-plano.txt'))), false)
+})

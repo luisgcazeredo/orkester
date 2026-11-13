@@ -128,6 +128,11 @@ export interface Recado {
   para: string
   texto: string
   criadoEm: number
+  /**
+   * Só nos avisos de "parou"/"pergunta" (1.5.3): o agente de que o aviso fala. O aviso mora na fila de **quem pediu**,
+   * não na do agente, e envelhece: se o agente some ou volta a trabalhar, o aviso é velho e é cancelado.
+   */
+  sobre?: string
 }
 
 export type FimDoRecado = 'entregue' | 'incerto' | 'ficou' | 'sem-destino' | 'cancelado'
@@ -153,8 +158,14 @@ export function textoDoRecado(r: Pick<Recado, 'tipo' | 'deNome' | 'texto'>, shel
 export const PARADO_PARA_AVISO = 20_000
 /** Numa pergunta, o aviso sai mais cedo: alguém precisa responder. */
 const PERGUNTA_PARA_AVISO = 8000
+/** Com comando em segundo plano no rodapé, o tempo parado não conta; passado isto, avisa mesmo assim. */
+export const SEGUNDO_PLANO_PARA_AVISO = 10 * 60_000
+/** O agente precisa ser visto trabalhando por este tempo seguido para um aviso sobre ele ser dado por velho. */
+const TRABALHANDO_PARA_VELHO = 3000
 /** Se nunca o vimos trabalhar, depois disto conta como se tivesse (pedido curto demais para a rodada ver). */
 const SEM_VER_TRABALHAR = 60_000
+/** O rodapé de segundo plano precisa ficar fora por isto para o relógio dele zerar (ele pisca entre uma rodada e outra). */
+const FORA_DO_SEGUNDO_PLANO = 5000
 
 /**
  * "Fulano pediu a Beltrano e Beltrano ainda não devolveu." Aberta quando um pedido de agente é entregue;
@@ -167,25 +178,46 @@ interface Pendencia {
   desde: number
   trabalhou: boolean
   paradoDesde: number
+  /** desde quando o agente está livre só esperando um comando em segundo plano (0 = não está) */
+  segundoPlanoDesde?: number
+  /** desde quando o rodapé de segundo plano sumiu (0 = está lá); piscar por poucos segundos não zera o relógio dele */
+  foraDoSegundoPlanoDesde?: number
 }
 
 /** O que fazer com uma pendência nesta rodada. */
-export function decidirPendencia(p: Pendencia, situacao: Situacao, agora: number): { pendencia: Pendencia; avisar: 'parou' | 'pergunta' | 'encerrou' | null } {
+export function decidirPendencia(
+  p: Pendencia,
+  situacao: Situacao,
+  agora: number,
+  /** o rodapé do agente diz que há comando em segundo plano: ele está esperando, não parado */
+  emSegundoPlano = false
+): { pendencia: Pendencia; avisar: 'parou' | 'pergunta' | 'encerrou' | 'segundo-plano' | null } {
   if (situacao === 'encerrado') return { pendencia: p, avisar: 'encerrou' }
-  if (situacao === 'trabalhando') return { pendencia: { ...p, trabalhou: true, paradoDesde: 0 }, avisar: null }
+  if (situacao === 'trabalhando') return { pendencia: { ...p, trabalhou: true, paradoDesde: 0, segundoPlanoDesde: 0, foraDoSegundoPlanoDesde: 0 }, avisar: null }
   const trabalhou = p.trabalhou || agora - p.desde >= SEM_VER_TRABALHAR
   if (!trabalhou) return { pendencia: p, avisar: null }
+  if (situacao === 'livre' && emSegundoPlano) {
+    // esperando o comando dele: o relógio de "parou" não anda; mas um comando que nunca acaba não esconde o agente para sempre
+    const segundoPlanoDesde = p.segundoPlanoDesde || agora
+    const parada = { ...p, trabalhou, paradoDesde: 0, segundoPlanoDesde, foraDoSegundoPlanoDesde: 0 }
+    return { pendencia: parada, avisar: agora - segundoPlanoDesde >= SEGUNDO_PLANO_PARA_AVISO ? 'segundo-plano' : null }
+  }
+  if (p.segundoPlanoDesde) {
+    const fora = p.foraDoSegundoPlanoDesde || agora
+    p = agora - fora >= FORA_DO_SEGUNDO_PLANO ? { ...p, segundoPlanoDesde: 0, foraDoSegundoPlanoDesde: 0 } : { ...p, foraDoSegundoPlanoDesde: fora }
+  }
   const paradoDesde = p.paradoDesde || agora
   const limite = situacao === 'pergunta' ? PERGUNTA_PARA_AVISO : PARADO_PARA_AVISO
   if (agora - paradoDesde >= limite) return { pendencia: { ...p, trabalhou, paradoDesde }, avisar: situacao === 'pergunta' ? 'pergunta' : 'parou' }
   return { pendencia: { ...p, trabalhou, paradoDesde }, avisar: null }
 }
 
-export function textoDoAviso(nome: string, motivo: 'parou' | 'pergunta' | 'encerrou', tela: string): string {
+export function textoDoAviso(nome: string, motivo: 'parou' | 'pergunta' | 'encerrou' | 'segundo-plano', tela: string): string {
   const cabeca = {
     parou: `"${nome}" terminou o que você pediu e parou sem mandar a entrega pelo \`ork entregar\`.`,
     pergunta: `"${nome}" parou numa pergunta e espera resposta (responda com \`ork teclas\` se for seguro, ou pergunte ao usuário).`,
-    encerrou: `O processo de "${nome}" terminou antes de mandar a entrega.`
+    encerrou: `"${nome}" saiu (o processo terminou, ou o agente voltou ao shell) antes de mandar a entrega.`,
+    'segundo-plano': `"${nome}" está há 10 min parado com um comando em segundo plano e não mandou a entrega pelo \`ork entregar\`. Pode ser só um comando longo: veja se ele ainda anda.`
   }[motivo]
   const fim = motivo === 'encerrou' ? '' : `\nLeia a tela inteira com \`ork ver "${nome}" --linhas 200\`.`
   return `${cabeca}\nÚltimas linhas da tela dele:\n${citarTela(tela)}${fim}`
@@ -258,6 +290,8 @@ interface DependenciasDaCaixa {
   situacao(id: string): Promise<Situacao | null>
   usuario(id: string): EntradaDoUsuario
   nome(id: string): string | null
+  /** O rodapé do agente diz que há comando em segundo plano (Claude: `1 shell`). Opcional. */
+  segundoPlano?(id: string): Promise<boolean>
   /** o destino é um shell (entrega e aviso vão como comentário) */
   shell(id: string): boolean
   tela(id: string, linhas: number): Promise<string>
@@ -430,9 +464,52 @@ export function criarCaixa(d: DependenciasDaCaixa): Caixa {
     }
   }
 
+  /** desde quando o agente de um aviso é visto trabalhando, por recado */
+  const trabalhandoDesde = new Map<string, number>()
+
+  /**
+   * Avisos que falam de um agente que sumiu, ou que voltou a trabalhar de vez (visto assim por 3 s seguidos: um eco
+   * na tela por um instante não basta), são velhos: cancelados, sem digitar. Um aviso já digitado (retomada) não volta atrás.
+   */
+  const cancelarAvisosVelhos = async (id: string): Promise<void> => {
+    for (const item of [...(filas.get(id) ?? [])]) {
+      const sobre = item.recado.sobre
+      if (!sobre || retomadas.get(id)?.item === item) continue
+      const situacao = await d.situacao(sobre)
+      if (situacao === 'trabalhando') {
+        const desde = trabalhandoDesde.get(item.recado.id) ?? d.agora()
+        trabalhandoDesde.set(item.recado.id, desde)
+        if (d.agora() - desde < TRABALHANDO_PARA_VELHO) continue
+      } else if (situacao !== null || d.nome(sobre) !== null) {
+        trabalhandoDesde.delete(item.recado.id)
+        continue
+      }
+      trabalhandoDesde.delete(item.recado.id)
+      terminar(id, item, 'cancelado')
+      // voltou a trabalhar: quem pediu ainda espera a entrega, então a pendência volta (já o vimos trabalhar)
+      if (situacao === 'trabalhando') {
+        const ultima = ultimaPendencia.get(sobre)
+        if (ultima && ultima.de === id && !pendencias.has(sobre)) {
+          ultimaPendencia.delete(sobre)
+          pendencias.set(sobre, { ...ultima, desde: d.agora(), trabalhou: true, paradoDesde: 0, segundoPlanoDesde: 0 })
+        }
+      }
+    }
+  }
+
+  /** O próximo da fila: a retomada em curso primeiro; depois entregas e pedidos passam na frente de avisos. */
+  const proximoDaFila = (id: string): NaFila | undefined => {
+    const fila = filas.get(id) ?? []
+    const ret = retomadas.get(id)
+    if (ret && fila.includes(ret.item)) return ret.item
+    return fila.find((x) => x.recado.tipo !== 'aviso') ?? fila[0]
+  }
+
   const tentarEntregar = async (id: string): Promise<void> => {
-    const primeiro = filas.get(id)?.[0]
-    if (!primeiro || entregando.has(id)) return
+    if (entregando.has(id)) return
+    await cancelarAvisosVelhos(id)
+    const primeiro = proximoDaFila(id)
+    if (!primeiro) return
     const desistido = desistidos.get(id)
     if (desistido !== undefined) {
       if (await d.marcaNoCampo(id, desistido)) {
@@ -499,7 +576,8 @@ export function criarCaixa(d: DependenciasDaCaixa): Caixa {
         continue
       }
       const situacao = (await d.situacao(p.para)) ?? 'encerrado'
-      const { pendencia, avisar } = decidirPendencia(p, situacao, d.agora())
+      const segundoPlano = situacao === 'livre' && d.segundoPlano ? await d.segundoPlano(p.para) : false
+      const { pendencia, avisar } = decidirPendencia(p, situacao, d.agora(), segundoPlano)
       if (!avisar) {
         if (pendencias.get(p.para) === p) pendencias.set(p.para, pendencia)
         continue
@@ -510,7 +588,8 @@ export function criarCaixa(d: DependenciasDaCaixa): Caixa {
       else ultimaPendencia.set(p.para, p)
       const nome = d.nome(p.para) ?? 'o agente'
       const tela = avisar === 'encerrou' ? '' : await d.tela(p.para, 15)
-      enfileirar({ tipo: 'aviso', de: null, deNome: 'Orkester', para: p.de, texto: textoDoAviso(nome, avisar, tela) })
+      // `encerrou` não envelhece: é o fato de o agente ter saído, e quem pediu precisa saber mesmo com o cartão já fechado
+      enfileirar({ tipo: 'aviso', de: null, deNome: 'Orkester', para: p.de, texto: textoDoAviso(nome, avisar, tela), sobre: avisar === 'encerrou' ? undefined : p.para })
     }
   }
 
@@ -564,6 +643,12 @@ export function criarCaixa(d: DependenciasDaCaixa): Caixa {
     },
     esquecer(id) {
       for (const item of [...(filas.get(id) ?? [])]) terminar(id, item, 'sem-destino')
+      // os avisos que FALAM deste agente moram na fila de outros cartões (de quem pediu): o agente sumiu, eles são velhos
+      for (const [outro, fila] of [...filas.entries()]) {
+        for (const item of [...fila]) {
+          if (item.recado.sobre === id && retomadas.get(outro)?.item !== item) terminar(outro, item, 'cancelado')
+        }
+      }
       retomadas.delete(id)
       desistidos.delete(id)
       pendencias.delete(id)
