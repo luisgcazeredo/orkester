@@ -35,16 +35,16 @@ export const MAX_TEXTO_DA_PECA = 4000
 /** Folga ao procurar um canto livre para o arranjo. */
 export const FOLGA = 60
 
-export type NoSalvavel = NoTerminal | NoTexto | NoPostIt | NoBanda
+type NoSalvavel = NoTerminal | NoTexto | NoPostIt | NoBanda
 
 /**
  * O que entra numa partitura: agentes, recados e as bandas (grupos de agentes) que os juntam. O resto do
  * quadro — código, pasta, portal, imagem — fica de fora: aquilo é do projeto, não do time.
  */
-export const salvavel = (no: No): no is NoSalvavel =>
+const salvavel = (no: No): no is NoSalvavel =>
   no.tipo === 'terminal' || no.tipo === 'texto' || no.tipo === 'postit' || no.tipo === 'banda'
 
-export interface AmbienteDePartitura {
+interface AmbienteDePartitura {
   novoId: () => string
   agora: () => string
   /** As funções guardadas: é delas que sai o prompt de cada papel na hora de subir. */
@@ -66,7 +66,7 @@ export interface SubidaDePartitura {
   texto: string
 }
 
-export type ResultadoDePartitura = { erro: string } | SubidaDePartitura
+type ResultadoDePartitura = { erro: string } | SubidaDePartitura
 
 const ordem = (a: No, b: No): number => a.y - b.y || a.x - b.x || a.id.localeCompare(b.id)
 

@@ -3,9 +3,9 @@
  * não conhece Electron, processos nem sessões: serve tanto ao main quanto às
  * provas por exemplos copiados das telas.
  */
-export type OrigemDoContexto = 'rodape' | 'comando-claude'
+type OrigemDoContexto = 'rodape' | 'comando-claude'
 
-export interface ContextoExtraido {
+interface ContextoExtraido {
   percentual: number
   origem: OrigemDoContexto
 }

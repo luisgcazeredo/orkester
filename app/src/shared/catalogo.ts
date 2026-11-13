@@ -21,7 +21,7 @@ export interface FichaDeCatalogo {
   prompt: string
 }
 
-export type LeituraDeFicha = { ficha: FichaDeCatalogo } | { erro: string }
+type LeituraDeFicha = { ficha: FichaDeCatalogo } | { erro: string }
 
 /** Tetos do que entra pela importação: é por aqui que arquivo de fora vira estado do app. */
 export const MAX_FICHAS = 100
@@ -106,7 +106,7 @@ export function nivelDaFicha(nivel: string): string | undefined {
   return achado?.palavra
 }
 
-export interface EscolhaDePreset {
+interface EscolhaDePreset {
   preset?: PresetAgente
   /** Quando não deu para atender o pedido da ficha ao pé da letra. */
   aviso?: string
@@ -129,14 +129,14 @@ export function presetParaFicha(presets: readonly PresetAgente[], motor: 'claude
   return { preset: doMotor[0], aviso: `nenhum preset de ${motor} com o nível "${nivel}"; usei "${doMotor[0].nome}"` }
 }
 
-export interface LinhaDoRelatorio {
+interface LinhaDoRelatorio {
   nome: string
   acao: 'criada' | 'atualizada' | 'igual'
   preset?: string
   aviso?: string
 }
 
-export interface CatalogoJuntado {
+interface CatalogoJuntado {
   funcoes: Funcao[]
   relatorio: LinhaDoRelatorio[]
 }

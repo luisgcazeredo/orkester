@@ -26,7 +26,7 @@ const emAtendimento = new Set<string>()
 let atendente: Atendente | null = null
 
 /** Quem sabe responder um pedido. Vem de fora para o correio não conhecer os verbos nem fechar ciclo. */
-export type Atendente = (linha: string) => Promise<{ resposta: unknown; depois?: () => Promise<void> }>
+type Atendente = (linha: string) => Promise<{ resposta: unknown; depois?: () => Promise<void> }>
 
 /**
  * A pasta do correio deste app. O nome leva o pid: assim um app que abre consegue saber quais pastas são

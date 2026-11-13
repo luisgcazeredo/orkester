@@ -112,7 +112,7 @@ import { enquadrarTudo } from './Controles'
 import type { ItemMenu } from './MenuContexto'
 import { avisar, confirmar, perguntarTexto } from './Perguntas'
 
-export const CORES_CARTAO: Array<{ cor: string | null; nome: string }> = [
+const CORES_CARTAO: Array<{ cor: string | null; nome: string }> = [
   { cor: null, nome: 'Sem cor' },
   { cor: '#007AFF', nome: 'Azul' },
   { cor: '#AF52DE', nome: 'Roxo' },
@@ -138,7 +138,7 @@ const separador: ItemMenu = { separador: true }
  * Cartão de código do lado do terminal, já no último arquivo que mexeram na pasta dele. Sem nenhum arquivo
  * ainda, ele nasce vazio e pega o primeiro que o agente gravar.
  */
-export async function verCodigoDoTerminal(no: NoTerminal): Promise<void> {
+async function verCodigoDoTerminal(no: NoTerminal): Promise<void> {
   const espaco = lerEstado().espaco
   const pasta = no.pasta || (espaco ? pastaDoPlano(espaco) : '')
   const recentes = pasta ? await window.ork.codigo.recentes(pasta).catch(() => []) : []

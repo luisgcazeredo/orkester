@@ -225,7 +225,7 @@ export function criarEspacoDoAgente(nome: string, pasta: string): ResumoEspaco {
 
 const ESTADO_PADRAO: EstadoJanela = { versao: 1, espacoAtivo: null, lateralAberta: true, explorador: { aberto: false, raizes: [] } }
 
-export function lerEstadoDaJanela(): EstadoJanela {
+function lerEstadoDaJanela(): EstadoJanela {
   const lido = lerJson<EstadoJanela>(join(RAIZ, 'estado.json'), ESTADO_PADRAO)
   return { ...ESTADO_PADRAO, ...lido, explorador: { ...ESTADO_PADRAO.explorador!, ...lido.explorador } }
 }

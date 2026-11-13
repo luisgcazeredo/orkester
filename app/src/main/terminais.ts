@@ -534,10 +534,6 @@ export function encerrarDoEspaco(espacoId: string): void {
   cordas.delete(espacoId)
 }
 
-export function quantosTerminais(): number {
-  return sessoes.size
-}
-
 export function encerrarTodos(): void {
   // os pids antes de encerrar: depois do `encerrar` a sessão já não tem processo para perguntar
   const pids = [...sessoes.values()].flatMap((s) => (s.processo?.pid ? [s.processo.pid] : []))

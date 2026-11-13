@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Check, ChevronRight, type LucideIcon } from 'lucide-react'
 
-export interface LinhaDeCores {
+interface LinhaDeCores {
   valores: Array<{ cor: string | null; nome: string; amostra?: string }>
   /** Cor marcada (null = "sem cor"); undefined quando a seleção tem cores diferentes. */
   atual?: string | null
@@ -32,7 +32,7 @@ export function abrirMenu(x: number, y: number, itens: ItemMenu[]): void {
   avisar()
 }
 
-export function fecharMenu(): void {
+function fecharMenu(): void {
   if (!aberto) return
   aberto = null
   avisar()

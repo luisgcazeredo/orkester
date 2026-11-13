@@ -3,7 +3,7 @@
  * (`app/build/icon.png`), simplificada para tamanho de interface — nestes 18 px o rabo fino das
  * faixas viraria sujeira, então aqui elas são arcos de espessura constante com ponta redonda.
  */
-export function Simbolo({ tamanho = 18 }: { tamanho?: number }) {
+function Simbolo({ tamanho = 18 }: { tamanho?: number }) {
   // peças a -90°, 30° e 150°, no raio 34 de uma caixa 100x100
   const pecas = [-90, 30, 150].map((grau) => {
     const r = (grau * Math.PI) / 180

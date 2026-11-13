@@ -35,9 +35,9 @@ export interface Tela {
 }
 
 /** Teto de janelas reabertas: acima disso é mais atrapalho que ajuda, e cada uma custa um processo. */
-export const MAX_JANELAS_REABERTAS = 6
-export const LARGURA_MINIMA = 640
-export const ALTURA_MINIMA = 420
+const MAX_JANELAS_REABERTAS = 6
+const LARGURA_MINIMA = 640
+const ALTURA_MINIMA = 420
 
 export const SESSAO_VAZIA: Sessao = { versao: 1, janelas: [] }
 

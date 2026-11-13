@@ -80,9 +80,6 @@ export function usuarioPorChave(segredo: unknown): ChaveGuardada | undefined {
   return chave
 }
 
-/** Há alguma chave viva? A tela usa para explicar o que o MCP é antes de a primeira existir. */
-export const temChave = (): boolean => ler().chaves.some((k) => !k.revogadaEm)
-
 export function registrarChaves(): void {
   ipcMain.handle(CANAIS_CHAVES.listar, () => listar())
   ipcMain.handle(CANAIS_CHAVES.criar, (_e, nome: string) => criar(nome))

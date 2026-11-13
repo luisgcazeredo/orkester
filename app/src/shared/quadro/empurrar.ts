@@ -9,7 +9,7 @@ export interface Caixa {
 const tocam = (a: Caixa, b: Caixa, folga: number): boolean =>
   a.x < b.x + b.largura + folga && b.x < a.x + a.largura + folga && a.y < b.y + b.altura + folga && b.y < a.y + a.altura + folga
 
-export interface Peca extends Caixa {
+interface Peca extends Caixa {
   id: string
 }
 

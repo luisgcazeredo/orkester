@@ -225,7 +225,6 @@ export interface EntradaPasta {
 }
 
 export type No = NoTerminal | NoPostIt | NoTexto | NoArquivo | NoPasta | NoPortal | NoImagem | NoCodigo | NoBanda
-export type TipoNo = No['tipo']
 
 /** Ligação entre dois terminais: é a permissão de um agente falar com o outro pelo `ork`. */
 export interface Corda {
@@ -235,7 +234,7 @@ export interface Corda {
   criadoEm: string
 }
 
-export type FerramentaDesenho = 'lapis' | 'retangulo' | 'seta'
+type FerramentaDesenho = 'lapis' | 'retangulo' | 'seta'
 /** O que a barra de desenho escolhe: uma forma ou a borracha (que apaga traços). */
 export type PincelDesenho = FerramentaDesenho | 'borracha'
 
@@ -334,7 +333,7 @@ export interface Espaco extends Plano {
   rotinas?: Rotina[]
 }
 
-export interface ResumoAndar {
+interface ResumoAndar {
   id: string
   nome: string
   ramo: string | null

@@ -19,7 +19,7 @@ const COLAGEM_RESUMIDA = /\[(pasted|colado|image)[^\]\n]*\]/i
 const limpar = (t: string): string => t.replace(/[│║┃╭╮╰╯─]/g, ' ').replace(/\s+/g, ' ').trim()
 
 /** Fim do pedido, em minúsculas e sem quebras: é o que mais provavelmente aparece inteiro numa linha. */
-export function marcaDoPedido(texto: string): string {
+function marcaDoPedido(texto: string): string {
   return limpar(texto).slice(-24).toLowerCase()
 }
 
@@ -27,7 +27,7 @@ export function marcaDoPedido(texto: string): string {
  * Distância, contada a partir do pé da tela (0 = última linha com texto), da última linha que mostra o
  * pedido (o fim dele, ou a marca de colagem resumida). -1 se não aparece.
  */
-export function distanciaDoPedido(tela: string, marca: string): number {
+function distanciaDoPedido(tela: string, marca: string): number {
   const linhas = tela.split('\n').map((l) => limpar(l).toLowerCase()).filter(Boolean).slice(-LINHAS_OLHADAS)
   for (let i = linhas.length - 1; i >= 0; i--) {
     const achou = (marca.length >= 4 && linhas[i].includes(marca)) || COLAGEM_RESUMIDA.test(linhas[i])
@@ -36,7 +36,7 @@ export function distanciaDoPedido(tela: string, marca: string): number {
   return -1
 }
 
-export type EvidenciaDeEnvio = 'saiu' | 'ficou' | 'indeterminado'
+type EvidenciaDeEnvio = 'saiu' | 'ficou' | 'indeterminado'
 
 /** O sinal com que o Claude Code (❯) e o Codex (›) abrem o campo de entrada — e cada mensagem no histórico. */
 const SINAL_DO_CAMPO = /^\s*[❯›]\s?/
@@ -117,7 +117,7 @@ export function evidenciaDeEnvio(p: {
 
 export type ResultadoDoEnvio = 'saiu' | 'ficou' | 'incerto'
 
-export type DependenciasDoEnvio = {
+type DependenciasDoEnvio = {
   texto: string
   shell: boolean
   /** escreve a colagem no processo; só é chamada DEPOIS de a tela de referência ter sido lida */

@@ -1,7 +1,7 @@
 // Regras puras sobre arquivos: o que vale acompanhar quando o agente escreve, o que tem cara de segredo e
 // como um anexo entra na linha do prompt. Puro de propósito: é o que as provas conseguem testar fora do app.
 
-export type AgenteAnexo = 'claude' | 'codex' | 'shell'
+type AgenteAnexo = 'claude' | 'codex' | 'shell'
 
 /** Pastas que não interessam: barulho de build, de dependência e de ferramenta. */
 export const PASTAS_IGNORADAS = [
@@ -141,7 +141,7 @@ export function pastaVigiavel(pasta: string, casa: string): boolean {
 }
 
 /** Uma janela pedindo aviso de uma pasta. O rótulo é o caminho como a janela escreveu. */
-export interface AssinaturaDeVigia {
+interface AssinaturaDeVigia {
   rotulo: string
   janela: number
 }

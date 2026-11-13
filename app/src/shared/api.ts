@@ -19,7 +19,7 @@ import type { PreferenciasParciais } from './preferencias'
 /** O que o processo principal precisa para manter o processo de um cartão de terminal. */
 
 /** Por que um agente recém-aberto não ficou pronto para receber o primeiro pedido. */
-export type MotivoNaoPronto = 'confirmar' | 'desconhecido' | 'tempo' | 'encerrado'
+type MotivoNaoPronto = 'confirmar' | 'desconhecido' | 'tempo' | 'encerrado'
 
 /**
  * O que aconteceu com o primeiro pedido de um cartão.
@@ -91,7 +91,7 @@ export interface ResumoDaCaixa {
   de: string[]
 }
 
-export interface ApiTerminal {
+interface ApiTerminal {
   /**
    * Diz ao processo principal quais terminais o espaço tem (todos os andares) e as cordas entre eles.
    * Cria os que faltam e encerra (depois de uma folga, para o Ctrl+Z) os que saíram do quadro.
@@ -200,7 +200,7 @@ export type PedidoDoAgente =
 
 export type RespostaAoAgente = { ok: true; id?: string; nome?: string; texto?: string } | { ok: false; erro: string }
 
-export interface ApiAgentes {
+interface ApiAgentes {
   /** A janela atende os pedidos dos agentes para o espaço que ela mostra. */
   aoPedir(atender: (pedido: PedidoDoAgente) => Promise<RespostaAoAgente> | RespostaAoAgente): void
 }

@@ -18,7 +18,7 @@
  * outros pedidos do `ork` (abrir, fechar, passar), que são estado operacional e ficam fora do histórico.
  */
 import type { Corda, Desenho, No, Plano } from '../modelo'
-export type AcaoNoQuadro = 'ler' | 'ler-cartao' | 'apagar' | 'mover' | 'arrumar' | 'nome' | 'ligar' | 'desligar' | 'anotar' | 'juntar'
+type AcaoNoQuadro = 'ler' | 'ler-cartao' | 'apagar' | 'mover' | 'arrumar' | 'nome' | 'ligar' | 'desligar' | 'anotar' | 'juntar'
 
 export interface PedidoNoQuadro {
   acao: AcaoNoQuadro
@@ -40,7 +40,7 @@ export interface PedidoNoQuadro {
   onde?: string
 }
 
-export interface AmbienteDoQuadroDoAgente {
+interface AmbienteDoQuadroDoAgente {
   novoId: () => string
   agora: () => string
   /** O cartão está ao alcance de quem pediu? Vem de fora (bandas.ts) para a regra da corda ter uma fonte só. */
@@ -54,22 +54,22 @@ export interface MudancaNoQuadro {
   terminais: string[]
 }
 
-export type ResultadoNoQuadro = { erro: string } | MudancaNoQuadro
+type ResultadoNoQuadro = { erro: string } | MudancaNoQuadro
 
 /** Teto de cartões no plano: o `anotar` para aqui em vez de encher o quadro num laço. */
 export const MAX_NOS = 400
-export const MAX_CORDAS = 200
+const MAX_CORDAS = 200
 export const MAX_TEXTO = 2000
 export const MAX_NOME = 80
 /** Vão entre cartões do `arrumar`, quando o agente não pede outro. */
-export const VAO = 40
+const VAO = 40
 
 const nomeDoArquivo = (caminho: string): string => caminho.split(/[/\\]/).filter(Boolean).pop() ?? caminho
 
 const umaLinha = (texto: string): string => texto.replace(/\s+/g, ' ').trim()
 
 /** Como o agente chama cada cartão. É o que ele lê e o que ele escreve de volta. */
-export function rotuloDoNo(no: No): string {
+function rotuloDoNo(no: No): string {
   switch (no.tipo) {
     case 'terminal':
       return no.nome
@@ -105,12 +105,12 @@ const COMO_CHAMAR: Record<No['tipo'], string> = {
 }
 
 /** A ordem em que a leitura numera os cartões: de cima para baixo, da esquerda para a direita. */
-export function ordenados(plano: Plano): No[] {
+function ordenados(plano: Plano): No[] {
   return [...plano.nos].sort((a, b) => a.y - b.y || a.x - b.x || a.id.localeCompare(b.id))
 }
 
 /** Por que este cartão não se mexe nem se renomeia por pedido de agente (null = pode). */
-export function motivoImovel(no: No): string | null {
+function motivoImovel(no: No): string | null {
   if (no.travado) return 'está travado'
   if (no.tipo === 'codigo') return 'é cartão de código (a árvore é do app, e o cartão solto é do usuário)'
   return null
@@ -202,7 +202,7 @@ function deslocar(plano: Plano, deltas: Map<string, { dx: number; dy: number }>)
 const emPonto = (no: No): string => `${Math.round(no.largura)}x${Math.round(no.altura)} em (${Math.round(no.x)}, ${Math.round(no.y)})`
 
 /** A leitura do quadro: é o único jeito de o agente saber o que existe e como chamar cada coisa. */
-export function lerQuadro(plano: Plano, pedido: PedidoNoQuadro): string {
+function lerQuadro(plano: Plano, pedido: PedidoNoQuadro): string {
   const lista = ordenados(plano)
   const nomeDoId = new Map(plano.nos.map((n) => [n.id, rotuloDoNo(n)]))
   const linhas = lista.map((no, i) => {

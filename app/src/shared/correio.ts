@@ -47,7 +47,7 @@ export function ehRecado(nome: string, tipo?: TipoDeRecado): boolean {
 }
 
 /** O começo do nome da pasta de correio de um app; o resto é o pid de quem a criou. */
-export const PREFIXO_PASTA = 'orkester-correio-'
+const PREFIXO_PASTA = 'orkester-correio-'
 
 export function nomeDaPasta(pid: number): string {
   return `${PREFIXO_PASTA}${pid}`

@@ -33,11 +33,11 @@ export interface CofreDeChaves {
 }
 
 export const MAX_CHAVES = 20
-export const MAX_NOME_DA_CHAVE = 60
+const MAX_NOME_DA_CHAVE = 60
 /** O prefixo diz de onde a chave veio quando ela aparece num log ou numa configuração colada. */
-export const PREFIXO = 'ork_'
+const PREFIXO = 'ork_'
 /** Em hex: 32 bytes de sorteio. */
-export const TAMANHO_DO_SEGREDO = 64
+const TAMANHO_DO_SEGREDO = 64
 
 export const COFRE_VAZIO: CofreDeChaves = { versao: 1, chaves: [] }
 
@@ -70,7 +70,7 @@ export function cofreValido(cofre: unknown): cofre is CofreDeChaves {
   )
 }
 
-export interface AmbienteDasChaves {
+interface AmbienteDasChaves {
   /** 32 bytes sorteados, em hex. */
   sortear: () => string
   /** Impressão digital do segredo (sha-256 em hex, no principal). */
@@ -79,7 +79,7 @@ export interface AmbienteDasChaves {
   agora: () => string
 }
 
-export type CriacaoDeChave = { cofre: CofreDeChaves; chave: ChaveGuardada; segredo: string } | { erro: string }
+type CriacaoDeChave = { cofre: CofreDeChaves; chave: ChaveGuardada; segredo: string } | { erro: string }
 
 /**
  * Cria uma chave. O segredo volta **uma vez**: o cofre guarda só a impressão digital, então ninguém — nem o

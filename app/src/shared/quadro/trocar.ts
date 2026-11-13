@@ -8,7 +8,7 @@
  */
 import type { Funcao, Plano, PresetAgente } from '../modelo'
 
-export interface PedidoDeTroca {
+interface PedidoDeTroca {
   id: string
   /** O preset escolhido: é dele que vêm o agente e a linha de comando. */
   preset: PresetAgente
@@ -25,7 +25,7 @@ export interface TrocaFeita {
   texto: string
 }
 
-export type ResultadoDaTroca = { erro: string } | TrocaFeita
+type ResultadoDaTroca = { erro: string } | TrocaFeita
 
 export function trocarAgente(
   plano: Plano,

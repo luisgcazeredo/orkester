@@ -19,7 +19,7 @@ export interface AmbienteTransformacoesDoQuadro {
   centro?: { x: number; y: number }
 }
 
-export interface ResultadoTransformacaoDoQuadro {
+interface ResultadoTransformacaoDoQuadro {
   espaco: Espaco
   resposta: RespostaAoAgente
 }

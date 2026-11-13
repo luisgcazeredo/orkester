@@ -16,14 +16,14 @@ import type { Corda, No, NoBanda, NoTerminal, Plano } from '../modelo'
 /** Folga entre a borda da moldura e os cartões de dentro quando a banda nasce em volta deles. */
 export const FOLGA = 40
 /** Barra de cima, onde fica o nome da banda. */
-export const TITULO = 46
-export const MIN_LARGURA = 320
-export const MIN_ALTURA = 220
+const TITULO = 46
+const MIN_LARGURA = 320
+const MIN_ALTURA = 220
 export const MAX_NOME = 60
 /** Teto de agentes que uma banda liga entre si (acima disso, a conta de pares não vale a pena). */
-export const MAX_MEMBROS = 24
+const MAX_MEMBROS = 24
 /** Teto de pares de permissão que as bandas podem gerar, somadas. */
-export const MAX_PARES = 600
+const MAX_PARES = 600
 
 const centroDe = (no: No): { x: number; y: number } => ({ x: no.x + no.largura / 2, y: no.y + no.altura / 2 })
 
@@ -57,7 +57,7 @@ export function bandasDoPlano(plano: Plano): NoBanda[] {
 }
 
 /** A moldura que cabe em volta destas caixas, com folga e com espaço para o nome em cima. */
-export function caixaDaBandaPara(caixas: Caixa[]): Caixa {
+function caixaDaBandaPara(caixas: Caixa[]): Caixa {
   if (!caixas.length) return { x: 0, y: 0, largura: MIN_LARGURA, altura: MIN_ALTURA }
   const x = Math.min(...caixas.map((c) => c.x)) - FOLGA
   const y = Math.min(...caixas.map((c) => c.y)) - FOLGA - TITULO
@@ -107,12 +107,12 @@ export function cordasEfetivas(plano: Plano): Array<[string, string]> {
   return pares
 }
 
-export interface AmbienteDeBanda {
+interface AmbienteDeBanda {
   novoId: () => string
   agora: () => string
 }
 
-export type ResultadoDeBanda = { erro: string } | { plano: Plano; banda: NoBanda; texto: string }
+type ResultadoDeBanda = { erro: string } | { plano: Plano; banda: NoBanda; texto: string }
 
 /**
  * Cria a banda em volta dos cartões escolhidos (ou solta, do tamanho mínimo, em (x, y) — é a moldura vazia

@@ -1,13 +1,13 @@
 /** Registro puro do protocolo do ork: pode ser usado pelo main, pelo CLI e pelas provas sem Electron. */
-export type TipoDeOpcao = 'texto' | 'numero' | 'bandeira'
+type TipoDeOpcao = 'texto' | 'numero' | 'bandeira'
 
-export interface ArgumentoDoVerbo {
+interface ArgumentoDoVerbo {
   nome: string
   obrigatorio?: boolean
   resto?: boolean
 }
 
-export interface OpcaoDoVerbo {
+interface OpcaoDoVerbo {
   nome: string
   tipo: TipoDeOpcao
   minimo?: number
@@ -146,7 +146,7 @@ export function opcaoExigeValor(comando: string, opcao: string): boolean {
   return verbo?.opcoes.find((x) => x.nome === opcao)?.tipo !== 'bandeira'
 }
 
-export interface ChamadaValidada {
+interface ChamadaValidada {
   verbo: Verbo
   posicionais: string[]
   opcoes: Record<string, string | number | true>

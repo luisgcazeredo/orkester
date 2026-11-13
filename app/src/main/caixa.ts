@@ -160,7 +160,7 @@ const SEM_VER_TRABALHAR = 60_000
  * fechada por `ork entregar`, por quem pediu ter esperado o fim (`ork pedir` sem `--sem-esperar`, `ork esperar`)
  * ou pelo aviso automático. Uma por destino: o pedido mais novo manda.
  */
-export interface Pendencia {
+interface Pendencia {
   de: string
   para: string
   desde: number
@@ -180,7 +180,7 @@ export function decidirPendencia(p: Pendencia, situacao: Situacao, agora: number
   return { pendencia: { ...p, trabalhou, paradoDesde }, avisar: null }
 }
 
-export function textoDoAviso(nome: string, motivo: 'parou' | 'pergunta' | 'encerrou', tela: string): string {
+function textoDoAviso(nome: string, motivo: 'parou' | 'pergunta' | 'encerrou', tela: string): string {
   const cabeca = {
     parou: `"${nome}" terminou o que você pediu e parou sem mandar a entrega pelo \`ork entregar\`.`,
     pergunta: `"${nome}" parou numa pergunta e espera resposta (responda com \`ork teclas\` se for seguro, ou pergunte ao usuário).`,
@@ -197,7 +197,7 @@ export const ESPERA_ENTRE_RECADOS = 4000
 
 export type { ResumoDaCaixa }
 
-export interface DependenciasDaCaixa {
+interface DependenciasDaCaixa {
   agora(): number
   novoId(): string
   /** null = a sessão não existe mais */

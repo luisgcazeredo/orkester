@@ -1264,7 +1264,7 @@ async function executar(eu: Sessao, pedido: Pedido, cancelado: () => boolean): P
  * que responder. **Os dois canais passam por aqui** — se cada um tivesse o seu caminho, um dia iam divergir
  * e o correio (que só o Codex usa) seria o que ninguém notaria apodrecendo.
  */
-export async function responderAoPedido(
+async function responderAoPedido(
   linha: string,
   fechado: () => boolean
 ): Promise<{ resposta: { ok: boolean; saida?: string; erro?: string }; sair?: Sessao[] }> {
