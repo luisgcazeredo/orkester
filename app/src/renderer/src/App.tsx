@@ -22,6 +22,7 @@ import {
 import { Casca, Dialogos } from './casca/Casca'
 import { irParaPagina, paginaAtiva, registrarPagina } from './casca/paginas'
 import { cancelarGestos, emGesto } from './quadro/arrasto'
+import { criarAtalhos } from './quadro/atalhos'
 import { colar, copiarSelecao } from './ui/area'
 import { abrirAtalhos } from './ui/Atalhos'
 import { BarraExplorador } from './ui/BarraExplorador'
@@ -39,60 +40,45 @@ function terminalComOTeclado(): HTMLElement | null {
   return document.querySelector('.no-terminal.selecionado.sozinho .xterm-helper-textarea')
 }
 
-function atalhos(e: KeyboardEvent): void {
-  // escrevendo num post-it, texto ou campo, com um menu ou uma janela de confirmação aberta: o teclado é deles
-  if (digitando() || menuAberto() || document.querySelector('.dialogo-fundo')) return
-  // rede de segurança: se o foco escapou do terminal ativo, devolve e deixa a tecla para ele, em vez de
-  // virar atalho do quadro — `d` trocava de ferramenta e Delete apagava o cartão em que ele ia escrever
-  const terminal = terminalComOTeclado()
-  if (terminal) {
-    terminal.focus()
-    return
+const atalhosDoQuadro = criarAtalhos(
+  () => ({
+    pagina: paginaAtiva(),
+    digitando: digitando(),
+    menuAberto: menuAberto(),
+    dialogoAberto: !!document.querySelector('.dialogo-fundo'),
+    terminalComTeclado: terminalComOTeclado() !== null,
+    emGesto: emGesto()
+  }),
+  {
+    devolverFoco: () => terminalComOTeclado()?.focus(),
+    cancelarGesto: cancelarGestos,
+    zoom: zoomPeloCentro,
+    enquadrarTudo,
+    desfazer,
+    refazer,
+    duplicar: duplicarSelecao,
+    selecionarTudo,
+    agrupar,
+    desagrupar,
+    copiar: (recortar) => void (recortar ? copiarSelecao(true) : copiarSelecao()),
+    colar: () => void colar(),
+    paleta: abrirPaleta,
+    novaJanela: abrirNovaJanela,
+    alternarExplorador,
+    empurrar: empurrarSelecao,
+    mostrarAtalhos: abrirAtalhos,
+    apagar: apagarSelecao,
+    escape: () => {
+      cancelarGestos()
+      selecionar(null)
+      editar(null)
+      loja.abrirVistaAndares(false)
+      escolherFerramenta('selecionar')
+    },
+    borracha: () => definirEstiloDesenho({ ferramenta: 'borracha' }),
+    ferramenta: escolherFerramenta
   }
-  // no meio de um arrasto ou desenho, atalho nenhum mexe no quadro (desfazer no meio quebraria o histórico);
-  // Esc cancela o gesto
-  if (emGesto()) {
-    if (e.key === 'Escape') cancelarGestos()
-    return
-  }
-  const ctrl = e.ctrlKey || e.metaKey
-  const tecla = e.key.toLowerCase()
-  if (ctrl && (e.key === '=' || e.key === '+')) return (e.preventDefault(), zoomPeloCentro(1.2))
-  if (ctrl && e.key === '-') return (e.preventDefault(), zoomPeloCentro(1 / 1.2))
-  if (ctrl && e.key === '0') return (e.preventDefault(), zoomPeloCentro('inicial'))
-  if (ctrl && e.key === '1') return (e.preventDefault(), enquadrarTudo())
-  if (ctrl && tecla === 'z') return (e.preventDefault(), e.shiftKey ? refazer() : desfazer())
-  if (ctrl && tecla === 'y') return (e.preventDefault(), refazer())
-  if (ctrl && tecla === 'd') return (e.preventDefault(), duplicarSelecao())
-  if (ctrl && tecla === 'a') return (e.preventDefault(), selecionarTudo())
-  if (ctrl && tecla === 'g') return (e.preventDefault(), e.shiftKey ? desagrupar() : agrupar())
-  if (ctrl && tecla === 'c') return (e.preventDefault(), void copiarSelecao())
-  if (ctrl && tecla === 'x') return (e.preventDefault(), void copiarSelecao(true))
-  if (ctrl && tecla === 'v') return (e.preventDefault(), void colar())
-  if (ctrl && tecla === 'k') return (e.preventDefault(), abrirPaleta())
-  if (ctrl && e.shiftKey && tecla === 'n') return (e.preventDefault(), abrirNovaJanela())
-  if (ctrl && e.shiftKey && tecla === 'e') return (e.preventDefault(), alternarExplorador())
-  if (ctrl || e.altKey) return
-  const seta: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
-  if (seta[e.key]) {
-    e.preventDefault()
-    const passo = e.shiftKey ? 10 : 1
-    return empurrarSelecao(seta[e.key][0] * passo, seta[e.key][1] * passo)
-  }
-  if (e.key === '?') return abrirAtalhos()
-  if (e.key === 'Delete' || e.key === 'Backspace') return apagarSelecao()
-  if (e.key === 'Escape') {
-    cancelarGestos()
-    selecionar(null)
-    editar(null)
-    loja.abrirVistaAndares(false)
-    return escolherFerramenta('selecionar')
-  }
-  if (tecla === 'e') return definirEstiloDesenho({ ferramenta: 'borracha' })
-  const porTecla: Record<string, loja.Ferramenta> = { v: 'selecionar', n: 'postit', t: 'texto', d: 'desenho' }
-  const ferramenta = porTecla[tecla]
-  if (ferramenta) escolherFerramenta(ferramenta)
-}
+)
 
 export function App() {
   const temEspaco = usarLoja((e) => e.espaco !== null)
@@ -111,10 +97,10 @@ export function App() {
 
   useEffect(() => {
     void iniciar()
-    window.addEventListener('keydown', atalhos)
+    window.addEventListener('keydown', atalhosDoQuadro)
     window.ork.aoPedirFechar(salvarParaFechar)
     if (window.ork.autoteste) window.__teste = { loja, casca: { registrarPagina, irParaPagina, paginaAtiva } }
-    return () => window.removeEventListener('keydown', atalhos)
+    return () => window.removeEventListener('keydown', atalhosDoQuadro)
   }, [])
 
   return (
