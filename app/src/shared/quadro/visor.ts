@@ -184,3 +184,43 @@ export function escolherNoVisor(no: NoCodigo, caminho: string): NoCodigo {
   if (no.arquivos?.[0]?.caminho === caminho) return seguirDeNovo(no)
   return { ...no, caminho, seguindo: false }
 }
+
+/**
+ * Tira da lista os arquivos pedidos (o agente os entregou a outro). Se um deles era o que estava à mostra, passa a
+ * mostrar o mais novo que sobrou — ou nada, se a lista esvaziou.
+ */
+export function tirarDoVisor(no: NoCodigo, caminhos: string[]): NoCodigo {
+  const saem = new Set(caminhos)
+  const arquivos = (no.arquivos ?? []).filter((a) => !saem.has(a.caminho))
+  if (arquivos.length === (no.arquivos ?? []).length) return no
+  if (no.caminho === undefined || !saem.has(no.caminho)) return { ...no, arquivos }
+  const { caminho: _caminho, ...resto } = no
+  return arquivos[0] ? { ...resto, arquivos, caminho: arquivos[0].caminho } : { ...resto, arquivos }
+}
+
+/**
+ * Junta entradas (de outro visor) na lista de `destino`, sem repetir caminho: vale a entrada de maior `em`. A lista
+ * volta ao mais novo primeiro, corta em `MAX_NA_LISTA` sem tirar o que está à mostra, e um visor sem nada à mostra
+ * passa a mostrar o primeiro.
+ */
+export function juntarNoVisor(destino: NoCodigo, entradas: ArquivoDoVisor[]): NoCodigo {
+  const por = new Map((destino.arquivos ?? []).map((a) => [a.caminho, { ...a }]))
+  for (const e of entradas) {
+    const ex = por.get(e.caminho)
+    if (!ex || e.em > ex.em) por.set(e.caminho, { ...e })
+  }
+  const lista = [...por.values()].sort((a, b) => b.em - a.em)
+  const arquivos = cortar(lista, MAX_NA_LISTA, destino.caminho)
+  return destino.caminho === undefined && arquivos[0] ? { ...destino, arquivos, caminho: arquivos[0].caminho } : { ...destino, arquivos }
+}
+
+/** `migrarCodigos` no térreo e em cada andar do espaço. Nada a migrar → o próprio espaço (mesma referência). */
+export function migrarEspaco<E extends Plano & { andares: Plano[] }>(espaco: E): E {
+  const terreo = migrarCodigos(espaco)
+  const andares = espaco.andares.map((a) => {
+    const m = migrarCodigos(a)
+    return m === a ? a : { ...a, nos: m.nos }
+  })
+  if (terreo === espaco && andares.every((a, i) => a === espaco.andares[i])) return espaco
+  return { ...espaco, nos: terreo.nos, andares }
+}

@@ -17,7 +17,7 @@
  * A janela registra isso no desfazer: uma bagunça de agente volta inteira com um Ctrl+Z, ao contrário dos
  * outros pedidos do `ork` (abrir, fechar, passar), que são estado operacional e ficam fora do histórico.
  */
-import type { Corda, Desenho, No, Plano } from '../modelo'
+import type { ArquivoDoVisor, Corda, Desenho, No, Plano } from '../modelo'
 type AcaoNoQuadro = 'ler' | 'ler-cartao' | 'apagar' | 'mover' | 'arrumar' | 'nome' | 'ligar' | 'desligar' | 'anotar' | 'juntar'
 
 export interface PedidoNoQuadro {
@@ -211,6 +211,7 @@ function lerQuadro(plano: Plano, pedido: PedidoNoQuadro): string {
       if (no.funcao) partes.push(`· função "${no.funcao}"`)
       if (no.pasta) partes.push(`· pasta ${no.pasta}`)
     }
+    if (no.tipo === 'codigo' && no.arquivos) partes.push(`· visor · ${no.arquivos.length} ${no.arquivos.length === 1 ? 'arquivo' : 'arquivos'}`)
     if (no.tipo === 'codigo' && no.terminal) partes.push(`· na árvore de "${nomeDoId.get(no.terminal) ?? 'alguém'}"`)
     if (no.grupo) partes.push(`· grupo ${no.grupo.slice(0, 4)}`)
     if (no.travado) partes.push('· travado')
@@ -226,6 +227,10 @@ function lerQuadro(plano: Plano, pedido: PedidoNoQuadro): string {
     'Mexa com: ork mover, arrumar, nome, ligar, desligar, anotar, juntar, ler, apagar (sempre pelo nome ou pelo #número).'
   ].join('\n')
 }
+
+/** O que o agente lê de um visor: os arquivos, do mais novo ao mais velho, com o apagado marcado. */
+const listaDoVisor = (arquivos: ArquivoDoVisor[]): string =>
+  arquivos.length ? arquivos.map((a) => (a.sumiu ? `${a.caminho} (apagado)` : a.caminho)).join('\n') : '(visor vazio)'
 
 const listar = (nos: No[]): string => nos.map((n) => `"${rotuloDoNo(n)}"`).join(', ')
 
@@ -250,7 +255,9 @@ export function mexerNoQuadro(plano: Plano, pedido: PedidoNoQuadro, amb: Ambient
           ? `post-it: o texto está no arquivo "${no.arquivo}", na pasta de notas deste espaço`
           : no.tipo === 'portal'
             ? no.url
-            : no.tipo === 'codigo' || no.tipo === 'arquivo' || no.tipo === 'pasta'
+            : no.tipo === 'codigo' && no.arquivos
+              ? listaDoVisor(no.arquivos)
+              : no.tipo === 'codigo' || no.tipo === 'arquivo' || no.tipo === 'pasta'
               ? no.caminho
               : no.tipo === 'terminal'
                 ? `é um agente; a tela dele se lê com \`ork ver "${no.nome}"\``

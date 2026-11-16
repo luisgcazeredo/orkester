@@ -1,8 +1,20 @@
 import { type ArvoreDeCodigo, type No, type NoCodigo, type Plano } from '../../../shared/modelo'
 import { empurrarParaBaixo } from '../../../shared/quadro/empurrar'
 import { manterBandas } from '../../../shared/quadro/bandas'
+import { VISOR_ABERTO, ehVisor, juntarNoVisor, tirarDoVisor } from '../../../shared/quadro/visor'
 import { caixaDoNo } from '../quadro/geometria'
-import { ABERTO, ARVORE_PRINCIPAL, arvoreDoCodigo, arvoresDoTerminal, BLOQUINHO, criarCodigoDoArquivo, ENTRE_ARVORES, inicioDaColuna, MAX_NA_COLUNA } from './codigo'
+import {
+  ABERTO,
+  ARVORE_PRINCIPAL,
+  anotarNoVisorDoAgente,
+  arvoreDoCodigo,
+  arvoresDoTerminal,
+  BLOQUINHO,
+  ENTRE_ARVORES,
+  garantirVisor,
+  inicioDaColuna,
+  visorDaArvore
+} from './codigo'
 import { acharNo, atualizarNo, novoId } from './nos'
 import { estado, mudarPlano, pastaDoPlano, planoAtual, registrarHistorico } from './nucleo'
 import { mudarTerminal } from './terminais'
@@ -33,12 +45,14 @@ export function criarArvore(terminalId: string, nome: string): ArvoreDeCodigo | 
   )
   const nova: ArvoreDeCodigo = { id: novoId(), nome: limpo, desloc: { x: 0, y: fundo + ENTRE_ARVORES - terminal.y } }
   mudarTerminal(terminalId, (n) => ({ ...n, arvores: [...(n.arvores ?? []), nova], arvoreAtiva: nova.id }))
+  garantirVisor(terminalId, nova.id)
   return nova
 }
 
-/** Em qual árvore nascem os próximos arquivos deste agente. */
+/** Em qual árvore nascem os próximos arquivos deste agente. A árvore ganha o visor (vazio) se ainda não tinha. */
 export function usarArvore(terminalId: string, arvoreId: string): void {
   mudarTerminal(terminalId, (n) => ({ ...n, arvoreAtiva: arvoreId === ARVORE_PRINCIPAL ? undefined : arvoreId }))
+  garantirVisor(terminalId, arvoreId)
 }
 
 export function renomearArvore(terminalId: string, arvoreId: string, nome: string): void {
@@ -54,35 +68,41 @@ export function renomearArvore(terminalId: string, arvoreId: string, nome: strin
   })
 }
 
-/** Tira a árvore do agente; os cartões dela voltam para a principal, para nada sumir sem você mandar. */
+/**
+ * Tira a árvore do agente; a lista do visor dela se junta à da principal (sem repetir), para nada sumir sem você
+ * mandar. A principal sem visor herda o da árvore desfeita.
+ */
 export function desfazerArvore(terminalId: string, arvoreId: string): void {
   if (arvoreId === ARVORE_PRINCIPAL) return
   const terminal = acharNo(terminalId)
   if (terminal?.tipo !== 'terminal') return
   registrarHistorico()
   mudarPlano((p) => {
-    const com = {
-      ...p,
-      nos: p.nos.map((n) => {
-        if (n.id === terminalId && n.tipo === 'terminal') {
-          return {
-            ...n,
-            arvores: (n.arvores ?? []).filter((a) => a.id !== arvoreId),
-            arvoreAtiva: n.arvoreAtiva === arvoreId ? undefined : n.arvoreAtiva
-          } as No
-        }
-        return n.tipo === 'codigo' && n.terminal === terminalId && n.arvore === arvoreId
-          ? ({ ...n, arvore: undefined, ordem: undefined } as No)
-          : n
-      })
+    const visor = visorDaArvore(p, terminalId, arvoreId)
+    const principal = visorDaArvore(p, terminalId, ARVORE_PRINCIPAL)
+    let nos = p.nos.map((n) => {
+      if (n.id === terminalId && n.tipo === 'terminal') {
+        return {
+          ...n,
+          arvores: (n.arvores ?? []).filter((a) => a.id !== arvoreId),
+          arvoreAtiva: n.arvoreAtiva === arvoreId ? undefined : n.arvoreAtiva
+        } as No
+      }
+      return n.tipo === 'codigo' && n.terminal === terminalId && n.arvore === arvoreId ? ({ ...n, arvore: undefined } as No) : n
+    })
+    if (visor && principal) {
+      nos = nos
+        .filter((n) => n.id !== visor.id)
+        .map((n) => (n.id === principal.id ? (juntarNoVisor(principal, visor.arquivos) as No) : n))
     }
-    return arrumarArvores(com, terminalId)
+    return arrumarArvores({ ...p, nos }, terminalId)
   }, false)
 }
 
 /**
- * Abre (ou traz para a árvore pedida) o cartão de um arquivo. É o que o agente usa para montar a árvore que
- * outro agente vai ler.
+ * Mostra arquivos no visor da árvore pedida (a em uso, se não disser). É o que o agente usa para montar a árvore
+ * que outro agente vai ler. O arquivo que já estava no visor de outra árvore do mesmo agente muda de árvore em
+ * vez de aparecer repetido.
  */
 export function mostrarArquivoNaArvore(terminalId: string, caminho: string, arvoreId?: string): boolean {
   const terminal = acharNo(terminalId)
@@ -90,32 +110,53 @@ export function mostrarArquivoNaArvore(terminalId: string, caminho: string, arvo
   if (!plano || terminal?.tipo !== 'terminal') return false
   const arvores = arvoresDoTerminal(terminal)
   const alvo = arvores.some((a) => a.id === arvoreId) ? arvoreId! : terminal.arvoreAtiva ?? ARVORE_PRINCIPAL
-  const jaTem = plano.nos.find(
-    (n): n is NoCodigo => n.tipo === 'codigo' && n.terminal === terminalId && n.caminho === caminho
+  const emOutra = plano.nos.some(
+    (n) => ehVisor(n) && n.terminal === terminalId && arvoreDoCodigo(n) !== alvo && n.arquivos.some((a) => a.caminho === caminho)
   )
-  if (jaTem) {
-    // o cartão já existe: ele muda de árvore em vez de nascer repetido
-    mudarPlano((pl) => {
-      const com = {
-        ...pl,
-        nos: pl.nos.map((n) =>
-          n.id === jaTem.id
-            ? ({ ...n, arvore: alvo === ARVORE_PRINCIPAL ? undefined : alvo, automatico: true, ordem: undefined } as No)
-            : n
+  if (emOutra) {
+    mudarPlano(
+      (p) => ({
+        ...p,
+        nos: p.nos.map((n) =>
+          n.tipo === 'codigo' && ehVisor(n) && n.terminal === terminalId && arvoreDoCodigo(n) !== alvo ? (tirarDoVisor(n, [caminho]) as No) : n
         )
-      }
-      return arrumarArvores(com, terminalId)
-    }, false)
-    return true
+      }),
+      false
+    )
   }
-  return !!criarCodigoDoArquivo(terminal, caminho, alvo)
+  return anotarNoVisorDoAgente(terminalId, alvo, [caminho])
 }
 
-/** Fecha os cartões de código que saíram da coluna deste agente. Os da coluna ficam. */
+/**
+ * Entrega arquivos a outro agente: eles saem da lista de quem deu (de qualquer árvore) e entram no topo do visor
+ * **principal** de quem recebe, que nasce se faltar. Devolve quantos arquivos passaram.
+ */
+export function entregarArquivos(origemId: string, destinoId: string, caminhos: string[]): number {
+  const plano = planoAtual()
+  if (!plano) return 0
+  const meus = plano.nos.filter((n) => ehVisor(n) && n.terminal === origemId)
+  const entregues = caminhos.filter((c) => meus.some((v) => ehVisor(v) && v.arquivos.some((a) => a.caminho === c)))
+  if (!entregues.length) return 0
+  registrarHistorico()
+  mudarPlano(
+    (p) => ({
+      ...p,
+      nos: p.nos.map((n) => (n.tipo === 'codigo' && ehVisor(n) && n.terminal === origemId ? (tirarDoVisor(n, entregues) as No) : n))
+    }),
+    false
+  )
+  anotarNoVisorDoAgente(destinoId, ARVORE_PRINCIPAL, entregues)
+  return entregues.length
+}
+
+/**
+ * Fecha só os cartões soltos que **não** são visor (um arquivo aberto à mão). Visor nunca se fecha por aqui: ele é a
+ * lista do agente. O item de menu que chama isto some na B2c.
+ */
 export function fecharCodigosSoltos(terminalId: string): void {
   const plano = planoAtual()
   if (!plano) return
-  const soltos = plano.nos.filter((n) => n.tipo === 'codigo' && n.terminal === terminalId && !n.automatico)
+  const soltos = plano.nos.filter((n) => n.tipo === 'codigo' && n.terminal === terminalId && !n.automatico && !ehVisor(n))
   if (!soltos.length) return
   const ids = new Set(soltos.map((n) => n.id))
   registrarHistorico()
@@ -127,10 +168,7 @@ export function soltarCodigoDaColuna(id: string): void {
   const no = acharNo(id)
   if (no?.tipo !== 'codigo' || !no.automatico) return
   registrarHistorico()
-  mudarPlano(
-    (p) => ({ ...p, nos: p.nos.map((n) => (n.id === id ? ({ ...n, automatico: false, ordem: undefined } as No) : n)) }),
-    false
-  )
+  mudarPlano((p) => ({ ...p, nos: p.nos.map((n) => (n.id === id ? ({ ...n, automatico: false } as No) : n)) }), false)
 }
 
 /** Quantos cartões de código de um agente estão fora da coluna (para o menu oferecer trazer de volta). */
@@ -139,70 +177,42 @@ export function contarCodigosSoltos(terminalId: string): number {
   return plano ? plano.nos.filter((n) => n.tipo === 'codigo' && n.terminal === terminalId && !n.automatico).length : 0
 }
 
-/** Arruma todas as árvores de um agente (quando a ação não é de uma só). */
+/**
+ * Arruma as árvores de um agente: um visor por árvore, empilhados na ordem das árvores. Cada um começa onde a
+ * árvore dele manda (ao lado do agente, mais o que o usuário arrastou pela bolinha) e nunca mais alto que o fim
+ * do visor de cima mais `ENTRE_ARVORES`. Só mexe nos visores do app (campo automatico): depois que você tira um
+ * da coluna, ele fica onde está.
+ */
 export function arrumarArvores(plano: Plano, terminalId: string): Plano {
   const terminal = plano.nos.find((n) => n.id === terminalId)
   if (terminal?.tipo !== 'terminal') return plano
-  return arvoresDoTerminal(terminal).reduce((p, a) => arrumarColuna(p, terminalId, a.id), plano)
-}
-
-/** Fim do arrasto pela bolinha: a árvore se realinha e empurra o que tiver ficado embaixo dela. */
-export function assentarColuna(terminalId: string, arvoreId: string): void {
-  mudarPlano((p) => arrumarColuna(p, terminalId, arvoreId), false)
-}
-
-/**
- * Arruma a coluna de um agente, do arquivo mais novo para o mais velho. Só mexe nos cartões que o app criou
- * e o usuário não tirou dele (ver automatico).
- *
- * `chegou` é o cartão do arquivo que acabou de ser gravado: ele abre e **o arquivo anterior** vira
- * bloquinho. Os outros ficam como estão — um bloquinho que você abriu para ler continua aberto, porque
- * abrir para ler não é arrumar o quadro; a coluna só desloca os de baixo para caber.
- */
-export function arrumarColuna(plano: Plano, terminalId: string, arvoreId: string, chegou?: string): Plano {
-  const terminal = plano.nos.find((n) => n.id === terminalId)
-  if (terminal?.tipo !== 'terminal') return plano
-  const meus = plano.nos
-    .filter(
-      (n): n is NoCodigo =>
-        n.tipo === 'codigo' && n.automatico === true && n.terminal === terminalId && arvoreDoCodigo(n) === arvoreId
-    )
-    // a ordem é a que o usuário deixou (campo ordem); sem ela, o mais novo primeiro. O que acabou de
-    // chegar vai para o topo.
-    .sort((a, b) => {
-      const pa = a.id === chegou ? -1 : a.ordem ?? Number.MAX_SAFE_INTEGER
-      const pb = b.id === chegou ? -1 : b.ordem ?? Number.MAX_SAFE_INTEGER
-      return pa - pb || b.criadoEm.localeCompare(a.criadoEm)
-    })
-  // passando do limite, saem do quadro só os que estão recolhidos: cartão que você deixou aberto está
-  // sendo lido agora, e sumir no meio do trabalho do agente era o pior jeito de respeitar um limite
-  const excedentes = meus.slice(MAX_NA_COLUNA)
-  const sobrando = new Set(excedentes.filter((n) => n.recolhido).map((n) => n.id))
-  const naColuna = [...meus.slice(0, MAX_NA_COLUNA), ...excedentes.filter((n) => !n.recolhido)]
-  // o que era o arquivo da vez até agora é o que se recolhe quando chega um novo
-  const anterior = chegou ? meus[1]?.id : undefined
-  const inicio = inicioDaColuna(terminal, arvoreId)
-  const x = inicio.x
-  let y = inicio.y
   const ajustes = new Map<string, Partial<NoCodigo>>()
-  for (const cartao of naColuna) {
-    const recolhido = cartao.id === chegou ? false : cartao.id === anterior ? true : !!cartao.recolhido
-    const larguraAberta = cartao.larguraAberta ?? (cartao.recolhido ? ABERTO.largura : cartao.largura)
-    const alturaAberta = cartao.alturaAberta ?? (cartao.recolhido ? ABERTO.altura : cartao.altura)
+  let piso = -Infinity
+  for (const a of arvoresDoTerminal(terminal)) {
+    const visor = plano.nos.find(
+      (n): n is NoCodigo => n.tipo === 'codigo' && n.automatico === true && n.terminal === terminalId && arvoreDoCodigo(n) === a.id && ehVisor(n)
+    )
+    if (!visor) continue
+    const inicio = inicioDaColuna(terminal, a.id)
+    const y = Math.max(inicio.y, piso)
+    const recolhido = !!visor.recolhido
+    const larguraAberta = visor.larguraAberta ?? (recolhido ? VISOR_ABERTO.largura : visor.largura)
+    const alturaAberta = visor.alturaAberta ?? (recolhido ? VISOR_ABERTO.altura : visor.altura)
     const largura = recolhido ? BLOQUINHO.largura : larguraAberta
     const altura = recolhido ? BLOQUINHO.altura : alturaAberta
-    ajustes.set(cartao.id, { x, y, largura, altura, recolhido, larguraAberta, alturaAberta, ordem: ajustes.size })
-    y += altura + 12
+    ajustes.set(visor.id, { x: inicio.x, y, largura, altura, recolhido, larguraAberta, alturaAberta })
+    piso = y + altura + ENTRE_ARVORES
   }
-  const arrumado = {
-    ...plano,
-    nos: plano.nos
-      .filter((n) => !sobrando.has(n.id))
-      .map((n) => (ajustes.has(n.id) ? ({ ...n, ...ajustes.get(n.id) } as No) : n))
-  }
+  if (!ajustes.size) return plano
+  const arrumado = { ...plano, nos: plano.nos.map((n) => (ajustes.has(n.id) ? ({ ...n, ...ajustes.get(n.id) } as No) : n)) }
   // a coluna cresceu e empurrou os vizinhos: a moldura de uma banda acompanha quem já estava dentro dela,
   // senão o app desmancha, sozinho, um time que o usuário montou
   return manterBandas(plano, afastarDaColuna(arrumado, terminalId, new Set(ajustes.keys())))
+}
+
+/** Fim do arrasto pela bolinha: as árvores se realinham e empurram o que tiver ficado embaixo delas. */
+export function assentarColuna(terminalId: string, _arvoreId?: string): void {
+  mudarPlano((p) => arrumarArvores(p, terminalId), false)
 }
 
 /**
@@ -233,8 +243,8 @@ export function alternarRecolhidoDoCodigo(id: string): void {
   const plano = planoAtual()
   const cartao = plano?.nos.find((n) => n.id === id)
   if (!plano || cartao?.tipo !== 'codigo') return
-  const larguraAberta = cartao.larguraAberta ?? (cartao.recolhido ? ABERTO.largura : cartao.largura)
-  const alturaAberta = cartao.alturaAberta ?? (cartao.recolhido ? ABERTO.altura : cartao.altura)
+  const larguraAberta = cartao.larguraAberta ?? (cartao.recolhido ? abertoDe(cartao).largura : cartao.largura)
+  const alturaAberta = cartao.alturaAberta ?? (cartao.recolhido ? abertoDe(cartao).altura : cartao.altura)
   const recolhido = !cartao.recolhido
   const mudanca: Partial<NoCodigo> = {
     recolhido,
@@ -246,9 +256,12 @@ export function alternarRecolhidoDoCodigo(id: string): void {
   registrarHistorico()
   mudarPlano((p) => {
     const com = { ...p, nos: p.nos.map((n) => (n.id === id ? ({ ...n, ...mudanca } as No) : n)) }
-    return cartao.automatico && cartao.terminal ? arrumarColuna(com, cartao.terminal, arvoreDoCodigo(cartao)) : com
+    return cartao.automatico && cartao.terminal ? arrumarArvores(com, cartao.terminal) : com
   }, false)
 }
+
+/** O tamanho de um cartão de código aberto: o do visor, ou o do cartão de um arquivo. */
+const abertoDe = (no: NoCodigo): { largura: number; altura: number } => (ehVisor(no) ? VISOR_ABERTO : ABERTO)
 
 /** Cartões de código de um agente (de uma árvore só, se você disser qual), do mais novo para o mais velho. */
 function codigosDoTerminal(plano: Plano, terminalId: string, arvoreId?: string): NoCodigo[] {
@@ -277,8 +290,8 @@ export function recolherCodigosDoTerminal(terminalId: string, recolher: boolean,
   const ajustes = new Map<string, Partial<NoCodigo>>()
   for (const cartao of meus) {
     if (!!cartao.recolhido === recolher) continue
-    const larguraAberta = cartao.larguraAberta ?? (cartao.recolhido ? ABERTO.largura : cartao.largura)
-    const alturaAberta = cartao.alturaAberta ?? (cartao.recolhido ? ABERTO.altura : cartao.altura)
+    const larguraAberta = cartao.larguraAberta ?? (cartao.recolhido ? abertoDe(cartao).largura : cartao.largura)
+    const alturaAberta = cartao.alturaAberta ?? (cartao.recolhido ? abertoDe(cartao).altura : cartao.altura)
     ajustes.set(cartao.id, {
       recolhido: recolher,
       larguraAberta,
@@ -322,4 +335,11 @@ export function alternarCodigoSozinho(id: string): void {
   const no = acharNo(id)
   if (no?.tipo !== 'terminal') return
   atualizarNo(id, { codigoSozinho: no.codigoSozinho === false } as Partial<No>, false)
+}
+
+/** Quantos arquivos há nas listas dos visores de um agente (de uma árvore só, se você disser qual). */
+export function contarArquivos(terminalId: string, arvoreId?: string): number {
+  const plano = planoAtual()
+  if (!plano) return 0
+  return codigosDoTerminal(plano, terminalId, arvoreId).reduce((t, n) => t + (ehVisor(n) ? n.arquivos.length : 0), 0)
 }

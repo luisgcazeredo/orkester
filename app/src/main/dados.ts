@@ -1,6 +1,8 @@
 import { BrowserWindow, dialog, ipcMain, shell, webContents } from 'electron'
 import { randomUUID } from 'node:crypto'
 import {
+  constants,
+  copyFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -30,6 +32,7 @@ import { CANAIS_DADOS } from '../shared/api'
 import { juntarPreferencias, type PreferenciasParciais } from '../shared/preferencias'
 import { TEMA_PADRAO, temaValido } from '../shared/temas'
 import { SESSAO_VAZIA, sessaoValida, type Sessao } from '../shared/janelas'
+import { migrarEspaco } from '../shared/quadro/visor'
 import { MAX_NOME_DA_PARTITURA, MAX_PARTITURAS, MAX_PECAS, MAX_TEXTO_DA_PECA } from '../shared/quadro/partituras'
 import { MAX_ROTINAS, rotinaValida } from '../shared/rotinas'
 import { avisar, avisarTodas, donoDe, esquecerEspaco, exigirDono } from './janelas'
@@ -123,6 +126,29 @@ function resumo(espaco: Espaco): ResumoEspaco {
 /** Espaço salvo por versões antigas ganha os campos novos (andares) com valor vazio. */
 function completar(espaco: Espaco): Espaco {
   return { ...espaco, andares: Array.isArray(espaco.andares) ? espaco.andares : [], andarAtivo: espaco.andarAtivo ?? null }
+}
+
+/**
+ * Quadro salvo antes do visor de código (cartão por arquivo) → quadro com visores, no térreo e em cada andar.
+ * A migração é pura (`migrarEspaco`); aqui só se cuida do disco: antes da 1ª gravação migrada guarda-se uma
+ * cópia `espaco.json.bak` (só uma: se já existe, é a mais antiga e fica) e só então o arquivo é regravado.
+ * Sem a cópia, o espaço fica como estava em disco e a migração roda de novo na próxima abertura.
+ */
+function migrarCodigosDoEspaco(id: string, espaco: Espaco): Espaco {
+  const migrado = migrarEspaco(espaco)
+  if (migrado === espaco) return espaco
+  const caminho = join(pastaDoEspaco(id), 'espaco.json')
+  try {
+    try {
+      copyFileSync(caminho, `${caminho}.bak`, constants.COPYFILE_EXCL)
+    } catch (erro) {
+      if ((erro as NodeJS.ErrnoException).code !== 'EEXIST') throw erro
+    }
+    gravarJson(caminho, migrado)
+    return migrado
+  } catch {
+    return espaco
+  }
 }
 
 function lerEspaco(id: string): Espaco | null {
@@ -437,8 +463,9 @@ export function registrarDados(): void {
   ipcMain.handle(CANAIS_DADOS.listarEspacos, (): ResumoEspaco[] => resumosDosEspacos())
 
   ipcMain.handle(CANAIS_DADOS.carregarEspaco, (_e, id: string): EspacoCarregado | null => {
-    const espaco = lerEspaco(id)
-    if (!espaco) return null
+    const lido = lerEspaco(id)
+    if (!lido) return null
+    const espaco = migrarCodigosDoEspaco(id, lido)
     limparImagens(espaco)
     const pastaNotas = join(pastaDoEspaco(id), 'notas')
     const notas: Record<string, string> = {}

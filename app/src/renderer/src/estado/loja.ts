@@ -20,4 +20,4 @@ export { posicoesDaSelecao, posicoesDaColuna, moverItens, empurrarSelecao, apaga
 export type { Posicoes, Alinhamento } from './arranjo'
 export { ligar, adicionarDesenho, definirCorDesenho, apagarDesenhosPerto } from './cordas'
 export { pastaEhVigiavel, ARVORE_PRINCIPAL, arvoresDoTerminal, arvoreDoCodigo, moverColuna, assentarCodigos, juntarCodigosDoTerminal } from './codigo'
-export { criarArvore, usarArvore, renomearArvore, desfazerArvore, mostrarArquivoNaArvore, fecharCodigosSoltos, soltarCodigoDaColuna, contarCodigosSoltos, assentarColuna, alternarRecolhidoDoCodigo, contarCodigos, recolherCodigosDoTerminal, fecharCodigosDoTerminal, alternarCodigoSozinho } from './arvores'
+export { criarArvore, usarArvore, renomearArvore, desfazerArvore, mostrarArquivoNaArvore, fecharCodigosSoltos, entregarArquivos, contarArquivos, soltarCodigoDaColuna, contarCodigosSoltos, assentarColuna, alternarRecolhidoDoCodigo, contarCodigos, recolherCodigosDoTerminal, fecharCodigosDoTerminal, alternarCodigoSozinho } from './arvores'

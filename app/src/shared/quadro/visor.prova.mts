@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 // Node executa provas TypeScript diretamente e precisa da extensão; o bundler resolve a fonte normalmente.
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
-import { anotarNoVisor, ehVisor, escolherNoVisor, exibidoDepois, marcarApagado, MAX_NA_LISTA, migrarCodigos, seguirDeNovo, VISOR_ABERTO, VISOR_RECOLHIDO } from './visor.ts'
+import { anotarNoVisor, ehVisor, escolherNoVisor, exibidoDepois, juntarNoVisor, marcarApagado, MAX_NA_LISTA, migrarCodigos, migrarEspaco, seguirDeNovo, tirarDoVisor, VISOR_ABERTO, VISOR_RECOLHIDO } from './visor.ts'
 import type { No, NoCodigo, Plano } from '../modelo'
 
 const hora = (k: number) => `2026-11-01T10:0${k}:00.000Z`
@@ -278,4 +278,48 @@ test('anotar: o corte nunca tira o arquivo à mostra; sai o mais antigo dos outr
     assert.equal(caminhos(depois).includes('f48.ts'), false) // o mais antigo que não é o exibido
     assert.equal(caminhos(depois)[49], 'f49.ts')
   }
+})
+
+test('tirar: some da lista; se era o exibido, passa ao mais novo que sobrou (ou a nada)', () => {
+  const v = codigo('v', { terminal: 'A', caminho: 'b.ts', arquivos: [{ caminho: 'b.ts', em: 3 }, { caminho: 'a.ts', em: 2 }, { caminho: 'c.ts', em: 1 }] })
+  const sem = tirarDoVisor(v, ['a.ts'])
+  assert.deepEqual(caminhos(sem), ['b.ts', 'c.ts'])
+  assert.equal(sem.caminho, 'b.ts')
+  const semExibido = tirarDoVisor(v, ['b.ts'])
+  assert.deepEqual(caminhos(semExibido), ['a.ts', 'c.ts'])
+  assert.equal(semExibido.caminho, 'a.ts')
+  const vazio = tirarDoVisor(v, ['a.ts', 'b.ts', 'c.ts'])
+  assert.deepEqual(vazio.arquivos, [])
+  assert.equal(vazio.caminho, undefined)
+  assert.equal(tirarDoVisor(v, ['zzz.ts']), v, 'nada a tirar: o mesmo visor')
+  assert.equal(v.arquivos!.length, 3, 'não mexe na entrada')
+})
+
+test('juntar: sem repetir, vale o de maior em, ordenado, e visor sem exibido ganha o primeiro', () => {
+  const destino = codigo('d', { terminal: 'A', caminho: 'a.ts', arquivos: [{ caminho: 'a.ts', em: 5 }, { caminho: 'b.ts', em: 1 }] })
+  const j = juntarNoVisor(destino, [{ caminho: 'b.ts', em: 7, sumiu: true }, { caminho: 'c.ts', em: 3 }, { caminho: 'a.ts', em: 2 }])
+  assert.deepEqual(j.arquivos, [{ caminho: 'b.ts', em: 7, sumiu: true }, { caminho: 'a.ts', em: 5 }, { caminho: 'c.ts', em: 3 }])
+  assert.equal(j.caminho, 'a.ts')
+  const vazio = codigo('e', { terminal: 'A', arquivos: [] })
+  assert.equal(juntarNoVisor(vazio, [{ caminho: 'x.ts', em: 1 }]).caminho, 'x.ts')
+  const cheio = juntarNoVisor(destino, Array.from({ length: 80 }, (_, i) => ({ caminho: `n${i}.ts`, em: 100 + i })))
+  assert.equal(cheio.arquivos!.length, MAX_NA_LISTA)
+  assert.equal(caminhos(cheio).includes('a.ts'), true, 'o exibido não sai no corte')
+})
+
+test('migrarEspaco: térreo e andares; idempotente; nada a migrar = o mesmo espaço', () => {
+  const nos = (pref: string): No[] => [
+    terminal('A'),
+    codigo(`${pref}1`, { terminal: 'A', automatico: true, caminho: 'a.ts', criadoEm: hora(1) }),
+    codigo(`${pref}2`, { terminal: 'A', automatico: true, caminho: 'b.ts', criadoEm: hora(2) })
+  ]
+  const espaco = { ...plano(nos('t')), andares: [plano(nos('x')), plano([terminal('B')])] }
+  const m = migrarEspaco(espaco)
+  assert.notEqual(m, espaco)
+  assert.equal(m.nos.filter((n) => n.tipo === 'codigo').length, 1)
+  assert.equal(m.andares[0].nos.filter((n) => n.tipo === 'codigo').length, 1)
+  assert.equal(m.andares[1], espaco.andares[1], 'andar sem o que migrar fica como está')
+  assert.equal(migrarEspaco(m), m, '2ª rodada: a mesma referência')
+  const limpo = { ...plano([terminal('A')]), andares: [] }
+  assert.equal(migrarEspaco(limpo), limpo)
 })

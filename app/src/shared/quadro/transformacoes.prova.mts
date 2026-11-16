@@ -54,3 +54,47 @@ test('herdeiro que já saiu do quadro não recebe nada', () => {
   const cartao = depois.nos.find((n) => n.id === 'c')
   assert.equal(cartao?.tipo === 'codigo' && cartao.terminal, 'filho')
 })
+
+const visor = (id: string, terminal: string, arquivos: { caminho: string; em: number }[], extra: Partial<No> = {}): No =>
+  ({ id, tipo: 'codigo', terminal, caminho: arquivos[0]?.caminho, modo: 'diff', automatico: true, arquivos, x: 300, y: 0, largura: 860, altura: 460, z: 1, criadoEm: instante, ...extra }) as No
+
+const lista = (n: No | undefined): string[] => (n?.tipo === 'codigo' ? (n.arquivos ?? []).map((a) => a.caminho) : [])
+
+test('fechar um agente: o visor dele se junta ao principal de quem o abriu, sem repetir arquivo', () => {
+  const espaco = espacoCom([
+    agente('chefe', 'Chefe'),
+    agente('filho', 'Filho', { criadoPor: 'chefe' }),
+    visor('vc', 'chefe', [{ caminho: 'a.ts', em: 5 }, { caminho: 'b.ts', em: 1 }]),
+    visor('vf', 'filho', [{ caminho: 'c.ts', em: 9 }, { caminho: 'a.ts', em: 3 }]),
+    visor('vf2', 'filho', [{ caminho: 'd.ts', em: 4 }], { arvore: 'outra' })
+  ])
+  const { espaco: depois } = fechar(espaco, { tipo: 'fechar', espacoId: 'e', id: 'filho' } as never)
+  assert.deepEqual(lista(depois.nos.find((n) => n.id === 'vc')), ['c.ts', 'a.ts', 'd.ts', 'b.ts'])
+  assert.equal(depois.nos.some((n) => n.id === 'vf' || n.id === 'vf2'), false, 'os visores do que fechou somem, as listas ficaram')
+  assert.equal(depois.nos.filter((n) => n.tipo === 'codigo').length, 1)
+})
+
+test('fechar um agente: o herdeiro sem visor fica com o do que fechou (principal), listas juntas', () => {
+  const espaco = espacoCom([
+    agente('chefe', 'Chefe'),
+    agente('filho', 'Filho', { criadoPor: 'chefe' }),
+    visor('vf', 'filho', [{ caminho: 'c.ts', em: 9 }], { arvore: 'outra' }),
+    visor('vp', 'filho', [{ caminho: 'p.ts', em: 2 }])
+  ])
+  const { espaco: depois } = fechar(espaco, { tipo: 'fechar', espacoId: 'e', id: 'filho' } as never)
+  const visores = depois.nos.filter((n) => n.tipo === 'codigo')
+  assert.equal(visores.length, 1)
+  const v = visores[0]
+  assert.equal(v.tipo === 'codigo' && v.terminal, 'chefe')
+  assert.equal(v.tipo === 'codigo' && v.arvore, undefined)
+  assert.equal(v.id, 'vp', 'a principal de quem fechou dá a posição')
+  assert.deepEqual(lista(v), ['c.ts', 'p.ts'])
+})
+
+test('fechar um agente sem herdeiro: o visor fica intacto', () => {
+  const espaco = espacoCom([agente('sozinho', 'Sozinho'), visor('v', 'sozinho', [{ caminho: 'a.ts', em: 1 }])])
+  const { espaco: depois } = fechar(espaco, { tipo: 'fechar', espacoId: 'e', id: 'sozinho' } as never)
+  const v = depois.nos.find((n) => n.id === 'v')
+  assert.equal(v?.tipo === 'codigo' && v.terminal, 'sozinho')
+  assert.deepEqual(lista(v), ['a.ts'])
+})

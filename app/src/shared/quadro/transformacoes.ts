@@ -1,8 +1,10 @@
 import type { PedidoDoAgente, RespostaAoAgente } from '../api'
-import type { Corda, Espaco, Funcao, No, NoTerminal, Plano, PresetAgente } from '../modelo'
+import type { Corda, Espaco, Funcao, No, NoCodigo, NoTerminal, Plano, PresetAgente } from '../modelo'
 // Node executa as provas TypeScript diretamente e precisa da extensão neste único import de execução.
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
 import { caixaDoNo, lugarPerto, proximoZ, tocam, type Caixa } from './geometria.ts'
+// @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
+import { ehVisor, juntarNoVisor } from './visor.ts'
 
 type PedidoAbrir = Extract<PedidoDoAgente, { tipo: 'abrir' }>
 type PedidoFechar = Extract<PedidoDoAgente, { tipo: 'fechar' }>
@@ -138,6 +140,33 @@ export function abrir(
   return { espaco: proximo, resposta: { ok: true, id: no.id, nome, ...comPrompt } }
 }
 
+/**
+ * Os visores do agente que fechou passam a quem o abriu: as listas de todas as árvores se juntam no visor principal
+ * do herdeiro (que nasce do primeiro visor, se ele não tinha), sem repetir arquivo. Sem herdeiro, ficam como estão.
+ */
+export function herdarVisores(nos: No[], morto: string, herdeiro: string | undefined): No[] {
+  if (!herdeiro) return nos
+  const dele = nos.filter((n): n is NoCodigo => ehVisor(n) && n.terminal === morto)
+  if (!dele.length) return nos
+  const principal = (n: No): boolean => ehVisor(n) && n.terminal === herdeiro && (!n.arvore || n.arvore === 'principal')
+  let alvo = nos.find((n): n is NoCodigo => n.tipo === 'codigo' && principal(n))
+  const sai = new Set<string>()
+  const novo = new Map<string, NoCodigo>()
+  // a principal de quem fechou vai primeiro: é ela que dá a posição, se o herdeiro não tinha visor
+  const ordem = [...dele].sort((a, b) => Number(!!a.arvore && a.arvore !== 'principal') - Number(!!b.arvore && b.arvore !== 'principal'))
+  for (const v of ordem) {
+    if (!alvo) {
+      alvo = { ...v, terminal: herdeiro, arvore: undefined }
+    } else {
+      alvo = juntarNoVisor(alvo, v.arquivos ?? [])
+      sai.add(v.id)
+    }
+    novo.set(alvo.id, alvo)
+  }
+  for (const v of dele) if (!novo.has(v.id) && !sai.has(v.id)) sai.add(v.id)
+  return nos.flatMap((n) => (sai.has(n.id) ? [] : [novo.get(n.id) ?? n]))
+}
+
 /** Remove o cartão e todas as cordas dele. */
 export function fechar(espaco: Espaco, pedido: PedidoFechar): ResultadoTransformacaoDoQuadro {
   const plano = planosDe(espaco).find((atual) => atual.nos.some((no) => no.id === pedido.id))
@@ -152,13 +181,17 @@ export function fechar(espaco: Espaco, pedido: PedidoFechar): ResultadoTransform
   const temHerdeiro = !!herdeiro && plano.nos.some((no) => no.id === herdeiro && no.tipo === 'terminal')
   const proximo = mudarPlano(espaco, plano, (atual) => ({
     ...atual,
-    nos: atual.nos
-      .filter((no) => no.id !== pedido.id)
-      .map((no) =>
-        temHerdeiro && no.tipo === 'codigo' && no.terminal === pedido.id
-          ? ({ ...no, terminal: herdeiro, arvore: undefined } as No)
-          : no
-      ),
+    nos: herdarVisores(
+      atual.nos
+        .filter((no) => no.id !== pedido.id)
+        .map((no) =>
+          temHerdeiro && no.tipo === 'codigo' && no.terminal === pedido.id && !ehVisor(no)
+            ? ({ ...no, terminal: herdeiro, arvore: undefined } as No)
+            : no
+        ),
+      pedido.id,
+      temHerdeiro ? herdeiro : undefined
+    ),
     cordas: atual.cordas.filter((corda) => corda.de !== pedido.id && corda.para !== pedido.id)
   }))
   return { espaco: proximo, resposta: { ok: true } }

@@ -1,4 +1,4 @@
-import { type ArvoreDeCodigo, type No, type NoCodigo, type NoTerminal, type Plano, PRESETS_PADRAO } from '../../../shared/modelo'
+import { type ArvoreDeCodigo, type NoTerminal, PRESETS_PADRAO } from '../../../shared/modelo'
 import { type PedidoDoAgente, type RespostaAoAgente } from '../../../shared/api'
 import { juntarCatalogo, textoDoRelatorio } from '../../../shared/catalogo'
 import { abrir, fechar, passar } from '../../../shared/quadro/transformacoes'
@@ -6,7 +6,7 @@ import { acharAlvos, mexerNoQuadro } from '../../../shared/quadro/agente'
 import { resumoDaPartitura } from '../../../shared/quadro/partituras'
 import { alcanca, alcancaveisPor, bandasDoPlano, cordasDaBanda, membrosDaBanda } from '../../../shared/quadro/bandas'
 import { centroDaTela } from '../quadro/geometria'
-import { arrumarArvores, contarCodigos, criarArvore, desfazerArvore, mostrarArquivoNaArvore, usarArvore } from './arvores'
+import { arrumarArvores, contarArquivos, criarArvore, desfazerArvore, entregarArquivos, mostrarArquivoNaArvore, usarArvore } from './arvores'
 import { criarBandaNoQuadro, trocarAgenteDoCartao } from './bandas'
 import { ARVORE_PRINCIPAL, arvoresDoTerminal } from './codigo'
 import { definirFuncoes, salvarPartitura, subirPartitura } from './espacos'
@@ -29,7 +29,7 @@ function atenderArvore(pedido: Extract<PedidoDoAgente, { tipo: 'arvore' }>): Res
   if (pedido.acao === 'lista') {
     const linhas = arvoresDoTerminal(terminal).map((a) => {
       const minha = a.id === (terminal.arvoreAtiva ?? ARVORE_PRINCIPAL)
-      const { total } = contarCodigos(terminal.id, a.id)
+      const total = contarArquivos(terminal.id, a.id)
       return `${minha ? '*' : ' '} "${a.nome || 'principal'}" · ${total} arquivo(s)${minha ? ' · em uso' : ''}`
     })
     return { ok: true, texto: ['Suas árvores de código:', ...linhas].join('\n') }
@@ -63,22 +63,9 @@ function atenderArvore(pedido: Extract<PedidoDoAgente, { tipo: 'arvore' }>): Res
     if (!alcancaveisPor(plano, terminal.id).has(destino.id)) {
       return { ok: false, erro: `"${destino.nome}" não está ao seu alcance: entregue a quem você abriu ou a quem está ligado a você` }
     }
-    const pedidos = pedido.arquivos ?? []
-    const meus = plano.nos.filter(
-      (n): n is NoCodigo => n.tipo === 'codigo' && n.terminal === terminal.id && !!n.caminho && pedidos.includes(n.caminho)
-    )
-    if (!meus.length) return { ok: false, erro: 'nenhum desses arquivos está na sua árvore; só se entrega cartão seu' }
-    const ids = new Set(meus.map((n) => n.id))
-    registrarHistorico()
-    mudarPlano((p) => {
-      const comDono: Plano = {
-        ...p,
-        // o cartão entra na árvore principal de quem recebe: a árvore de quem deu não existe para ele
-        nos: p.nos.map((n) => (ids.has(n.id) ? ({ ...n, terminal: destino.id, arvore: undefined, automatico: true } as No) : n))
-      }
-      return arrumarArvores(arrumarArvores(comDono, terminal.id), destino.id)
-    }, false)
-    return { ok: true, texto: `Entreguei ${meus.length} cartão(ões) para "${destino.nome}".` }
+    const entregues = entregarArquivos(terminal.id, destino.id, pedido.arquivos ?? [])
+    if (!entregues) return { ok: false, erro: 'nenhum desses arquivos está na sua lista; só se entrega arquivo seu' }
+    return { ok: true, texto: `Entreguei ${entregues} arquivo(s) para "${destino.nome}".` }
   }
   if (pedido.acao === 'desfazer') {
     const achada = porNome()

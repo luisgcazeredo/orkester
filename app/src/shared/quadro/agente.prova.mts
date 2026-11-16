@@ -229,3 +229,18 @@ test('o maestro liga dois que ele abriu, que é o fluxo do time', () => {
   const feito = mudou(mexer(p, { acao: 'ligar', alvos: ['Implementador', 'Provador'] }))
   assert.equal(feito.plano.cordas.length, 1)
 })
+
+test('visor: a leitura diz "visor · N arquivos" e ler o cartão lista os arquivos (apagado marcado)', () => {
+  const visor = {
+    id: 'v', tipo: 'codigo', terminal: 'a', caminho: 'src/b.ts', modo: 'diff', automatico: true, x: 400, y: 0, largura: 860, altura: 460, z: 1, criadoEm: instante,
+    arquivos: [{ caminho: 'src/b.ts', em: 2 }, { caminho: 'src/a.ts', em: 1, sumiu: true }]
+  } as No
+  const umSo = { ...visor, id: 'v1', y: 600, caminho: 'x.ts', arquivos: [{ caminho: 'x.ts', em: 1 }] } as No
+  const p = plano([agente('a', 'Carteiro', 0, 0), visor, umSo])
+  const saida = mudou(mexer(p, { acao: 'ler' })).texto
+  assert.match(saida, /codigo "b\.ts" · .* · visor · 2 arquivos · na árvore de "Carteiro"/)
+  assert.match(saida, /visor · 1 arquivo · na árvore/)
+  const lido = mudou(mexer(p, { acao: 'ler-cartao', alvos: ['b.ts'] })).texto
+  assert.match(lido, /src\/b\.ts\nsrc\/a\.ts \(apagado\)/)
+  assert.match(naoDeu(mexer(p, { acao: 'mover', alvos: ['b.ts'], dx: 5 })), /cartão de código/)
+})
