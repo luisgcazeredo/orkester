@@ -1,11 +1,12 @@
 import { type ArvoreDeCodigo, type No, type NoCodigo, type Plano } from '../../../shared/modelo'
 import { empurrarParaBaixo } from '../../../shared/quadro/empurrar'
 import { manterBandas } from '../../../shared/quadro/bandas'
-import { VISOR_ABERTO, ehVisor, juntarNoVisor, tirarDoVisor } from '../../../shared/quadro/visor'
+import { VISOR_ABERTO, ehVisor, entregarEntreVisores, escolherNoVisor, juntarNoVisor, seguirDeNovo, tirarDoVisor } from '../../../shared/quadro/visor'
 import { caixaDoNo } from '../quadro/geometria'
 import {
   ABERTO,
   ARVORE_PRINCIPAL,
+  agendarExibicao,
   anotarNoVisorDoAgente,
   arvoreDoCodigo,
   arvoresDoTerminal,
@@ -137,30 +138,13 @@ export function entregarArquivos(origemId: string, destinoId: string, caminhos: 
   const meus = plano.nos.filter((n) => ehVisor(n) && n.terminal === origemId)
   const entregues = caminhos.filter((c) => meus.some((v) => ehVisor(v) && v.arquivos.some((a) => a.caminho === c)))
   if (!entregues.length) return 0
+  // o histórico guarda o quadro antes do visor nascer: Ctrl+Z leva junto o visor vazio do destino
   registrarHistorico()
-  mudarPlano(
-    (p) => ({
-      ...p,
-      nos: p.nos.map((n) => (n.tipo === 'codigo' && ehVisor(n) && n.terminal === origemId ? (tirarDoVisor(n, entregues) as No) : n))
-    }),
-    false
-  )
-  anotarNoVisorDoAgente(destinoId, ARVORE_PRINCIPAL, entregues)
+  garantirVisor(destinoId, ARVORE_PRINCIPAL)
+  mudarPlano((p) => ({ ...p, nos: entregarEntreVisores(p.nos, origemId, destinoId, entregues, Date.now()) }), false)
+  const novo = visorDaArvore(planoAtual() ?? plano, destinoId, ARVORE_PRINCIPAL)
+  if (novo) agendarExibicao(novo.id)
   return entregues.length
-}
-
-/**
- * Fecha só os cartões soltos que **não** são visor (um arquivo aberto à mão). Visor nunca se fecha por aqui: ele é a
- * lista do agente. O item de menu que chama isto some na B2c.
- */
-export function fecharCodigosSoltos(terminalId: string): void {
-  const plano = planoAtual()
-  if (!plano) return
-  const soltos = plano.nos.filter((n) => n.tipo === 'codigo' && n.terminal === terminalId && !n.automatico && !ehVisor(n))
-  if (!soltos.length) return
-  const ids = new Set(soltos.map((n) => n.id))
-  registrarHistorico()
-  mudarPlano((p) => ({ ...p, nos: p.nos.filter((n) => !ids.has(n.id)) }), false)
 }
 
 /** Tira um cartão da coluna do agente: daí em diante ele fica onde o usuário o deixar. */
@@ -342,4 +326,18 @@ export function contarArquivos(terminalId: string, arvoreId?: string): number {
   const plano = planoAtual()
   if (!plano) return 0
   return codigosDoTerminal(plano, terminalId, arvoreId).reduce((t, n) => t + (ehVisor(n) ? n.arquivos.length : 0), 0)
+}
+
+/** Clicou num arquivo da lista do visor: o mais novo volta a seguir; qualquer outro fixa o visor nele. */
+export function escolherArquivoDoVisor(id: string, caminho: string): void {
+  const no = acharNo(id)
+  if (no?.tipo !== 'codigo' || !ehVisor(no)) return
+  mudarPlano((p) => ({ ...p, nos: p.nos.map((n) => (n.id === id && n.tipo === 'codigo' ? (escolherNoVisor(n, caminho) as No) : n)) }), false)
+}
+
+/** O botão "seguir": o visor volta a mostrar o arquivo mais novo e a acompanhar o que o agente gravar. */
+export function seguirVisor(id: string): void {
+  const no = acharNo(id)
+  if (no?.tipo !== 'codigo' || !ehVisor(no)) return
+  mudarPlano((p) => ({ ...p, nos: p.nos.map((n) => (n.id === id && n.tipo === 'codigo' ? (seguirDeNovo(n) as No) : n)) }), false)
 }

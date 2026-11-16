@@ -4,7 +4,7 @@ import type { Corda, Espaco, Funcao, No, NoCodigo, NoTerminal, Plano, PresetAgen
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
 import { caixaDoNo, lugarPerto, proximoZ, tocam, type Caixa } from './geometria.ts'
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
-import { ehVisor, juntarNoVisor } from './visor.ts'
+import { ehVisor, juntarNoVisor, tirarDoVisor } from './visor.ts'
 
 type PedidoAbrir = Extract<PedidoDoAgente, { tipo: 'abrir' }>
 type PedidoFechar = Extract<PedidoDoAgente, { tipo: 'fechar' }>
@@ -164,7 +164,27 @@ export function herdarVisores(nos: No[], morto: string, herdeiro: string | undef
     novo.set(alvo.id, alvo)
   }
   for (const v of dele) if (!novo.has(v.id) && !sai.has(v.id)) sai.add(v.id)
-  return nos.flatMap((n) => (sai.has(n.id) ? [] : [novo.get(n.id) ?? n]))
+  // nada repetido entre as árvores do herdeiro: sai das outras listas dele só o que ficou na lista de destino
+  // depois do corte (o que o corte levou continua onde estava), e vale o `em`/`sumiu` mais novo dos dois lados
+  let chegaram: string[] = []
+  if (alvo) {
+    const doMorto = new Set(dele.flatMap((v) => (v.arquivos ?? []).map((a) => a.caminho)))
+    const ficaram = new Set((alvo.arquivos ?? []).map((a) => a.caminho))
+    chegaram = [...doMorto].filter((c) => ficaram.has(c))
+    const maisNovas = nos.flatMap((n) =>
+      ehVisor(n) && n.terminal === herdeiro && n.id !== alvo!.id ? (n.arquivos ?? []).filter((a) => doMorto.has(a.caminho)) : []
+    )
+    if (maisNovas.length) {
+      alvo = juntarNoVisor(alvo, maisNovas.filter((a) => ficaram.has(a.caminho)))
+      novo.set(alvo.id, alvo)
+    }
+  }
+  return nos.flatMap((n) => {
+    if (sai.has(n.id)) return []
+    const trocado = novo.get(n.id)
+    if (trocado) return [trocado]
+    return [ehVisor(n) && n.terminal === herdeiro ? tirarDoVisor(n, chegaram) : n]
+  })
 }
 
 /** Remove o cartão e todas as cordas dele. */

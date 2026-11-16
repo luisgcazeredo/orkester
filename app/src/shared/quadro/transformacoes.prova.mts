@@ -55,7 +55,7 @@ test('herdeiro que já saiu do quadro não recebe nada', () => {
   assert.equal(cartao?.tipo === 'codigo' && cartao.terminal, 'filho')
 })
 
-const visor = (id: string, terminal: string, arquivos: { caminho: string; em: number }[], extra: Partial<No> = {}): No =>
+const visor = (id: string, terminal: string, arquivos: { caminho: string; em: number; sumiu?: boolean }[], extra: Partial<No> = {}): No =>
   ({ id, tipo: 'codigo', terminal, caminho: arquivos[0]?.caminho, modo: 'diff', automatico: true, arquivos, x: 300, y: 0, largura: 860, altura: 460, z: 1, criadoEm: instante, ...extra }) as No
 
 const lista = (n: No | undefined): string[] => (n?.tipo === 'codigo' ? (n.arquivos ?? []).map((a) => a.caminho) : [])
@@ -97,4 +97,49 @@ test('fechar um agente sem herdeiro: o visor fica intacto', () => {
   const v = depois.nos.find((n) => n.id === 'v')
   assert.equal(v?.tipo === 'codigo' && v.terminal, 'sozinho')
   assert.deepEqual(lista(v), ['a.ts'])
+})
+
+test('fechar um agente: o que chegou ao herdeiro sai das outras árvores dele (nada repetido)', () => {
+  const espaco = espacoCom([
+    agente('chefe', 'Chefe'),
+    agente('filho', 'Filho', { criadoPor: 'chefe' }),
+    visor('vc', 'chefe', [{ caminho: 'b.ts', em: 1 }]),
+    visor('vcb', 'chefe', [{ caminho: 'api.ts', em: 2 }, { caminho: 'k.ts', em: 1 }], { arvore: 'Backend' }),
+    visor('vf', 'filho', [{ caminho: 'api.ts', em: 9 }])
+  ])
+  const { espaco: depois } = fechar(espaco, { tipo: 'fechar', espacoId: 'e', id: 'filho' } as never)
+  assert.deepEqual(lista(depois.nos.find((n) => n.id === 'vc')), ['api.ts', 'b.ts'])
+  assert.deepEqual(lista(depois.nos.find((n) => n.id === 'vcb')), ['k.ts'])
+})
+
+test('fechar um agente: arquivo que o corte de 50 levou continua na árvore do herdeiro onde estava', () => {
+  const recentes = Array.from({ length: 45 }, (_, i) => ({ caminho: `r${i}.ts`, em: 1000 - i }))
+  const velhos = [{ caminho: 'x.ts', em: 5 }, ...Array.from({ length: 9 }, (_, i) => ({ caminho: `v${i}.ts`, em: 10 + i }))]
+  const espaco = espacoCom([
+    agente('chefe', 'Chefe'),
+    agente('filho', 'Filho', { criadoPor: 'chefe' }),
+    visor('vc', 'chefe', recentes),
+    visor('vcb', 'chefe', [{ caminho: 'x.ts', em: 500 }], { arvore: 'Backend' }),
+    visor('vf', 'filho', velhos)
+  ])
+  const { espaco: depois } = fechar(espaco, { tipo: 'fechar', espacoId: 'e', id: 'filho' } as never)
+  const principal = lista(depois.nos.find((n) => n.id === 'vc'))
+  assert.equal(principal.length, 50)
+  assert.ok(!principal.includes('x.ts'), 'x.ts foi o mais velho e o corte o levou')
+  assert.deepEqual(lista(depois.nos.find((n) => n.id === 'vcb')), ['x.ts'], 'não some de todas as listas')
+})
+
+test('fechar um agente: o em/sumiu mais novo da outra árvore não é trocado pelo mais velho de quem fechou', () => {
+  const espaco = espacoCom([
+    agente('chefe', 'Chefe'),
+    agente('filho', 'Filho', { criadoPor: 'chefe' }),
+    visor('vc', 'chefe', [{ caminho: 'b.ts', em: 1 }]),
+    visor('vcb', 'chefe', [{ caminho: 'api.ts', em: 80, sumiu: true }], { arvore: 'Backend' }),
+    visor('vf', 'filho', [{ caminho: 'api.ts', em: 9 }])
+  ])
+  const { espaco: depois } = fechar(espaco, { tipo: 'fechar', espacoId: 'e', id: 'filho' } as never)
+  const v = depois.nos.find((n) => n.id === 'vc')
+  const api = v?.tipo === 'codigo' ? v.arquivos?.find((a) => a.caminho === 'api.ts') : undefined
+  assert.deepEqual(api, { caminho: 'api.ts', em: 80, sumiu: true })
+  assert.deepEqual(lista(depois.nos.find((n) => n.id === 'vcb')), [])
 })

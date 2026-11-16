@@ -45,7 +45,7 @@ import {
   Unlock,
   Users
 } from 'lucide-react'
-import type { Andar, Desenho, EntradaPasta, EstadoAndar, No, NoPostIt, NoTerminal, ResumoEspaco } from '../../../shared/modelo'
+import type { Andar, Desenho, EntradaPasta, EstadoAndar, No, NoCodigo, NoPostIt, NoTerminal, ResumoEspaco } from '../../../shared/modelo'
 import {
   abrirEspaco,
   abrirNovaJanela,
@@ -54,12 +54,19 @@ import {
   alinhar,
   alternarCodigoSozinho,
   alternarLinhasDoCodigo,
+  alternarRecolhidoDoCodigo,
+  arvoreDoCodigo,
+  escolherArquivoDoVisor,
+  planoAtual,
   ARVORE_PRINCIPAL,
   arvoresDoTerminal,
+  anotarNoVisorDoAgente,
+  arvoreAtivaDe,
+  contarArquivos,
   contarCodigos,
+  garantirVisor,
   contarCodigosSoltos,
   criarArvore,
-  fecharCodigosSoltos,
   pastaEhVigiavel,
   desfazerArvore,
   juntarCodigosDoTerminal,
@@ -100,6 +107,7 @@ import {
   tirarDoGrupo,
   trazerParaFrente
 } from '../estado/loja'
+import { ehVisor } from '../../../shared/quadro/visor'
 import { anexarAoPrompt, anexarArquivosAoPrompt, anexarPastaAoPrompt } from './anexar'
 import { abrirAtalhos } from './Atalhos'
 import { abrirRotinas } from './Rotinas'
@@ -124,15 +132,22 @@ const NOMES_POSTIT: Record<NoPostIt['cor'], string> = {
 const separador: ItemMenu = { separador: true }
 
 /**
- * Cartão de código do lado do terminal, já no último arquivo que mexeram na pasta dele. Sem nenhum arquivo
- * ainda, ele nasce vazio e pega o primeiro que o agente gravar.
+ * Põe o último arquivo mexido na pasta do agente no visor dele (na árvore em uso). O visor nasce se faltar; sem
+ * nenhum arquivo ainda, ele nasce vazio e pega o primeiro que o agente gravar.
  */
 async function verCodigoDoTerminal(no: NoTerminal): Promise<void> {
   const espaco = lerEstado().espaco
   const pasta = no.pasta || (espaco ? pastaDoPlano(espaco) : '')
   const recentes = pasta ? await window.ork.codigo.recentes(pasta).catch(() => []) : []
-  // adicionarNo centra no ponto; isto põe o cartão colado à direita do terminal, alinhado pelo topo
-  adicionarNo({ tipo: 'codigo', terminal: no.id, caminho: recentes[0]?.caminho }, no.x + no.largura + 40 + 310, no.y + 230)
+  const arvore = arvoreAtivaDe(no)
+  if (!recentes[0]) return garantirVisor(no.id, arvore)
+  const caminho = recentes[0].caminho
+  anotarNoVisorDoAgente(no.id, arvore, [caminho])
+  // o item MOSTRA: escolher o arquivo vale mesmo com o visor fixo (o mais novo volta a seguir) e abre o visor recolhido
+  const visor = planoAtual()?.nos.find((n): n is NoCodigo => n.tipo === 'codigo' && ehVisor(n) && n.terminal === no.id && arvoreDoCodigo(n) === arvore)
+  if (!visor) return
+  escolherArquivoDoVisor(visor.id, caminho)
+  if (visor.recolhido) alternarRecolhidoDoCodigo(visor.id)
 }
 
 /**
@@ -147,21 +162,22 @@ function itensDasArvores(no: NoTerminal): ItemMenu[] {
   const ativa = no.arvoreAtiva ?? ARVORE_PRINCIPAL
   const arvores = arvoresDoTerminal(no).map((arvore) => {
     const conta = contarCodigos(no.id, arvore.id)
+    const arquivos = contarArquivos(no.id, arvore.id)
     const principal = arvore.id === ARVORE_PRINCIPAL
     return {
-      rotulo: `${arvore.nome || 'principal'} · ${conta.total}`,
+      rotulo: `${arvore.nome || 'principal'} · ${arquivos === 1 ? '1 arquivo' : `${arquivos} arquivos`}`,
       icone: FileCode,
       marcado: arvore.id === ativa,
       submenu: [
         { rotulo: 'Os próximos arquivos vêm para cá', icone: FileCode, acao: () => usarArvore(no.id, arvore.id) },
         {
-          rotulo: 'Recolher os desta árvore',
+          rotulo: 'Recolher o visor desta árvore',
           icone: ChevronsDownUp,
           desligado: !conta.total || conta.recolhidos === conta.total,
           acao: () => recolherCodigosDoTerminal(no.id, true, arvore.id)
         },
         {
-          rotulo: 'Abrir os desta árvore',
+          rotulo: 'Abrir o visor desta árvore',
           icone: ChevronsUpDown,
           desligado: !conta.recolhidos,
           acao: () => recolherCodigosDoTerminal(no.id, false, arvore.id)
@@ -179,7 +195,7 @@ function itensDasArvores(no: NoTerminal): ItemMenu[] {
           ? []
           : [
               {
-                rotulo: 'Desfazer a árvore (os arquivos voltam para a principal)',
+                rotulo: 'Desfazer a árvore (a lista volta para a principal)',
                 icone: Unlink,
                 acao: () => desfazerArvore(no.id, arvore.id)
               }
@@ -204,6 +220,7 @@ function itensDasArvores(no: NoTerminal): ItemMenu[] {
 export function itensDoCodigoDoTerminal(no: NoTerminal): ItemMenu[] {
   const { total, recolhidos } = contarCodigos(no.id)
   const soltos = contarCodigosSoltos(no.id)
+  const arquivos = contarArquivos(no.id)
   const comLinhas = lerEstado().preferencias.linhasDoCodigo !== false
   // pasta que o app não vigia (a do usuário, a raiz de um disco): dizer o motivo, senão o cartão
   // simplesmente não nasce e parece defeito
@@ -218,47 +235,41 @@ export function itensDoCodigoDoTerminal(no: NoTerminal): ItemMenu[] {
           acao: () => {}
         }
       : {
-          rotulo: 'Abrir o código sozinho quando ele gravar',
+          rotulo: 'Mostrar no visor sozinho o que ele gravar',
           icone: FileCode,
           marcado: no.codigoSozinho !== false,
           acao: () => alternarCodigoSozinho(no.id)
         },
-    { rotulo: 'Abrir um cartão com o último arquivo mexido', icone: FileCode, acao: () => void verCodigoDoTerminal(no) },
+    { rotulo: 'Mostrar o último arquivo mexido no visor', icone: FileCode, acao: () => void verCodigoDoTerminal(no) },
     { rotulo: 'Árvores', icone: FileCode, submenu: itensDasArvores(no) },
     separador,
     {
-      rotulo: total ? `Recolher os ${total} em bloquinhos` : 'Recolher todos',
+      rotulo: total > 1 ? `Recolher os ${total} visores em bloquinhos` : 'Recolher o visor',
       icone: ChevronsDownUp,
       desligado: !total || recolhidos === total,
       acao: () => recolherCodigosDoTerminal(no.id, true)
     },
     {
-      rotulo: 'Abrir todos',
+      rotulo: total > 1 ? 'Abrir todos os visores' : 'Abrir o visor',
       icone: ChevronsUpDown,
       desligado: !recolhidos,
       acao: () => recolherCodigosDoTerminal(no.id, false)
     },
     {
-      rotulo: soltos ? `Trazer ${soltos === 1 ? 'o arquivo solto' : `os ${soltos} arquivos soltos`} de volta` : 'Juntar na coluna',
+      rotulo: soltos ? `Trazer ${soltos === 1 ? 'o visor arrastado' : `os ${soltos} visores arrastados`} de volta` : 'Juntar ao lado do agente',
       icone: FileCode,
       desligado: !soltos,
       acao: () => juntarCodigosDoTerminal(no.id)
     },
     {
-      rotulo: soltos ? `Fechar ${soltos === 1 ? 'o arquivo solto' : `os ${soltos} arquivos soltos`}` : 'Fechar os soltos',
-      icone: Trash2,
-      desligado: !soltos,
-      acao: () => fecharCodigosSoltos(no.id)
-    },
-    {
-      rotulo: total ? `Fechar os ${total} e parar de abrir` : 'Fechar todos e parar de abrir',
+      rotulo: total ? `Fechar ${total > 1 ? `os ${total} visores` : 'o visor'} (${arquivos === 1 ? '1 arquivo' : `${arquivos} arquivos`}) e parar de abrir` : 'Fechar o visor e parar de abrir',
       icone: Trash2,
       perigo: true,
       desligado: !total,
       acao: () => fecharCodigosDoTerminal(no.id)
     },
     separador,
-    { rotulo: 'Mostrar as linhas até os cartões', icone: Unlink, marcado: comLinhas, acao: alternarLinhasDoCodigo }
+    { rotulo: 'Mostrar as linhas até os visores', icone: Unlink, marcado: comLinhas, acao: alternarLinhasDoCodigo }
   ]
 }
 

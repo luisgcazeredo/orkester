@@ -182,6 +182,7 @@ export const CamadaVinculos = memo(function CamadaVinculos({ nos }: { nos: No[] 
         const hy = (Math.min(...pontas.map((p) => p.y)) + Math.max(...pontas.map((p) => p.y))) / 2
         const meio = (hx - tx) / 2
         const todosRecolhidos = cartoes.every((c) => c.tipo === 'codigo' && c.recolhido)
+        const arquivos = cartoes.reduce((t, c) => t + (c.arquivos?.length ?? (c.caminho ? 1 : 0)), 0)
         return (
           <g key={chave} className="vinculo">
             <path d={`M ${tx} ${ty} C ${tx + meio} ${ty}, ${hx - meio} ${hy}, ${hx} ${hy}`} className="vinculo-linha" />
@@ -218,7 +219,7 @@ export const CamadaVinculos = memo(function CamadaVinculos({ nos }: { nos: No[] 
             >
               <title>
                 {nome ? `${nome}: ` : ''}
-                {todosRecolhidos ? 'abrir' : 'recolher'} os {cartoes.length} arquivos — arraste para levar a árvore junto
+                {todosRecolhidos ? 'abrir' : 'recolher'} o visor ({arquivos} {arquivos === 1 ? 'arquivo' : 'arquivos'}) — arraste para levar a árvore junto
               </title>
             </circle>
           </g>

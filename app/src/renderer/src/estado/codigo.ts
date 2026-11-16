@@ -119,7 +119,7 @@ function novoVisor(plano: Plano, terminal: NoTerminal, arvoreId: string): NoCodi
 /** Visores com espera em andamento: cada arquivo novo reinicia a espera daquele visor. */
 const esperas = new Map<string, ReturnType<typeof setTimeout>>()
 
-function agendarExibicao(visorId: string): void {
+export function agendarExibicao(visorId: string): void {
   clearTimeout(esperas.get(visorId))
   esperas.set(
     visorId,

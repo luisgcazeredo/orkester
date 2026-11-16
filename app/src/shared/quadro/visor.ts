@@ -224,3 +224,26 @@ export function migrarEspaco<E extends Plano & { andares: Plano[] }>(espaco: E):
   if (terreo === espaco && andares.every((a, i) => a === espaco.andares[i])) return espaco
   return { ...espaco, nos: terreo.nos, andares }
 }
+
+/**
+ * `ork arvore dar`: os `caminhos` saem das listas de todos os visores de `origem` e entram no topo do visor
+ * **principal** de `destino` (que já existe). A marca de apagado vai junto, e o arquivo sai das outras árvores do
+ * destino para não ficar repetido. Nada a entregar ou destino sem principal → os próprios `nos`.
+ */
+export function entregarEntreVisores(nos: No[], origem: string, destino: string, caminhos: string[], em: number): No[] {
+  const principal = nos.find((n) => ehVisor(n) && n.terminal === destino && (!n.arvore || n.arvore === ARVORE_PRINCIPAL))
+  if (!principal || principal.tipo !== 'codigo') return nos
+  const dele = nos.flatMap((n) => (ehVisor(n) && n.terminal === origem ? n.arquivos : []))
+  const entradas = caminhos.flatMap((c, i) => {
+    const velha = dele.find((a) => a.caminho === c)
+    return velha ? [{ caminho: c, em: em + i, ...(velha.sumiu ? { sumiu: true } : {}) }] : []
+  })
+  if (!entradas.length) return nos
+  const saem = entradas.map((e) => e.caminho)
+  return nos.map((n) => {
+    if (n.tipo !== 'codigo' || !ehVisor(n)) return n
+    if (n.terminal === origem) return tirarDoVisor(n, saem)
+    if (n.terminal !== destino) return n
+    return n.id === principal.id ? juntarNoVisor(n, entradas) : tirarDoVisor(n, saem)
+  })
+}

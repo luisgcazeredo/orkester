@@ -1,16 +1,38 @@
 import { memo, useEffect, useState } from 'react'
-import { ChevronsDownUp, ChevronsUpDown, FileCode, GitCompare, History, RefreshCw } from 'lucide-react'
+import { ChevronsDownUp, ChevronsUpDown, FileCode, GitCompare, History, Pin, Radio, RefreshCw } from 'lucide-react'
 import type { MudancaArquivo } from '../../../shared/api'
 import { caminhoRelativo, nomeDoArquivo } from '../../../shared/arquivos'
 import { escaparHtml } from '../../../shared/realce'
 import type { NoCodigo } from '../../../shared/modelo'
+import { ehVisor } from '../../../shared/quadro/visor'
 import { realcarLinhas } from '../arquivos/realce'
-import { alternarRecolhidoDoCodigo, atualizarNo, pastaDoPlano, planoDe, usarLoja } from '../estado/loja'
+import {
+  alternarRecolhidoDoCodigo,
+  arvoresDoTerminal,
+  atualizarNo,
+  escolherArquivoDoVisor,
+  pastaDoPlano,
+  planoDe,
+  seguirVisor,
+  usarLoja
+} from '../estado/loja'
 import { MolduraNo, type Marca } from '../quadro/MolduraNo'
 import { abrirMenu } from '../ui/MenuContexto'
 
-// O cartão que mostra o código. Ele não pergunta nada ao agente: ou está preso num arquivo (é assim que os
-// cartões automáticos nascem, um por arquivo), ou segue o arquivo mexido por último na pasta do agente.
+// O cartão que mostra o código. Ele não pergunta nada ao agente. Tem duas caras: o **visor** de um agente (uma
+// lista de arquivos à esquerda, mais novo primeiro, e o arquivo escolhido à direita) e o cartão de **um arquivo**
+// só (sem lista), que é o que o explorador abre.
+
+/** "agora", "há 5 min", "há 2 h", "há 3 d": a idade de uma entrada da lista. */
+export function haQuanto(em: number, agora: number): string {
+  const s = Math.max(0, Math.round((agora - em) / 1000))
+  if (s < 45) return 'agora'
+  const min = Math.round(s / 60)
+  if (min < 60) return `há ${min} min`
+  const h = Math.round(min / 60)
+  if (h < 24) return `há ${h} h`
+  return `há ${Math.round(h / 24)} d`
+}
 
 type Tipo = 'mais' | 'menos' | 'trecho' | 'igual'
 
@@ -79,25 +101,42 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
     const alvo = planoDe(e.espaco).nos.find((n) => n.id === no.terminal)
     return alvo?.tipo === 'terminal' ? alvo.nome : null
   })
+  const nomeDaArvore = usarLoja((e) => {
+    if (!e.espaco || !no.terminal || !ehVisor(no)) return ''
+    const alvo = planoDe(e.espaco).nos.find((n) => n.id === no.terminal)
+    if (alvo?.tipo !== 'terminal') return ''
+    return arvoresDoTerminal(alvo).find((a) => a.id === (no.arvore ?? 'principal'))?.nome || 'principal'
+  })
+  const visor = ehVisor(no)
+  const lista = ehVisor(no) ? no.arquivos : []
+  const [agoraMs, definirAgora] = useState(() => Date.now())
+  // a idade das entradas ("há 5 min") se atualiza sozinha, mas só enquanto o visor está aberto
+  useEffect(() => {
+    if (!visor || no.recolhido) return
+    definirAgora(Date.now())
+    const t = setInterval(() => definirAgora(Date.now()), 30_000)
+    return () => clearInterval(t)
+  }, [visor, no.recolhido])
   const [recentes, definirRecentes] = useState<MudancaArquivo[]>([])
   const [carga, definirCarga] = useState<Carga>(VAZIO)
   const [rodada, definirRodada] = useState(0)
 
   const alvo = no.caminho ?? null
+  const apagado = !!lista.find((a) => a.caminho === alvo)?.sumiu
 
   // a lista do botão de histórico: os arquivos que a pasta já tem
   useEffect(() => {
-    if (!pasta) return
+    if (!pasta || visor) return
     let vivo = true
     void window.ork.codigo.recentes(pasta).then((lista) => vivo && definirRecentes(lista))
     return () => {
       vivo = false
     }
-  }, [pasta])
+  }, [pasta, visor])
 
   // vigia a pasta só para reler quando o arquivo deste cartão muda (quem abre cartão novo é a loja)
   useEffect(() => {
-    if (!pasta) return
+    if (!pasta || visor) return
     return window.ork.codigo.vigiar(pasta, (mudanca) => {
       definirRecentes((lista) => {
         const outros = lista.filter((m) => m.caminho !== mudanca.caminho)
@@ -105,11 +144,13 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
       })
       if (mudanca.caminho === no.caminho) definirRodada((r) => r + 1)
     })
-  }, [pasta, no.caminho])
+  }, [pasta, no.caminho, visor])
 
   useEffect(() => {
     // recolhido não lê nada: o bloquinho fica só com o nome e para de custar leitura de disco
     if (no.recolhido || !alvo) return definirCarga(VAZIO)
+    // arquivo que sumiu do disco continua na lista, mas não há o que ler
+    if (apagado) return definirCarga({ ...VAZIO, aviso: 'este arquivo foi apagado do disco' })
     let vivo = true
     const guardar = (c: Carga): void => {
       if (vivo) definirCarga(c)
@@ -147,9 +188,9 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
     return () => {
       vivo = false
     }
-  }, [alvo, no.modo, no.recolhido, rodada])
+  }, [alvo, apagado, no.modo, no.recolhido, rodada])
 
-  const nome = alvo ? nomeDoArquivo(alvo) : 'esperando o agente gravar'
+  const nome = alvo ? nomeDoArquivo(alvo) : visor ? 'nenhum arquivo ainda' : 'esperando o agente gravar'
   const relativo = alvo ? caminhoRelativo(pasta, alvo) ?? alvo : ''
   const semArrasto = { onPointerDown: (e: React.PointerEvent) => e.stopPropagation() }
 
@@ -161,6 +202,7 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
           <header className="cartao-ferramenta-cabecalho" data-arrasta title={alvo ?? pasta}>
             <FileCode size={13} />
             <span className="cartao-ferramenta-titulo">{nome}</span>
+            {visor && <span className="codigo-contagem">{lista.length === 1 ? '1 arquivo' : `${lista.length} arquivos`}</span>}
             <button className="botao-mini" title="Abrir" {...semArrasto} onClick={() => alternarRecolhido(no)}>
               <ChevronsUpDown size={12} />
             </button>
@@ -176,28 +218,45 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
         <header className="cartao-ferramenta-cabecalho" data-arrasta>
           <FileCode size={13} />
           <span className="cartao-ferramenta-titulo" title={alvo ?? pasta}>
-            {nome}
+            {visor ? `${nomeDoTerminal ?? 'código'} · ${nomeDaArvore}` : nome}
           </span>
-          <button
-            className="botao-mini"
-            title="Arquivos mexidos por último nesta pasta"
-            disabled={!recentes.length}
-            {...semArrasto}
-            onClick={(e) => {
-              const caixa = e.currentTarget.getBoundingClientRect()
-              abrirMenu(
-                caixa.left,
-                caixa.bottom,
-                recentes.slice(0, 12).map((m) => ({
-                  rotulo: caminhoRelativo(pasta, m.caminho) ?? nomeDoArquivo(m.caminho),
-                  marcado: m.caminho === alvo,
-                  acao: () => atualizarNo(no.id, { caminho: m.caminho }, false)
-                }))
-              )
-            }}
-          >
-            <History size={12} />
-          </button>
+          {visor && (
+            <button
+              className={`botao-mini codigo-seguir${no.seguindo === false ? '' : ' ligado'}`}
+              title={
+                no.seguindo === false
+                  ? 'Fixo neste arquivo — clique para voltar a seguir o que o agente gravar'
+                  : 'Seguindo o agente: mostra o arquivo mais novo'
+              }
+              disabled={no.seguindo !== false}
+              {...semArrasto}
+              onClick={() => seguirVisor(no.id)}
+            >
+              {no.seguindo === false ? <Pin size={12} /> : <Radio size={12} />}
+            </button>
+          )}
+          {!visor && (
+            <button
+              className="botao-mini"
+              title="Arquivos mexidos por último nesta pasta"
+              disabled={!recentes.length}
+              {...semArrasto}
+              onClick={(e) => {
+                const caixa = e.currentTarget.getBoundingClientRect()
+                abrirMenu(
+                  caixa.left,
+                  caixa.bottom,
+                  recentes.slice(0, 12).map((m) => ({
+                    rotulo: caminhoRelativo(pasta, m.caminho) ?? nomeDoArquivo(m.caminho),
+                    marcado: m.caminho === alvo,
+                    acao: () => atualizarNo(no.id, { caminho: m.caminho }, false)
+                  }))
+                )
+              }}
+            >
+              <History size={12} />
+            </button>
+          )}
           <button
             className="botao-mini"
             title={no.modo === 'diff' ? 'Mostrando o que mudou — ver o arquivo inteiro' : 'Mostrando o arquivo — ver o que mudou'}
@@ -213,8 +272,32 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
             <ChevronsDownUp size={12} />
           </button>
         </header>
-        <div className="codigo-corpo rolavel" data-sem-arrasto>
-          {carga.erro ? (
+        <div className={visor ? 'codigo-visor' : 'codigo-um'}>
+          {visor && (
+            <ul className="codigo-lista rolavel" data-sem-arrasto aria-label="Arquivos do agente">
+              {lista.length === 0 && <li className="codigo-lista-vazia">—</li>}
+              {lista.map((a, i) => {
+                const novo = no.seguindo === false && i === 0 && a.caminho !== alvo
+                return (
+                  <li key={a.caminho}>
+                    <button
+                      className={`codigo-item${a.caminho === alvo ? ' ativo' : ''}${a.sumiu ? ' sumiu' : ''}`}
+                      title={caminhoRelativo(pasta, a.caminho) ?? a.caminho}
+                      onClick={() => escolherArquivoDoVisor(no.id, a.caminho)}
+                    >
+                      <span className="codigo-item-nome">{nomeDoArquivo(a.caminho)}</span>
+                      {novo && <span className="codigo-novo" title="chegou arquivo novo" />}
+                      <span className="codigo-item-idade">{a.sumiu ? 'apagado' : haQuanto(a.em, agoraMs)}</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+          <div className="codigo-corpo rolavel" data-sem-arrasto>
+          {!alvo ? (
+            visor ? <p className="codigo-aviso">Nenhum arquivo ainda. O que o agente gravar aparece aqui.</p> : null
+          ) : carga.erro ? (
             <p className="codigo-aviso">{carga.erro}</p>
           ) : (
             <>
@@ -231,10 +314,12 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
               {carga.truncado && <p className="codigo-aviso">arquivo grande: só o começo está à mostra</p>}
             </>
           )}
+          </div>
         </div>
         <footer className="cartao-ferramenta-rodape" data-arrasta title={alvo ?? ''}>
-          <span className="codigo-caminho">{relativo || pasta}</span>
-          {nomeDoTerminal && <span className="codigo-fonte">{nomeDoTerminal}</span>}
+          <span className="codigo-caminho">{relativo || (visor ? '' : pasta)}</span>
+          {visor && <span className="codigo-fonte">{no.seguindo === false ? 'fixo' : 'seguindo'}</span>}
+          {nomeDoTerminal && !visor && <span className="codigo-fonte">{nomeDoTerminal}</span>}
         </footer>
       </div>
     </MolduraNo>

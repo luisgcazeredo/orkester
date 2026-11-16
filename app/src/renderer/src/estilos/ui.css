@@ -1860,8 +1860,97 @@ kbd {
 
 .codigo-corpo {
   flex: 1;
+  min-width: 0;
   overflow: auto;
   background: var(--terminal-corpo);
+}
+
+/* o visor: a lista de arquivos à esquerda e o arquivo escolhido à direita; o cartão de um arquivo só tem o corpo */
+.codigo-visor,
+.codigo-um {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.codigo-lista {
+  flex: 0 0 220px;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  overflow-y: auto;
+  background: var(--terminal-cabecalho);
+  border-right: 1px solid var(--borda-suave);
+}
+
+.codigo-lista-vazia {
+  padding: 8px 10px;
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--texto-suave);
+}
+
+.codigo-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--texto);
+  font-family: var(--fonte-mono);
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.codigo-item:hover {
+  background: var(--hover);
+}
+
+.codigo-item.ativo {
+  background: var(--lateral-ativo);
+  color: var(--destaque);
+}
+
+.codigo-item-nome {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* apagado do disco: continua na lista, riscado, como histórico */
+.codigo-item.sumiu .codigo-item-nome {
+  text-decoration: line-through;
+  color: var(--texto-suave);
+}
+
+.codigo-item-idade {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--texto-suave);
+}
+
+/* ponto de "chegou arquivo novo" no topo, enquanto o visor está fixo em outro */
+.codigo-novo {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--destaque);
+}
+
+.codigo-contagem {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  color: var(--texto-suave);
+}
+
+.codigo-seguir.ligado {
+  color: var(--destaque);
 }
 
 .codigo-linhas {

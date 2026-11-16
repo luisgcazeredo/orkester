@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 // Node executa provas TypeScript diretamente e precisa da extensão; o bundler resolve a fonte normalmente.
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
-import { anotarNoVisor, ehVisor, escolherNoVisor, exibidoDepois, juntarNoVisor, marcarApagado, MAX_NA_LISTA, migrarCodigos, migrarEspaco, seguirDeNovo, tirarDoVisor, VISOR_ABERTO, VISOR_RECOLHIDO } from './visor.ts'
+import { anotarNoVisor, ehVisor, entregarEntreVisores, escolherNoVisor, exibidoDepois, juntarNoVisor, marcarApagado, MAX_NA_LISTA, migrarCodigos, migrarEspaco, seguirDeNovo, tirarDoVisor, VISOR_ABERTO, VISOR_RECOLHIDO } from './visor.ts'
 import type { No, NoCodigo, Plano } from '../modelo'
 
 const hora = (k: number) => `2026-11-01T10:0${k}:00.000Z`
@@ -322,4 +322,33 @@ test('migrarEspaco: térreo e andares; idempotente; nada a migrar = o mesmo espa
   assert.equal(migrarEspaco(m), m, '2ª rodada: a mesma referência')
   const limpo = { ...plano([terminal('A')]), andares: [] }
   assert.equal(migrarEspaco(limpo), limpo)
+})
+
+test('dar: o arquivo sai de quem deu, entra no principal do destino e some das outras árvores dele', () => {
+  const nos = [
+    terminal('M'),
+    terminal('H'),
+    codigo('vm', { terminal: 'M', arquivos: [{ caminho: 'api.ts', em: 5 }, { caminho: 'z.ts', em: 1 }], caminho: 'api.ts' }),
+    codigo('vh', { terminal: 'H', arquivos: [{ caminho: 'h.ts', em: 2 }], caminho: 'h.ts' }),
+    codigo('vb', { terminal: 'H', arvore: 'Backend', arquivos: [{ caminho: 'api.ts', em: 3 }], caminho: 'api.ts' })
+  ]
+  const depois = entregarEntreVisores(nos, 'M', 'H', ['api.ts'], 100)
+  const por = (id: string) => depois.find((n) => n.id === id) as NoCodigo
+  assert.deepEqual(caminhos(por('vm')), ['z.ts'])
+  assert.deepEqual(caminhos(por('vh')), ['api.ts', 'h.ts'])
+  assert.deepEqual(caminhos(por('vb')), [], 'não fica repetido na outra árvore do destino')
+})
+
+test('dar: a marca de apagado chega ao destino; arquivo que o dador não tem não passa', () => {
+  const nos = [
+    terminal('M'),
+    terminal('H'),
+    codigo('vm', { terminal: 'M', arquivos: [{ caminho: 'x.ts', em: 5, sumiu: true }], caminho: 'x.ts' }),
+    codigo('vh', { terminal: 'H', arquivos: [], caminho: undefined })
+  ]
+  const depois = entregarEntreVisores(nos, 'M', 'H', ['x.ts', 'nao.ts'], 100)
+  const h = depois.find((n) => n.id === 'vh') as NoCodigo
+  assert.deepEqual(h.arquivos, [{ caminho: 'x.ts', em: 100, sumiu: true }])
+  assert.equal(entregarEntreVisores(nos, 'M', 'H', ['nao.ts'], 1), nos)
+  assert.equal(entregarEntreVisores(nos.filter((n) => n.id !== 'vh'), 'M', 'H', ['x.ts'], 1).length, 3, 'sem principal no destino não faz nada')
 })
