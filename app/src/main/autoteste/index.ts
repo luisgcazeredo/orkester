@@ -25,6 +25,7 @@ import { agentes } from './17-agentes'
 import { codigoExplorador } from './18-codigo-explorador'
 import { caixaDeEntrada } from './19-caixa-de-entrada'
 import { menuTerminal } from './20-menu-terminal'
+import { cascaPaginas } from './21-casca-paginas'
 
 // `npm run autoteste`: monta um quadro de exemplo numa pasta de dados temporária, tira print nos dois
 // temas, usa o mouse como um usuário (arrastar terminal, ligar dois terminais pela porta), recarrega e
@@ -123,6 +124,7 @@ export async function rodarAutoteste(
     ...codigoExplorador(e),
     ...caixaDeEntrada(e),
     ...menuTerminal(e),
+    ...cascaPaginas(e),
   ]
   const filtro = (process.env.ORK_CENARIOS ?? '')
     .split(',')
