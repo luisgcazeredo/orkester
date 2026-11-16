@@ -160,17 +160,31 @@ export interface NoPasta extends NoBase {
   expandidas: string[]
 }
 
+/** Uma entrada da lista de um visor: um arquivo que o agente gravou. */
+export interface ArquivoDoVisor {
+  caminho: string
+  /** Quando foi gravado pela última vez (ms desde 1970). */
+  em: number
+  /** O arquivo foi apagado do disco; fica na lista, riscado, como histórico. */
+  sumiu?: boolean
+}
+
 /**
- * Cartão que mostra o código: acompanha um cartão de terminal e segue o arquivo que o agente mexeu por
- * último, ou fica preso num arquivo escolhido à mão.
+ * Visor de código: **um por agente e por árvore**, ao lado dele, com a lista dos arquivos que o agente mexeu
+ * (o mais novo em cima) e o diff ou o conteúdo do que está à mostra. Quem tem `arquivos` é visor.
+ *
+ * Sem `terminal` é o cartão de **um** arquivo, aberto à mão ("Ver o código no quadro" do explorador): sem
+ * lista, sem acompanhar ninguém. Quadro salvo antes do visor tinha um cartão por arquivo; `migrarCodigos`
+ * (shared/quadro/visor.ts) junta esses cartões em um visor ao abrir o espaço. Os campos novos são opcionais,
+ * então uma versão velha que abra um quadro já migrado vê um cartão comum mostrando o arquivo exibido.
  */
 export interface NoCodigo extends NoBase {
   tipo: 'codigo'
-  /** Terminal acompanhado; sem ele (ou se o cartão saiu do quadro), segue a pasta do espaço ou do andar. */
+  /** Terminal acompanhado; sem ele, é o cartão de um arquivo só (ver acima). */
   terminal?: string
   /**
-   * O arquivo que o cartão mostra. Fica vazio só no instante entre abrir o cartão e o agente gravar algo:
-   * na primeira gravação ele passa a ser o cartão daquele arquivo, e o próximo arquivo abre outro cartão.
+   * O arquivo à mostra agora. No visor, é um dos da lista; o corte em 50 nunca o tira. Vazio só enquanto o agente
+   * ainda não gravou nada.
    */
   caminho?: string
   /** O que mudou desde o último commit, ou o arquivo inteiro. */
@@ -181,15 +195,18 @@ export interface NoCodigo extends NoBase {
   alturaAberta?: number
   larguraAberta?: number
   /**
-   * O cartão está na coluna do agente, arrumada pelo app. Ler, recolher, redimensionar e mesmo arrastar
-   * dentro da coluna não tiram ele daqui — só arrastar para longe dela, ou o menu. Fora da coluna, o cartão
-   * fica onde o usuário o deixou.
+   * O visor está na posição que o app arruma, ao lado do agente. Arrastar para longe tira dela, mas o visor
+   * continua sendo do agente e recebendo arquivos. Só decide **posição**.
    */
   automatico?: boolean
-  /** Lugar na coluna, de cima para baixo. É o que guarda a ordem quando você arrasta um cartão para outra. */
+  /** Só para ler quadro antigo (lugar do cartão na coluna). O visor não usa; a migração apaga. */
   ordem?: number
   /** Árvore do agente a que este cartão pertence. Vazio: a árvore principal. */
   arvore?: string
+  /** Os arquivos do visor, o mais novo primeiro (no máximo `MAX_NA_LISTA`). Ter a lista = ser visor. */
+  arquivos?: ArquivoDoVisor[]
+  /** `false`: o visor está fixo no arquivo escolhido e não troca sozinho. Ausente = acompanha o mais novo. */
+  seguindo?: boolean
 }
 
 /**
