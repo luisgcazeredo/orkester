@@ -4,14 +4,14 @@
 // Por que vigiar a pasta em vez de ler a tela do agente: a tela é interface de terceiro e muda sem aviso (foi
 // o que aconteceu com o rodapé de contexto do Claude Code). O sistema de arquivos não mente e serve para
 // qualquer agente. O preço: dois cartões na mesma pasta veem as mesmas mudanças — um andar separa as pastas.
-import { execFile } from 'node:child_process'
-import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, statSync, watch, type Dirent, type FSWatcher } from 'node:fs'
+import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync, watch, type Dirent, type FSWatcher } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { ipcMain, webContents } from 'electron'
 import { CANAIS_CODIGO, type DiffArquivo, type MudancaArquivo, type TextoArquivo } from '../shared/api'
 import { caminhoRelativo, criarFiltro, destinosDoAviso, pastaVigiavel, temCaraDeSegredo, type Filtro } from '../shared/arquivos'
-import { dentroDeUmaRaiz, raizesDoQuadro } from './dados'
+import { dentroDeUmaRaiz, raizesDoQuadro, raizesParaAbrir } from './dados'
+import { gitSeguro } from './gitSeguro'
 
 /** Uma gravação costuma chegar em rajada (temporário, troca de nome, arquivo final): espera e junta. */
 const ESPERA = 250
@@ -272,15 +272,32 @@ function ler(caminho: string): TextoArquivo {
   }
 }
 
-function git(pasta: string, argumentos: string[]): Promise<{ ok: boolean; saida: string }> {
-  return new Promise((pronto) => {
-    execFile(
-      'git',
-      argumentos,
-      { cwd: pasta, timeout: 5000, windowsHide: true, maxBuffer: LIMITE_PATCH * 2 },
-      (erro, saida) => pronto({ ok: !erro, saida: String(saida ?? '') })
-    )
+async function git(pasta: string, argumentos: string[]): Promise<{ ok: boolean; saida: string }> {
+  const r = await gitSeguro(pasta, argumentos, { timeout: 5000, maxBuffer: LIMITE_PATCH * 2 })
+  return { ok: r.codigo === 0, saida: r.saida }
+}
+
+/** Pasta fixada do Leitor (só leitura, de fora do quadro): nenhum git roda lá, o `.git/config` dela não é de confiança. */
+function ehPastaFixadaDoLeitor(caminho: string): boolean {
+  const alvo = realDe(caminho) ?? realDe(dirname(caminho))
+  if (!alvo) return true
+  return !raizesParaAbrir().some((raiz) => {
+    const r = realDe(raiz)
+    return r !== null && dentroDaPasta(r, alvo)
   })
+}
+
+function realDe(caminho: string): string | null {
+  try {
+    return realpathSync.native(caminho)
+  } catch {
+    return null
+  }
+}
+
+function dentroDaPasta(raiz: string, alvo: string): boolean {
+  const rel = relative(raiz.toLowerCase(), alvo.toLowerCase())
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
 }
 
 /** O que mudou desde o último commit. Sem git, sem mudança ou arquivo novo, não há patch — e isso é dito. */
@@ -291,6 +308,7 @@ async function diff(caminho: string): Promise<DiffArquivo> {
   }
   if (temCaraDeSegredo(caminho)) return { ...vazio, erro: 'arquivo com cara de segredo: não mostro o conteúdo' }
   if (!existsSync(caminho)) return { ...vazio, erro: 'arquivo não encontrado' }
+  if (ehPastaFixadaDoLeitor(caminho)) return { ...vazio, semGit: true }
   const pasta = dirname(caminho)
   const raiz = await git(pasta, ['rev-parse', '--show-toplevel'])
   if (!raiz.ok) return { ...vazio, semGit: true }

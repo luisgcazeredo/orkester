@@ -11,8 +11,9 @@
     "build": "electron-vite build",
     "start": "set \"ELECTRON_RUN_AS_NODE=\" && electron-vite preview",
     "typecheck": "tsc --noEmit",
-    "provas": "node --test \"src/**/*.prova.mts\"",
+    "provas": "node --test \"src/**/*.prova.mts\" \"scripts/*.prova.mts\"",
     "autoteste": "set \"ELECTRON_RUN_AS_NODE=\" && electron-vite build && electron . --autoteste",
+    "autoteste:curto": "node scripts/cenarios-da-mudanca.mjs --rodar",
     "medir": "set \"ELECTRON_RUN_AS_NODE=\" && electron-vite build && electron . --medir",
     "empacotar": "set \"ELECTRON_RUN_AS_NODE=\" && electron-vite build && node scripts/limpar-pacote.mjs && electron-builder --win --x64 && node scripts/conferir-pacote.mjs && node scripts/conferir-saida.mjs",
     "instalar": "npm run empacotar && node scripts/instalar.mjs"
@@ -37,6 +38,7 @@
     "electron-vite": "6.0.0",
     "highlight.js": "11.12.0",
     "lucide-react": "1.58.0",
+    "markdown-it": "15.0.3",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "typescript": "6.0.3",

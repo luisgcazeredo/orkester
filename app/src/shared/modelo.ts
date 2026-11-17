@@ -403,6 +403,12 @@ export interface Preferencias {
   corPostItPadrao: CorPostIt
   /** false esconde as linhas entre o agente e os cartões de código dele. Campo novo: sem ele, mostra. */
   linhasDoCodigo?: boolean
+  /** Leitor de Markdown: pastas absolutas que o usuário fixou (até 20). Campo novo: arquivo antigo não tem. */
+  leitor?: LeitorPreferencias
+}
+
+export interface LeitorPreferencias {
+  pastas: string[]
 }
 
 export interface EstadoJanela {

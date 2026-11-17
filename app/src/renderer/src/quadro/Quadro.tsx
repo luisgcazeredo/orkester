@@ -126,7 +126,8 @@ export function Quadro() {
   useEffect(() => {
     const digitando = (): boolean => !!document.activeElement?.closest('input, textarea, [contenteditable], [data-teclado]')
     const baixo = (e: KeyboardEvent): void => {
-      if (e.code === 'Space' && !digitando()) {
+      // o quadro fica montado (escondido) com outra página em tela: o Space é daquela página (rolar, ativar botão)
+      if (e.code === 'Space' && lerEstado().paginaAtiva === 'quadro' && !digitando()) {
         e.preventDefault()
         setEspacoApertado(true)
       }

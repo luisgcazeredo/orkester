@@ -1,0 +1,26 @@
+{
+  "aviso": "Mapa arquivo -> cenários do autoteste. Caminhos relativos a app/. Termina em / = pasta inteira; senão é o arquivo exato. Usado por scripts/cenarios-da-mudanca.mjs (npm run autoteste:curto). Todo nome citado aqui precisa existir: o autoteste falha se não existir.",
+  "padrao": ["casca-paginas", "menus-dialogos"],
+  "aguardando": ["menus-dialogos"],
+  "ignorar": [".prova.mts", ".md", ".log", "package-lock.json"],
+  "regras": [
+    { "arquivos": ["src/main/rotinas.ts", "src/shared/rotinas.ts", "src/renderer/src/estado/rotinas.ts", "src/renderer/src/ui/Rotinas.tsx"], "cenarios": ["rotinas"] },
+    { "arquivos": ["src/main/correio.ts", "src/shared/correio.ts"], "cenarios": ["ork-correio"] },
+    { "arquivos": ["src/main/codigo.ts", "src/shared/arquivos.ts", "src/shared/realce.ts", "src/shared/quadro/visor.ts", "src/renderer/src/estado/codigo.ts", "src/renderer/src/nos/Codigo.tsx", "src/renderer/src/arquivos/", "src/renderer/src/ui/BarraExplorador.tsx"], "cenarios": ["codigo-explorador"] },
+    { "arquivos": ["src/main/caixa.ts", "src/renderer/src/estado/caixa.ts", "src/renderer/src/estado/caixas.ts"], "cenarios": ["caixa-de-entrada"] },
+    { "arquivos": ["src/renderer/src/ui/Presets.tsx", "src/main/comandos.ts"], "cenarios": ["ork-presets"] },
+    { "arquivos": ["src/shared/catalogo.ts"], "cenarios": ["ork-catalogo", "ork-presets"] },
+    { "arquivos": ["src/renderer/src/ui/Partituras.tsx", "src/shared/quadro/partituras.ts"], "cenarios": ["ork-partituras"] },
+    { "arquivos": ["src/renderer/src/ui/Funcoes.tsx"], "cenarios": ["ork-conexoes"] },
+    { "arquivos": ["src/main/navegador.ts", "src/renderer/src/nos/Portal.tsx", "src/renderer/src/nos/PortalChrome.tsx"], "cenarios": ["quadro-portal"] },
+    { "arquivos": ["src/renderer/src/casca/", "src/renderer/src/App.tsx"], "cenarios": ["casca-paginas", "barra-paginas"] },
+    { "arquivos": ["src/renderer/src/ui/Configuracoes.tsx", "src/shared/preferencias.ts", "src/shared/temas.ts"], "cenarios": ["tela-configuracoes"] },
+    { "arquivos": ["src/shared/quadro/bandas.ts", "src/renderer/src/nos/Banda.tsx", "src/renderer/src/estado/bandas.ts"], "cenarios": ["ork-banda"] },
+    { "arquivos": ["src/main/terminais.ts", "src/renderer/src/terminal/", "src/renderer/src/nos/PecaTerminal.tsx", "src/renderer/src/estado/terminais.ts"], "cenarios": ["selecao-no-terminal", "teto-de-terminais", "menu-terminal"] },
+    { "arquivos": ["src/main/dados.ts", "src/renderer/src/estado/espacos.ts", "src/renderer/src/ui/ListaDeEspacos.tsx"], "cenarios": ["ork-espacos"] },
+    { "arquivos": ["src/mcp/orkester.ts"], "cenarios": ["ork-mcp"] },
+    { "arquivos": ["src/cli/ork.ts", "src/main/verbos.ts", "src/main/verbosDoAgente.ts", "src/main/verbosDoUsuario.ts"], "cenarios": ["ork", "ork-conexoes", "ork-quadro"] },
+    { "arquivos": ["src/main/quadroDoAgente.ts", "src/shared/quadro/agente.ts"], "cenarios": ["ork-quadro"] },
+    { "arquivos": ["src/renderer/src/quadro/", "src/renderer/src/estado/nos.ts", "src/renderer/src/estado/loja.ts", "src/renderer/src/estado/nucleo.ts", "src/shared/quadro/geometria.ts", "src/shared/quadro/empurrar.ts"], "cenarios": ["quadro-portal", "ork-conexoes"] }
+  ]
+}

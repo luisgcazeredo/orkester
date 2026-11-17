@@ -34,7 +34,10 @@ const medindo = process.argv.includes('--medir')
 if (autoteste) app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
 // E o autoteste usa um perfil do Chromium só dele: com o app instalado aberto, os dois disputavam o mesmo
 // perfil e a rodada morria sem dizer nada — ficava um log vazio, que já custou rodadas para entender.
-if (autoteste) app.setPath('userData', join(tmpdir(), 'orkester-autoteste-chromium'))
+// Pasta POR RODADA (dois autotestes ao mesmo tempo não disputam o GPUPersistentCache): dentro de ORK_DADOS quando
+// existir (some junto com ela), senão em %TEMP% com o pid, que a rodada apaga antes do app.exit (autoteste/index.ts; process.on('exit') não dispara com app.exit).
+const pastaChromiumDoAutoteste = process.env.ORK_DADOS ? resolve(process.env.ORK_DADOS, 'chromium-autoteste') : join(tmpdir(), `orkester-autoteste-chromium-${process.pid}`)
+if (autoteste) app.setPath('userData', pastaChromiumDoAutoteste)
 // Com ORK_DADOS (cópia de teste, conferir-saida) o perfil do Chromium vai junto da pasta de dados: a trava de
 // instância única é por perfil, então outra pasta de dados é outra instância e não cede a vez ao app instalado.
 // Sem ORK_DADOS nada muda: o perfil padrão segue único e o app do Luís continua com uma instância só.

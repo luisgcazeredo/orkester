@@ -9,7 +9,7 @@ export const cascaPaginas = (_e: Estado): Cenario[] => [
         const { esperar, js, conferir, teclar, print } = d
         const estado = (): Promise<{ ativa: string; ferramenta: string; quadro: boolean; teste: boolean }> =>
           js(`({ ativa: window.__teste.casca.paginaAtiva(), ferramenta: window.__teste.loja.lerEstado().ferramenta,
-            quadro: !!document.querySelector('.quadro'), teste: !!document.querySelector('#pagina-teste-casca') })`)
+            quadro: !!document.querySelector('.pagina-ativa .quadro'), teste: !!document.querySelector('#pagina-teste-casca') })`)
         try {
           // o quadro só monta depois da carga do espaço: dá até 6 s
           let inicio = await estado()

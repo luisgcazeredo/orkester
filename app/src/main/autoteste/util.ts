@@ -1,9 +1,24 @@
-import { BrowserWindow } from 'electron'
-import { readdirSync, writeFileSync } from 'node:fs'
+import { BrowserWindow, app, nativeImage } from 'electron'
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pastaDoCorreio } from '../correio'
 import { ehRecado } from '../../shared/correio'
 import { sessaoPorId, telaDe } from '../terminais'
+import { JANELA_BASE, compararBitmaps, relatarComparacao } from './comparar'
+
+type ModoBase = 'gravar' | 'comparar' | null
+const modoBase = (): ModoBase => {
+  const m = (process.env.ORK_BASE ?? '').trim()
+  if (m === '') return null
+  if (m === 'gravar' || m === 'comparar') return m
+  throw new Error(`ORK_BASE=${m} não existe: use gravar ou comparar`)
+}
+// Escala 1 só vale se for pedida antes de a janela nascer: este módulo é importado (index.ts) antes do `ready`.
+// Num monitor a 125% a janela de 1280×800 sairia 1600×1000 em pixels reais; com isto sai 1280×800.
+if (process.env.ORK_BASE?.trim() && process.argv.includes('--autoteste')) app.commandLine.appendSwitch('force-device-scale-factor', '1')
+
+/** Base de capturas: .contexto/base-telas na raiz do projeto (fora do git), ou ORK_BASE_PASTA. */
+const pastaDaBase = (): string => process.env.ORK_BASE_PASTA || join(app.getAppPath(), '..', '.contexto', 'base-telas')
 
 /** Recados que sobraram na pasta do correio. Zero é o esperado: quem lê apaga. */
 export function recadosNoCorreio(): number {
@@ -24,16 +39,97 @@ export function criarDriver(janela: BrowserWindow, pastaSaida: string) {
   const conferir = (nome: string, ok: boolean, detalhe = ''): void => {
     resultados.push([nome, ok, detalhe])
   }
-  const print = async (nome: string): Promise<void> => {
+  const capturar = async (): Promise<Electron.NativeImage> => {
     for (let tentativa = 1; ; tentativa++) {
       await esperar(400 * tentativa)
       try {
-        writeFileSync(join(pastaSaida, `autoteste-${nome}.png`), (await tela.capturePage()).toPNG())
-        return
+        return await tela.capturePage()
       } catch (erro) {
         if (tentativa === 4) throw erro
       }
     }
+  }
+  // ORK_BASE=gravar guarda a captura como base; ORK_BASE=comparar a confronta com ela. O nome do print
+  // é o nome do arquivo da base: quem chama põe cenário e tema nele (ex.: 'casca-pagina-teste').
+  const nomesDaRodada = new Set<string>()
+  const printBase = async (modo: 'gravar' | 'comparar', nome: string, img: Electron.NativeImage): Promise<void> => {
+    const pasta = pastaDaBase()
+    const arquivo = join(pasta, `${nome}.png`)
+    const indice = join(pasta, 'base.json')
+    // dois prints com o mesmo nome se sobrescreveriam em silêncio (gravar) ou confrontariam a mesma base duas vezes
+    if (nomesDaRodada.has(nome)) {
+      conferir(`base: ${nome}`, false, 'nome de print repetido nesta rodada: ponha cenário e tema no nome')
+      return
+    }
+    nomesDaRodada.add(nome)
+    const escala = await js<number>('window.devicePixelRatio')
+    if (escala !== 1) throw new Error(`base de telas pede escala 1; a janela está em ${escala} (o force-device-scale-factor não pegou)`)
+    const { width, height } = img.getSize()
+    if (width !== JANELA_BASE.largura || height !== JANELA_BASE.altura) {
+      throw new Error(`base de telas pede janela ${JANELA_BASE.largura}x${JANELA_BASE.altura} em escala 1; a captura veio ${width}x${height}`)
+    }
+    if (modo === 'gravar') {
+      mkdirSync(pasta, { recursive: true })
+      writeFileSync(arquivo, img.toPNG())
+      let base: { versao?: string; janela?: unknown; escala?: number; telas?: Record<string, { largura: number; altura: number }> } = {}
+      try {
+        base = JSON.parse(readFileSync(indice, 'utf8'))
+      } catch {
+        // primeira gravação
+      }
+      base.versao = app.getVersion()
+      base.janela = { largura: JANELA_BASE.largura, altura: JANELA_BASE.altura }
+      base.escala = escala
+      base.telas = { ...(base.telas ?? {}), [nome]: { largura: width, altura: height } }
+      writeFileSync(indice, JSON.stringify(base, null, 2) + '\n')
+      conferir(`base gravada: ${nome}`, true, arquivo)
+      return
+    }
+    if (!existsSync(arquivo)) {
+      conferir(`base: ${nome}`, false, `sem base em ${arquivo} (rode antes com ORK_BASE=gravar)`)
+      return
+    }
+    const velha = nativeImage.createFromBuffer(readFileSync(arquivo))
+    const tamanho = velha.getSize()
+    if (tamanho.width !== width || tamanho.height !== height) {
+      conferir(`base: ${nome}`, false, `tamanho ${width}x${height} contra a base ${tamanho.width}x${tamanho.height}`)
+      return
+    }
+    const c = compararBitmaps(
+      { largura: width, altura: height, dados: velha.toBitmap() },
+      { largura: width, altura: height, dados: img.toBitmap() }
+    )
+    const { ok, gravarDiferenca, detalhe: texto } = relatarComparacao(c)
+    let detalhe = texto
+    if (gravarDiferenca) {
+      const saida = join(pastaSaida, `diferenca-${nome}.png`)
+      writeFileSync(saida, nativeImage.createFromBitmap(Buffer.from(c.diferenca), { width, height }).toPNG())
+      detalhe += ` — diferença em ${saida}`
+    }
+    conferir(`base: ${nome}`, ok, detalhe)
+  }
+  const print = async (nome: string): Promise<void> => {
+    const modo = modoBase()
+    if (modo) {
+      // janela fixa só nos modos de base; sem ORK_BASE o print continua do tamanho que a janela tem
+      const [l, a] = janela.getContentSize()
+      if (janela.isMaximized() || janela.isFullScreen() || l !== JANELA_BASE.largura || a !== JANELA_BASE.altura) {
+        if (janela.isFullScreen()) janela.setFullScreen(false)
+        if (janela.isMaximized()) janela.unmaximize()
+        // em tela com escala de 125% o Windows arredonda o tamanho da janela e sobram uns pixels: ajusta pela sobra
+        let pedido: number[] = [JANELA_BASE.largura, JANELA_BASE.altura]
+        for (let i = 0; i < 4; i++) {
+          janela.setContentSize(pedido[0], pedido[1])
+          await esperar(400)
+          const [cl, ca] = janela.getContentSize()
+          if (cl === JANELA_BASE.largura && ca === JANELA_BASE.altura) break
+          pedido = [pedido[0] - (cl - JANELA_BASE.largura), pedido[1] - (ca - JANELA_BASE.altura)]
+        }
+      }
+    }
+    const img = await capturar()
+    writeFileSync(join(pastaSaida, `autoteste-${nome}.png`), img.toPNG())
+    if (modo) await printBase(modo, nome, img)
   }
   const aguardarCarga = async (): Promise<void> => {
     for (let i = 0; i < 60; i++) {

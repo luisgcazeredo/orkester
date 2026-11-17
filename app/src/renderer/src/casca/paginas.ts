@@ -13,6 +13,8 @@ export interface Pagina {
   /** Vem de fábrica (não é de um plugin). */
   nativa: boolean
   Componente: () => JSX.Element
+  /** Fica montada (só escondida) quando outra página está em tela: o quadro precisa, ou os terminais cairiam junto. */
+  manterMontada?: boolean
   /** Atalhos próprios da página (R6): só chamados com ela ativa. */
   atalhos?: (e: KeyboardEvent) => void
 }
@@ -38,10 +40,26 @@ export function ligarPaginaAtiva(novo?: ArmazemDaPaginaAtiva): void {
   armazem = novo ?? armazemEmMemoria()
 }
 
+// A barra de páginas desenha o que está registrado; quem registra depois (plugin) precisa avisá-la.
+const ouvintesDoRegistro = new Set<() => void>()
+let versaoDoRegistro = 0
+
+export function aoMudarRegistro(ouvinte: () => void): () => void {
+  ouvintesDoRegistro.add(ouvinte)
+  return () => void ouvintesDoRegistro.delete(ouvinte)
+}
+
+/** Número que sobe a cada página registrada (para `useSyncExternalStore`). */
+export function versaoDoRegistroDePaginas(): number {
+  return versaoDoRegistro
+}
+
 /** Recusa (lança) id repetido: duas páginas com o mesmo id esconderiam uma à outra. */
 export function registrarPagina(pagina: Pagina): void {
   if (paginas.has(pagina.id)) throw new Error(`Já existe uma página com o id "${pagina.id}".`)
   paginas.set(pagina.id, pagina)
+  versaoDoRegistro++
+  ouvintesDoRegistro.forEach((o) => o())
 }
 
 export function paginasRegistradas(): Pagina[] {
@@ -67,7 +85,31 @@ export function irParaPagina(id: string): boolean {
   return true
 }
 
+/**
+ * Despacho dos atalhos: o `keydown` global chama isto, e só o `atalhos` da página ativa é chamado (R6).
+ * Página sem `atalhos`, ou ativa sem registro, não faz nada.
+ */
+export function despacharAtalho(e: KeyboardEvent): void {
+  acharPagina(paginaAtiva())?.atalhos?.(e)
+}
+
+// Páginas já montadas, na ordem em que apareceram. Uma página sem `manterMontada` sai daqui ao deixar de ser a
+// ativa (desmonta); uma com `manterMontada` fica, e a casca só a esconde.
+let montadas: string[] = []
+
+/**
+ * As páginas que a casca deve manter montadas com `ativa` em tela: a ativa, mais as já montadas que pedem
+ * `manterMontada`. A ordem é estável (a primeira a montar fica no início), para o React não remontar ao trocar.
+ */
+export function paginasMontadas(ativa: string): string[] {
+  const alvo = temPagina(ativa) ? ativa : PAGINA_INICIAL
+  montadas = montadas.filter((id) => id === alvo || acharPagina(id)?.manterMontada)
+  if (!montadas.includes(alvo)) montadas.push(alvo)
+  return [...montadas]
+}
+
 /** Só para a prova: esvazia o registro. */
 export function limparPaginas(): void {
   paginas.clear()
+  montadas = []
 }

@@ -26,6 +26,9 @@ import { codigoExplorador } from './18-codigo-explorador'
 import { caixaDeEntrada } from './19-caixa-de-entrada'
 import { menuTerminal } from './20-menu-terminal'
 import { cascaPaginas } from './21-casca-paginas'
+import { barraPaginas } from './24-barra-paginas'
+import mapa from './mapa.json'
+import { apagarChromiumDaRodada, escolherCenarios } from './filtro'
 
 // `npm run autoteste`: monta um quadro de exemplo numa pasta de dados temporária, tira print nos dois
 // temas, usa o mouse como um usuário (arrastar terminal, ligar dois terminais pela porta), recarrega e
@@ -125,43 +128,69 @@ export async function rodarAutoteste(
     ...caixaDeEntrada(e),
     ...menuTerminal(e),
     ...cascaPaginas(e),
+    ...barraPaginas(e),
   ]
-  const filtro = (process.env.ORK_CENARIOS ?? '')
-    .split(',')
-    .map((nome) => nome.trim().toLocaleLowerCase())
-    .filter(Boolean)
-  // Pedir um cenário traz o que ele depende, em cadeia: sem isto, `ORK_CENARIOS=ork-correio` só dizia
-  // "não rodou: depende de ork", e a única saída era rodar a suíte inteira para conferir uma coisa só.
-  const pedidos = new Set(
-    cenarios.filter((cenario) => !filtro.length || filtro.some((nome) => cenario.nome.toLocaleLowerCase().includes(nome))).map((c) => c.nome)
-  )
-  for (let mudou = true; mudou; ) {
-    mudou = false
-    for (const cenario of cenarios) {
-      if (pedidos.has(cenario.nome) && cenario.depende && !pedidos.has(cenario.depende)) {
-        pedidos.add(cenario.depende)
-        mudou = true
-      }
-    }
+  // O mapa arquivo→cenários (autoteste:curto) não pode apontar para um cenário que não existe: um nome
+  // errado faria o teste curto "passar" sem rodar nada. `aguardando` é o que outra tarefa ainda vai criar.
+  const existentes = new Set(cenarios.map((cenario) => cenario.nome))
+  const citados = new Set([...mapa.padrao, ...mapa.regras.flatMap((regra) => regra.cenarios)])
+  const inexistentes = [...citados].filter((nome) => !existentes.has(nome) && !mapa.aguardando.includes(nome))
+  driver.conferir('mapa-de-cenarios', inexistentes.length === 0, inexistentes.length ? `cenário inexistente no mapa: ${inexistentes.join(', ')}` : `${citados.size} nomes conferidos`)
+  const tetoMs = (Number(process.env.ORK_TETO_MIN) > 0 ? Number(process.env.ORK_TETO_MIN) : 15) * 60_000
+  // Casamento por nome EXATO (filtro.ts). Pedir o que não existe é FALHA: nunca "PASSOU com 0 cenários".
+  // O que o cenário pedido depende (`depende`) entra em cadeia: sem isto, `ORK_CENARIOS=ork-correio` só dizia
+  // "não rodou: depende de ork".
+  const { selecionados, semPar, adiados } = escolherCenarios(cenarios, process.env.ORK_CENARIOS, mapa.aguardando)
+  if (adiados.length) console.log(`AUTOTESTE AVISO cenário ainda não existe (está em aguardando no mapa), pulado: ${adiados.join(', ')}`)
+  if (semPar.length || (process.env.ORK_CENARIOS?.trim() && !selecionados.length && !adiados.length)) {
+    driver.conferir(
+      'filtro-de-cenarios',
+      false,
+      `ORK_CENARIOS pede cenário que não existe: ${semPar.join(', ') || process.env.ORK_CENARIOS}. Existem: ${cenarios.map((c) => c.nome).join(', ')}`
+    )
   }
-  const selecionados = cenarios.filter((cenario) => pedidos.has(cenario.nome))
   const situacao = new Map<string, 'passou' | 'falhou' | 'não rodou'>()
   const detalhesDeCenario = new Map<string, string>()
+  const duracoes = new Map<string, number>()
+  let estourou: string | undefined
   for (const cenario of selecionados) {
+    if (estourou) {
+      // o cenário que estourou segue vivo com o mesmo driver e a mesma janela: rodar outro em cima dele sujaria o resultado
+      situacao.set(cenario.nome, 'não rodou')
+      detalhesDeCenario.set(cenario.nome, `${estourou} estourou o tempo; a rodada parou`)
+      continue
+    }
     if (cenario.depende && situacao.get(cenario.depende) !== 'passou') {
       situacao.set(cenario.nome, 'não rodou')
       detalhesDeCenario.set(cenario.nome, `depende de ${cenario.depende}`)
       continue
     }
+    const inicio = Date.now()
+    let relogio: NodeJS.Timeout | undefined
     try {
-      await cenario.rodar(driver)
+      await Promise.race([
+        cenario.rodar(driver),
+        new Promise<never>((_, rejeitar) => {
+          relogio = setTimeout(() => {
+            estourou = cenario.nome
+            rejeitar(new Error(`estourou o tempo (${tetoMs / 60_000} min, ORK_TETO_MIN)`))
+          }, tetoMs)
+        })
+      ])
       situacao.set(cenario.nome, 'passou')
     } catch (erro) {
       const detalhe = erro instanceof Error ? erro.message : String(erro)
       situacao.set(cenario.nome, 'falhou')
       detalhesDeCenario.set(cenario.nome, detalhe)
       console.error(`AUTOTESTE ERRO ${cenario.nome}`, erro)
+    } finally {
+      clearTimeout(relogio)
+      duracoes.set(cenario.nome, Date.now() - inicio)
     }
+  }
+  if (estourou) {
+    const parados = [...situacao].filter(([, estado]) => estado === 'não rodou').map(([nome]) => nome)
+    console.log(`AUTOTESTE ESTOUROU o tempo em ${estourou}; não rodaram: ${parados.join(', ') || '(nenhum)'}`)
   }
   const passou = resultados.every(([, ok]) => ok) && [...situacao.values()].every((estado) => estado === 'passou')
   for (const [nome, estado] of situacao) {
@@ -176,9 +205,13 @@ export async function rodarAutoteste(
     `AUTOTESTE resumo — ${resultados.length} checagens (${passouChecagens} ok, ${falhouChecagens} falhas) · ` +
       `${situacao.size} cenários (${passouCenarios} ok, ${falhouCenarios} falhas, ${naoRodouCenarios} não rodaram)`
   )
+  for (const [nome, ms] of duracoes) console.log(`AUTOTESTE duração ${nome} — ${(ms / 1000).toFixed(1)} s`)
+  console.log(`AUTOTESTE duração total — ${([...duracoes.values()].reduce((soma, ms) => soma + ms, 0) / 1000).toFixed(1)} s`)
   for (const [nome, ok, detalhe] of resultados) console.log(`AUTOTESTE ${ok ? 'ok    ' : 'FALHOU'} ${nome} — ${detalhe}`)
   console.log(`AUTOTESTE ${passou ? 'PASSOU' : 'FALHOU'} — prints em ${pastaSaida}`)
   encerrarTodos()
   await encerrarNavegador()
+  // app.exit não dispara process.on('exit'): a pasta do Chromium desta rodada (sem ORK_DADOS) é apagada aqui
+  if (!process.env.ORK_DADOS) console.log(`AUTOTESTE pasta do Chromium ${apagarChromiumDaRodada(app.getPath('userData'), process.pid)}`)
   app.exit(passou ? 0 : 1)
 }

@@ -134,6 +134,9 @@ export function CorpoXterm({ id, ativo }: Props) {
 
   // Ativo, o cartão é dono do teclado. Focar uma só vez não basta: no mesmo clique que o selecionou, o
   // navegador ainda vai entregar um mousedown que mexe no foco, então foca de novo no quadro seguinte.
+  // `noQuadro` entra nas dependências: ao voltar de outra página o mesmo terminal continua ativo (`ativo` não muda)
+  // e o foco ficou no botão da barra; sem mexer no tamanho.
+  const noQuadro = usarLoja((e) => e.paginaAtiva === 'quadro')
   useEffect(() => {
     const terminal = termRef.current?.terminal
     if (!terminal) return
@@ -141,10 +144,11 @@ export function CorpoXterm({ id, ativo }: Props) {
       terminal.blur()
       return
     }
+    if (!noQuadro) return
     terminal.focus()
     const quadro = requestAnimationFrame(() => terminal.focus())
     return () => cancelAnimationFrame(quadro)
-  }, [ativo])
+  }, [ativo, noQuadro])
 
   return (
     <div

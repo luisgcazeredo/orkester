@@ -2472,3 +2472,55 @@ textarea:focus-visible,
 .dialogo-texto.erro {
   color: var(--perigo);
 }
+
+/* ---------- casca: pilha de páginas e trilho de ícones ---------- */
+
+/* as páginas montadas dividem o mesmo lugar; a escondida segue com o tamanho (o terminal não é redimensionado) */
+.paginas {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+
+.pagina {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+.pagina-escondida {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.barra-paginas {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--espaco-1);
+  padding: var(--espaco-3) var(--espaco-2);
+  background: var(--lateral-fundo);
+  border-right: 1px solid var(--lateral-borda);
+}
+
+.barra-pagina {
+  display: grid;
+  place-items: center;
+  padding: var(--espaco-2);
+  border: 0;
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--texto-suave);
+}
+
+.barra-pagina:hover {
+  background: var(--hover);
+  color: var(--texto);
+}
+
+.barra-pagina.ativo {
+  background: var(--lateral-ativo);
+  color: var(--destaque);
+}

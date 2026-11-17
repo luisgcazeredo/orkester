@@ -29,6 +29,7 @@ import {
   type ResumoEspaco
 } from '../shared/modelo'
 import { CANAIS_DADOS } from '../shared/api'
+import { leitorValido, pastaFixavelReal, raizesDeLeitura } from '../shared/leitor'
 import { juntarPreferencias, type PreferenciasParciais } from '../shared/preferencias'
 import { TEMA_PADRAO, temaValido } from '../shared/temas'
 import { SESSAO_VAZIA, sessaoValida, type Sessao } from '../shared/janelas'
@@ -252,9 +253,41 @@ export function criarEspacoDoAgente(nome: string, pasta: string): ResumoEspaco {
 
 const ESTADO_PADRAO: EstadoJanela = { versao: 1, espacoAtivo: null, lateralAberta: true, explorador: { aberto: false, raizes: [] } }
 
+/** Caminho real de uma pasta (atalho/junção resolvidos); null se não existe ou não é pasta. */
+function resolverPasta(caminho: string): string | null {
+  try {
+    const r = realpathSync.native(caminho)
+    return statSync(r).isDirectory() ? r : null
+  } catch {
+    return null
+  }
+}
+
+const raizesRecusadas = new Set<string>()
+
+/**
+ * Fica só com as pastas que passam na regra das pastas fixadas, pelo texto e pelo caminho real (nada de disco,
+ * casa, ancestral da casa, rede ou pasta inexistente). A recusada é descartada com aviso no log (uma vez por
+ * caminho), sem quebrar o resto.
+ */
+function raizesFixaveis(origem: string, raizes: unknown): string[] {
+  if (!Array.isArray(raizes)) return []
+  const casa = homedir()
+  const boas: string[] = []
+  for (const raiz of raizes) {
+    if (pastaFixavelReal(raiz, casa, resolverPasta) !== null) boas.push(raiz as string)
+    else if (!raizesRecusadas.has(`${origem}|${String(raiz)}`)) {
+      raizesRecusadas.add(`${origem}|${String(raiz)}`)
+      console.warn(`[dados] ${origem}: pasta descartada (inválida, inexistente ou larga demais): ${JSON.stringify(raiz)}`)
+    }
+  }
+  return boas
+}
+
 function lerEstadoDaJanela(): EstadoJanela {
   const lido = lerJson<EstadoJanela>(join(RAIZ, 'estado.json'), ESTADO_PADRAO)
-  return { ...ESTADO_PADRAO, ...lido, explorador: { ...ESTADO_PADRAO.explorador!, ...lido.explorador } }
+  const explorador = { ...ESTADO_PADRAO.explorador!, ...lido.explorador }
+  return { ...ESTADO_PADRAO, ...lido, explorador: { ...explorador, raizes: raizesFixaveis('explorador', explorador.raizes) } }
 }
 
 /** Nós de todos os espaços e de todos os andares. */
@@ -292,6 +325,15 @@ function dentroDeUmaArvore(caminho: string): boolean {
  * só mais larga do que a da árvore, porque agora o explorador e o cartão de código também leem.
  */
 export function raizesDoQuadro(): string[] {
+  // Pastas fixadas do Leitor: SÓ leitura (listar, ler, vigiar), nunca abrir. Relidas e revalidadas pelo
+  // caminho real a cada chamada, para um arquivo editado à mão, uma junção ou um atalho não abrirem o disco.
+  const fixadas = lerPreferencias().leitor
+  const validas = leitorValido(fixadas, homedir()) && fixadas ? raizesFixaveis('leitor', fixadas.pastas) : []
+  return raizesDeLeitura(raizesParaAbrir(), validas, homedir(), resolverPasta)
+}
+
+/** Raízes de onde a janela pode **abrir** um arquivo (`shell.openPath`): as do quadro, sem as pastas fixadas do Leitor. */
+export function raizesParaAbrir(): string[] {
   const raizes = new Set<string>()
   for (const espaco of todosOsEspacos()) {
     raizes.add(espaco.pasta)
@@ -307,15 +349,24 @@ export function raizesDoQuadro(): string[] {
   return [...raizes]
 }
 
-/** O caminho está dentro de alguma raiz do quadro? Comparado pelo caminho real (link para fora não passa). */
+/** O caminho está dentro de alguma raiz do quadro (leitura, com as pastas fixadas)? Pelo caminho real. */
 export function dentroDeUmaRaiz(caminho: string): boolean {
+  return dentroDe(caminho, raizesDoQuadro())
+}
+
+/** O caminho está dentro de uma raiz de onde se pode abrir arquivo (sem as pastas fixadas)? */
+function dentroDeUmaRaizParaAbrir(caminho: string): boolean {
+  return dentroDe(caminho, raizesParaAbrir())
+}
+
+function dentroDe(caminho: string, raizes: string[]): boolean {
   // Arquivo apagado não tem caminho real. Em vez de recusar, resolve a pasta dele: a proteção contra link
   // para fora continua valendo, e quem chamou pode dizer "arquivo não encontrado" — que é a verdade — em vez
   // de "não está em pasta do quadro", que manda procurar o problema no lugar errado.
   const pai = real(dirname(caminho))
   const alvo = real(caminho) ?? (pai ? join(pai, basename(caminho)) : null)
   if (!alvo) return false
-  return raizesDoQuadro().some((raiz) => {
+  return raizes.some((raiz) => {
     const r = real(raiz)
     return r !== null && estaDentro(r, alvo)
   })
@@ -433,6 +484,7 @@ function preferenciasValidas(p: Preferencias): boolean {
     temaValido(p.tema) &&
     typeof p.corPostItPadrao === 'string' &&
     partiturasValidas(p.partituras) &&
+    leitorValido(p.leitor, homedir()) &&
     Array.isArray(p.presets) &&
     p.presets.length > 0 &&
     p.presets.length <= 50 &&
@@ -554,13 +606,24 @@ export function registrarDados(): void {
   ipcMain.handle(CANAIS_DADOS.salvarPreferencias, (evento, parcial: PreferenciasParciais) => {
     const juntas = juntarPreferencias(lerPreferencias(), parcial ?? {})
     if (!preferenciasValidas(juntas)) throw new Error('preferências inválidas: nada foi gravado')
+    // pastas fixadas: só valida o caminho real quando esta gravação traz o `leitor` (uma pasta apagada depois
+    // não pode travar a gravação do tema)
+    if (parcial?.leitor && parcial.leitor.pastas.some((p) => pastaFixavelReal(p, homedir(), resolverPasta) === null)) {
+      throw new Error('pasta fixada inválida (inexistente, de rede, o disco, a pasta do usuário ou acima dela): nada foi gravado')
+    }
     gravarJson(join(RAIZ, 'preferencias.json'), juntas)
     avisarTodas({ tipo: 'preferencias' }, evento.sender)
   })
 
   ipcMain.handle(CANAIS_DADOS.carregarEstado, (): EstadoJanela => lerEstadoDaJanela())
 
-  ipcMain.handle(CANAIS_DADOS.salvarEstado, (_e, estado: EstadoJanela) => gravarJson(join(RAIZ, 'estado.json'), estado))
+  // `explorador.raizes` vira raiz de leitura: passa pela mesma regra das pastas fixadas (a inválida cai com aviso)
+  ipcMain.handle(CANAIS_DADOS.salvarEstado, (_e, estado: EstadoJanela) => {
+    const limpo = estado?.explorador
+      ? { ...estado, explorador: { ...estado.explorador, raizes: raizesFixaveis('explorador', estado.explorador.raizes) } }
+      : estado
+    gravarJson(join(RAIZ, 'estado.json'), limpo)
+  })
 
   ipcMain.handle(CANAIS_DADOS.escolherPasta, async (evento): Promise<string | null> => {
     const janela = BrowserWindow.fromWebContents(evento.sender)
@@ -584,7 +647,7 @@ export function registrarDados(): void {
   ipcMain.handle(CANAIS_DADOS.abrirArquivo, (_e, caminho: string) => {
     if (typeof caminho !== 'string') return 'caminho inválido'
     const anexado = todosOsNos().some((n) => n.tipo === 'arquivo' && n.caminho === caminho)
-    if (!anexado && !dentroDeUmaRaiz(caminho)) return 'arquivo não está no quadro'
+    if (!anexado && !dentroDeUmaRaizParaAbrir(caminho)) return 'arquivo não está no quadro'
     if (!existsSync(caminho)) return 'arquivo não encontrado'
     return shell.openPath(caminho)
   })
