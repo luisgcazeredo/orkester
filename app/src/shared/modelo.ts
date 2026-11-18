@@ -191,6 +191,8 @@ export interface NoCodigo extends NoBase {
   modo: 'diff' | 'conteudo'
   /** Só o cabeçalho à mostra, para não espalhar o quadro. */
   recolhido?: boolean
+  /** Quebra de linha no visor e no cartão de um arquivo. Ausente = ligada; `false` volta à rolagem para os lados. */
+  quebra?: boolean
   /** Tamanho de antes de recolher, para o cartão voltar ao que era. */
   alturaAberta?: number
   larguraAberta?: number

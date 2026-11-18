@@ -8,6 +8,7 @@ import {
   CANAIS_CODIGO,
   CANAIS_DADOS,
   CANAIS_JANELAS,
+  CANAIS_LEITOR,
   CANAIS_ROTINAS,
   CANAL_AVISO,
   CANAIS_PORTAL,
@@ -16,6 +17,7 @@ import {
   type ApiCodigo,
   type ApiDados,
   type ApiJanelas,
+  type ApiLeitor,
   type ApiPortal,
   type ApiRotinas,
   type AvisoRotina,
@@ -107,6 +109,24 @@ const codigo: ApiCodigo = {
   diff: (caminho) => ipcRenderer.invoke(CANAIS_CODIGO.diff, caminho)
 }
 
+// Leitor de Markdown: um aviso de mudança por vez (a janela vigia um arquivo só).
+const ouvintesDoLeitor = new Set<(caminho: string) => void>()
+ipcRenderer.on(CANAIS_LEITOR.aviso, (_evento, caminho: string) => ouvintesDoLeitor.forEach((o) => o(caminho)))
+const leitor: ApiLeitor = {
+  arvore: (raiz) => ipcRenderer.invoke(CANAIS_LEITOR.arvore, raiz),
+  ler: (raiz, caminho) => ipcRenderer.invoke(CANAIS_LEITOR.ler, raiz, caminho),
+  lerLink: (raiz, mdAtual, valor) => ipcRenderer.invoke(CANAIS_LEITOR.lerLink, raiz, mdAtual, valor),
+  vigiar: (raiz, caminho, ouvinte) => {
+    ouvintesDoLeitor.add(ouvinte)
+    ipcRenderer.send(CANAIS_LEITOR.vigiar, raiz, caminho)
+    return () => {
+      ouvintesDoLeitor.delete(ouvinte)
+      ipcRenderer.send(CANAIS_LEITOR.pararDeVigiar)
+    }
+  },
+  externo: (endereco) => ipcRenderer.invoke(CANAIS_LEITOR.externo, endereco)
+}
+
 // O cofre das chaves de usuário: a aba de configurações cria, lista e revoga por aqui.
 const chaves: ApiChaves = {
   listar: () => ipcRenderer.invoke(CANAIS_CHAVES.listar),
@@ -153,6 +173,7 @@ const api: ApiOrkester = {
   },
   dados,
   codigo,
+  leitor,
   chaves,
   andares,
   area,

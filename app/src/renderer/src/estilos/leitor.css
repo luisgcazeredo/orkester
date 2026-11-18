@@ -1,0 +1,437 @@
+/* ------------------------------------------------------------------ Leitor de Markdown (1.9.0, T4)
+ * Só tokens (R7): nenhuma cor literal aqui. Importado depois do ui.css.
+ */
+
+.leitor {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  background: var(--quadro-fundo);
+  color: var(--texto);
+  font-family: var(--fonte-interface);
+}
+
+.leitor-lateral {
+  flex-shrink: 0;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  padding: var(--espaco-3);
+  background: var(--lateral-fundo);
+  border-right: 1px solid var(--lateral-borda);
+  min-height: 0;
+}
+
+.leitor-raizes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.leitor-raiz {
+  display: flex;
+  align-items: center;
+  border-radius: var(--raio-pequeno);
+}
+
+.leitor-raiz.ativo {
+  background: var(--lateral-ativo);
+}
+
+.leitor-raiz-nome,
+.leitor-fixar,
+.leitor-desafixar,
+.leitor-item,
+.leitor-voltar {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  border: 0;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  border-radius: var(--raio-pequeno);
+  cursor: pointer;
+}
+
+.leitor-raiz-nome {
+  flex: 1;
+  min-width: 0;
+  padding: var(--espaco-2);
+}
+
+.leitor-raiz-nome span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leitor-raiz-nome em,
+.leitor-achado em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--texto-suave);
+}
+
+.leitor-fixar {
+  padding: var(--espaco-2);
+  color: var(--texto-suave);
+}
+
+.leitor-desafixar {
+  padding: var(--espaco-2);
+  color: var(--texto-suave);
+}
+
+.leitor-raiz-nome:hover,
+.leitor-fixar:hover,
+.leitor-desafixar:hover,
+.leitor-item:hover,
+.leitor-voltar:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.leitor-busca {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: 0 var(--espaco-2);
+  background: var(--lateral-filtro);
+  border: 1px solid var(--lateral-borda);
+  border-radius: var(--raio-pequeno);
+  color: var(--texto-suave);
+}
+
+.leitor-busca-campo {
+  flex: 1;
+  min-width: 0;
+  padding: var(--espaco-2) 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+}
+
+.leitor-busca:focus-within {
+  border-color: var(--destaque);
+}
+
+.leitor-arvore {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.leitor-item {
+  width: 100%;
+  padding: var(--espaco-1) var(--espaco-2);
+}
+
+.leitor-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leitor-achado em {
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leitor-pasta {
+  color: var(--texto-suave);
+}
+
+.leitor-item.ativo {
+  background: var(--lateral-ativo);
+  color: var(--destaque);
+}
+
+.leitor-vazio {
+  margin: var(--espaco-3) var(--espaco-2);
+  font-size: 12px;
+  color: var(--texto-suave);
+}
+
+.leitor-vazio-grande {
+  margin: var(--espaco-5);
+  font-size: 14px;
+}
+
+.leitor-leitura {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.leitor-topo {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: var(--espaco-2) var(--espaco-3);
+  background: var(--painel);
+  border-bottom: 1px solid var(--borda);
+}
+
+.leitor-voltar {
+  padding: var(--espaco-2);
+  color: var(--texto-suave);
+}
+
+.leitor-voltar:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.leitor-titulo {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.leitor-pino {
+  color: var(--texto-suave);
+}
+
+.leitor-corpo {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  user-select: text;
+}
+
+.leitor-aviso {
+  margin: var(--espaco-3);
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 1px solid var(--atencao);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel-alto);
+  font-size: 13px;
+}
+
+.leitor-aviso-fechavel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-2);
+}
+
+/* ---------- o texto formatado ---------- */
+
+.md-corpo {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: var(--espaco-5);
+  font-size: 15px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.md-corpo h1,
+.md-corpo h2,
+.md-corpo h3,
+.md-corpo h4,
+.md-corpo h5,
+.md-corpo h6 {
+  margin: 1.4em 0 0.5em;
+  line-height: 1.25;
+}
+
+.md-corpo h1 {
+  font-size: 1.9em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--borda);
+}
+
+.md-corpo h2 {
+  font-size: 1.5em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--borda-suave);
+}
+
+.md-corpo h3 {
+  font-size: 1.2em;
+}
+
+.md-corpo > :first-child {
+  margin-top: 0;
+}
+
+.md-corpo p,
+.md-corpo ul,
+.md-corpo ol,
+.md-corpo blockquote,
+.md-corpo table {
+  margin: 0 0 1em;
+}
+
+.md-corpo ul,
+.md-corpo ol {
+  padding-left: 1.6em;
+}
+
+.md-corpo li + li {
+  margin-top: 0.25em;
+}
+
+.md-corpo blockquote {
+  padding: 0 1em;
+  border-left: 3px solid var(--borda);
+  color: var(--texto-suave);
+}
+
+.md-corpo hr {
+  border: 0;
+  border-top: 1px solid var(--borda);
+  margin: 1.6em 0;
+}
+
+.md-link {
+  color: var(--destaque);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.md-link:hover {
+  color: var(--destaque-forte);
+}
+
+.md-link-morto {
+  color: var(--texto-suave);
+  text-decoration: none;
+  cursor: default;
+}
+
+.md-imagem {
+  padding: 0 var(--espaco-1);
+  border: 1px dashed var(--borda);
+  border-radius: var(--raio-micro);
+  color: var(--texto-suave);
+  font-size: 0.9em;
+}
+
+.md-corpo code {
+  padding: 0.15em 0.4em;
+  border-radius: var(--raio-micro);
+  background: var(--painel-alto);
+  font-family: var(--fonte-mono);
+  font-size: 0.88em;
+}
+
+.md-codigo {
+  margin: 0 0 1em;
+  padding: var(--espaco-3);
+  overflow: auto;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel);
+  line-height: 1.5;
+}
+
+.md-corpo .md-codigo code {
+  padding: 0;
+  background: transparent;
+  font-size: 13px;
+  color: var(--cod-texto);
+}
+
+.md-tabela {
+  max-width: 100%;
+  margin: 0 0 1em;
+  overflow-x: auto;
+}
+
+.md-corpo table {
+  border-collapse: collapse;
+  margin: 0;
+}
+
+.md-corpo th,
+.md-corpo td {
+  padding: var(--espaco-1) var(--espaco-3);
+  border: 1px solid var(--borda);
+}
+
+.md-corpo th {
+  background: var(--painel-alto);
+  text-align: left;
+}
+
+/* realce de sintaxe dos blocos de código (mesmos tokens do cartão de código) */
+.md-codigo .hljs-comment,
+.md-codigo .hljs-quote {
+  color: var(--cod-comentario);
+  font-style: italic;
+}
+
+.md-codigo .hljs-keyword,
+.md-codigo .hljs-selector-tag,
+.md-codigo .hljs-literal,
+.md-codigo .hljs-tag,
+.md-codigo .hljs-name,
+.md-codigo .hljs-doctag {
+  color: var(--cod-palavra);
+}
+
+.md-codigo .hljs-meta,
+.md-codigo .hljs-section,
+.md-codigo .hljs-selector-pseudo {
+  color: var(--cod-controle);
+}
+
+.md-codigo .hljs-string,
+.md-codigo .hljs-link,
+.md-codigo .hljs-symbol,
+.md-codigo .hljs-bullet {
+  color: var(--cod-texto-literal);
+}
+
+.md-codigo .hljs-number,
+.md-codigo .hljs-selector-attr {
+  color: var(--cod-numero);
+}
+
+.md-codigo .hljs-title.function_,
+.md-codigo .hljs-built_in {
+  color: var(--cod-funcao);
+}
+
+.md-codigo .hljs-title,
+.md-codigo .hljs-type,
+.md-codigo .hljs-selector-class {
+  color: var(--cod-tipo);
+}
+
+.md-codigo .hljs-variable,
+.md-codigo .hljs-attr,
+.md-codigo .hljs-attribute,
+.md-codigo .hljs-property,
+.md-codigo .hljs-params,
+.md-codigo .hljs-template-variable,
+.md-codigo .hljs-selector-id {
+  color: var(--cod-variavel);
+}
+
+.md-codigo .hljs-regexp {
+  color: var(--cod-regex);
+}

@@ -6,6 +6,7 @@ import './estilos/quadro.css'
 import './estilos/nos.css'
 import './estilos/terminal.css'
 import './estilos/ui.css'
+import './estilos/leitor.css'
 import { App } from './App'
 
 // Sem StrictMode: ele monta cada componente duas vezes no desenvolvimento, e montar um cartão de terminal

@@ -1,7 +1,7 @@
 {
   "aviso": "Mapa arquivo -> cenários do autoteste. Caminhos relativos a app/. Termina em / = pasta inteira; senão é o arquivo exato. Usado por scripts/cenarios-da-mudanca.mjs (npm run autoteste:curto). Todo nome citado aqui precisa existir: o autoteste falha se não existir.",
   "padrao": ["casca-paginas", "menus-dialogos"],
-  "aguardando": ["menus-dialogos"],
+  "aguardando": [],
   "ignorar": [".prova.mts", ".md", ".log", "package-lock.json"],
   "regras": [
     { "arquivos": ["src/main/rotinas.ts", "src/shared/rotinas.ts", "src/renderer/src/estado/rotinas.ts", "src/renderer/src/ui/Rotinas.tsx"], "cenarios": ["rotinas"] },
@@ -14,6 +14,7 @@
     { "arquivos": ["src/renderer/src/ui/Funcoes.tsx"], "cenarios": ["ork-conexoes"] },
     { "arquivos": ["src/main/navegador.ts", "src/renderer/src/nos/Portal.tsx", "src/renderer/src/nos/PortalChrome.tsx"], "cenarios": ["quadro-portal"] },
     { "arquivos": ["src/renderer/src/casca/", "src/renderer/src/App.tsx"], "cenarios": ["casca-paginas", "barra-paginas"] },
+    { "arquivos": ["src/renderer/src/paginas/leitor/", "src/main/leitor.ts", "src/main/leitorCaminhos.ts", "src/shared/markdown.ts", "src/renderer/src/nos/Codigo.tsx"], "cenarios": ["leitor-markdown"] },
     { "arquivos": ["src/renderer/src/ui/Configuracoes.tsx", "src/shared/preferencias.ts", "src/shared/temas.ts"], "cenarios": ["tela-configuracoes"] },
     { "arquivos": ["src/shared/quadro/bandas.ts", "src/renderer/src/nos/Banda.tsx", "src/renderer/src/estado/bandas.ts"], "cenarios": ["ork-banda"] },
     { "arquivos": ["src/main/terminais.ts", "src/renderer/src/terminal/", "src/renderer/src/nos/PecaTerminal.tsx", "src/renderer/src/estado/terminais.ts"], "cenarios": ["selecao-no-terminal", "teto-de-terminais", "menu-terminal"] },

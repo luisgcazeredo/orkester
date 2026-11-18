@@ -145,18 +145,18 @@ export function criarDriver(janela: BrowserWindow, pastaSaida: string) {
   // engolia os últimos e o cartão andava um pedaço só — foi assim que esta checagem caiu na rodada com
   // agentes de verdade. Mais passos, mais tempo entre eles, e uma pausa antes de soltar o botão: o
   // renderer precisa ter processado o último movimento antes do mouseUp, senão o arrasto termina onde parou.
-  const arrastar = async (de: { x: number; y: number }, ate: { x: number; y: number }): Promise<void> => {
-    tela.sendInputEvent({ type: 'mouseMove', x: de.x, y: de.y })
-    tela.sendInputEvent({ type: 'mouseDown', x: de.x, y: de.y, button: 'left', clickCount: 1 })
+  const arrastar = async (de: { x: number; y: number }, ate: { x: number; y: number }, teclas: ('shift' | 'control' | 'alt')[] = []): Promise<void> => {
+    tela.sendInputEvent({ type: 'mouseMove', x: de.x, y: de.y, modifiers: teclas })
+    tela.sendInputEvent({ type: 'mouseDown', x: de.x, y: de.y, button: 'left', clickCount: 1, modifiers: teclas })
     const passos = 12
     for (let i = 1; i <= passos; i++) {
       const x = Math.round(de.x + ((ate.x - de.x) * i) / passos)
       const y = Math.round(de.y + ((ate.y - de.y) * i) / passos)
-      tela.sendInputEvent({ type: 'mouseMove', x, y, button: 'left', modifiers: ['leftbuttondown'] })
+      tela.sendInputEvent({ type: 'mouseMove', x, y, button: 'left', modifiers: [...teclas, 'leftbuttondown'] })
       await esperar(25)
     }
     await esperar(90)
-    tela.sendInputEvent({ type: 'mouseUp', x: ate.x, y: ate.y, button: 'left', clickCount: 1 })
+    tela.sendInputEvent({ type: 'mouseUp', x: ate.x, y: ate.y, button: 'left', clickCount: 1, modifiers: teclas })
     await esperar(250)
   }
   const tecla = async (letra: string): Promise<void> => {

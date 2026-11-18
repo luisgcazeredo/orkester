@@ -246,7 +246,7 @@ export const quadroPortal = (e: Estado): Cenario[] => [
     )
 
     // levar o cartão até a borda direita: a tela anda junto enquanto o mouse fica lá
-    const camAntes = await js<{ x: number }>('window.__teste.loja.lerEstado().espaco.camera')
+    const camAntes = await js<{ x: number; y: number; zoom: number }>('window.__teste.loja.lerEstado().espaco.camera')
     const cabecalhoArvore = await centroDe('.no-pasta .cartao-ferramenta-cabecalho')
     if (!cabecalhoArvore) throw new Error('cabeçalho da árvore fora da tela')
     const naBorda = { x: quadro.direita - 6, y: cabecalhoArvore.y }
@@ -268,6 +268,24 @@ export const quadroPortal = (e: Estado): Cenario[] => [
     tela.sendInputEvent({ type: 'mouseUp', x: naBorda.x, y: naBorda.y, button: 'left', clickCount: 1 })
     await esperar(200)
     conferir('tela anda junto na borda', andou > 80, `a tela andou ${andou} px para a direita`)
+    // a rolagem na borda anda por quadro de tela e para quando passa de 80 px: onde a câmera para varia de uma rodada
+    // para outra (um quadro a mais ou a menos, ~13 px), e a base de telas pegava um dos dois. A câmera vai para uma
+    // posição ABSOLUTA antes do print, e espera-se o layout assentar (2 quadros seguidos com o mesmo recorte do quadro).
+    // E o cartão da árvore (que o teste levou até a borda) volta para onde estava antes da corrida, com a câmera de antes:
+    // o print mostra o cartão inteiro, longe da borda, e não depende de onde a rolagem parou.
+    await js(`(() => { const L = window.__teste.loja
+      L.atualizarNo(${JSON.stringify(arvoreDepois.id)}, { x: ${Number(arvoreDepois.x)}, y: ${Number(arvoreDepois.y)} }, false)
+      L.definirCamera({ x: ${camAntes.x}, y: ${camAntes.y}, zoom: ${camAntes.zoom} }) })()`)
+    let anterior = ''
+    for (let i = 0; i < 30; i++) {
+      await esperar(100)
+      const agora = await js<string>(`(async () => { await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+        const q = document.querySelector('.pagina-ativa .quadro')?.getBoundingClientRect()
+        const n = document.querySelector('.no-portal')?.getBoundingClientRect()
+        return JSON.stringify([q && [q.left, q.width], n && [n.left, n.top]]) })()`)
+      if (agora === anterior) break
+      anterior = agora
+    }
     await print('uso-real')
 
     // fechar a janela logo depois de editar: a última edição tem que chegar ao disco
@@ -389,14 +407,7 @@ export const quadroPortal = (e: Estado): Cenario[] => [
     await clicar(vazio)
     const de = tela2(60, 150)
     const ate = tela2(900, 800)
-    tela.sendInputEvent({ type: 'mouseMove', x: de.x, y: de.y, modifiers: ['shift'] })
-    tela.sendInputEvent({ type: 'mouseDown', x: de.x, y: de.y, button: 'left', clickCount: 1, modifiers: ['shift'] })
-    for (let i = 1; i <= 8; i++) {
-      tela.sendInputEvent({ type: 'mouseMove', x: Math.round(de.x + ((ate.x - de.x) * i) / 8), y: Math.round(de.y + ((ate.y - de.y) * i) / 8), modifiers: ['shift', 'leftbuttondown'] })
-      await esperar(16)
-    }
-    tela.sendInputEvent({ type: 'mouseUp', x: ate.x, y: ate.y, button: 'left', clickCount: 1, modifiers: ['shift'] })
-    await esperar(200)
+    await arrastar(de, ate, ['shift'])
     conferir('retângulo de seleção (Shift + arrastar)', (await selecionados()).length === 3, `${(await selecionados()).length} selecionados`)
     // ímã: C chega a 3 px de alinhar com A e gruda; a guia aparece no meio do arrasto
     await clicar(vazio)
@@ -406,14 +417,16 @@ export const quadroPortal = (e: Estado): Cenario[] => [
     const pegaC = tela2(c0.x + 130, c0.y + 100)
     tela.sendInputEvent({ type: 'mouseMove', x: pegaC.x, y: pegaC.y })
     tela.sendInputEvent({ type: 'mouseDown', x: pegaC.x, y: pegaC.y, button: 'left', clickCount: 1 })
-    for (let i = 1; i <= 8; i++) {
-      tela.sendInputEvent({ type: 'mouseMove', x: Math.round(pegaC.x + (desloca * i) / 8), y: pegaC.y, button: 'left', modifiers: ['leftbuttondown'] })
-      await esperar(20)
+    // à mão (a guia é lida no meio do arrasto), mas no mesmo ritmo do `arrastar`: 12 passos, 25 ms, pausa antes de soltar
+    for (let i = 1; i <= 12; i++) {
+      tela.sendInputEvent({ type: 'mouseMove', x: Math.round(pegaC.x + (desloca * i) / 12), y: pegaC.y, button: 'left', modifiers: ['leftbuttondown'] })
+      await esperar(25)
     }
     await esperar(120)
     const guias = await js<number>(`document.querySelectorAll('.guia').length`)
+    await esperar(90)
     tela.sendInputEvent({ type: 'mouseUp', x: pegaC.x + desloca, y: pegaC.y, button: 'left', clickCount: 1 })
-    await esperar(200)
+    await esperar(250)
     const c1 = (await no(ab.c))!
     conferir('ímã de alinhamento com guia', c1.x === aAgora.x && guias > 0, `C x ${c0.x} → ${c1.x} (A em ${aAgora.x}) · ${guias} guias`)
     // barrinha: a lixeira apaga o que está selecionado

@@ -1,8 +1,9 @@
-import { memo, useEffect, useState } from 'react'
-import { ChevronsDownUp, ChevronsUpDown, FileCode, GitCompare, History, Pin, Radio, RefreshCw } from 'lucide-react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import hljs from 'highlight.js/lib/core'
+import { ChevronsDownUp, ChevronsUpDown, Code2, FileCode, GitCompare, BookOpen, History, Pin, Radio, RefreshCw, WrapText } from 'lucide-react'
 import type { MudancaArquivo } from '../../../shared/api'
 import { caminhoRelativo, nomeDoArquivo } from '../../../shared/arquivos'
-import { escaparHtml } from '../../../shared/realce'
+import { escaparHtml, linguaDe } from '../../../shared/realce'
 import type { NoCodigo } from '../../../shared/modelo'
 import { ehVisor } from '../../../shared/quadro/visor'
 import { realcarLinhas } from '../arquivos/realce'
@@ -16,6 +17,8 @@ import {
   seguirVisor,
   usarLoja
 } from '../estado/loja'
+import { irParaPagina } from '../casca/paginas'
+import { pedirEIr } from '../paginas/leitor/pedido'
 import { MolduraNo, type Marca } from '../quadro/MolduraNo'
 import { abrirMenu } from '../ui/MenuContexto'
 
@@ -44,9 +47,24 @@ interface Carga {
   truncado: boolean
   /** É um diff de verdade (e não o arquivo inteiro): muda o que a canaleta da esquerda mostra. */
   patch: boolean
+  /** O texto cru do arquivo inteiro (só fora do diff): é o que o `.md` formatado lê. */
+  texto: string | null
 }
 
-const VAZIO: Carga = { linhas: [], erro: null, aviso: null, truncado: false, patch: false }
+const VAZIO: Carga = { linhas: [], erro: null, aviso: null, truncado: false, patch: false, texto: null }
+
+const EH_MD = /\.(md|markdown)$/i
+
+/** Realce dos blocos do Markdown: só `hljs.highlight(...).value` (que escapa); língua que o hljs não tem sai escapada. */
+function realcarBloco(codigo: string, lingua: string): string | null {
+  const nome = linguaDe(`x.${lingua}`) ?? lingua
+  if (!hljs.getLanguage(nome)) return null
+  try {
+    return hljs.highlight(codigo, { language: nome, ignoreIllegals: true }).value
+  } catch {
+    return null
+  }
+}
 
 /** O que aparece na canaleta da esquerda no modo diff. */
 const SINAL: Record<Tipo, string> = { mais: '+', menos: '−', trecho: '', igual: '' }
@@ -120,6 +138,9 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
   const [recentes, definirRecentes] = useState<MudancaArquivo[]>([])
   const [carga, definirCarga] = useState<Carga>(VAZIO)
   const [rodada, definirRodada] = useState(0)
+  const alvoDaCarga = useRef<string | null>(null)
+  // `.md` no modo arquivo sai formatado; "ver código" vale para o arquivo em que foi pedido
+  const [verCodigo, definirVerCodigo] = useState<string | null>(null)
 
   const alvo = no.caminho ?? null
   const apagado = !!lista.find((a) => a.caminho === alvo)?.sumiu
@@ -147,6 +168,11 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
   }, [pasta, no.caminho, visor])
 
   useEffect(() => {
+    // outro arquivo: a carga do anterior não fica na tela até a nova chegar
+    if (alvoDaCarga.current !== alvo) {
+      alvoDaCarga.current = alvo
+      definirCarga(VAZIO)
+    }
     // recolhido não lê nada: o bloquinho fica só com o nome e para de custar leitura de disco
     if (no.recolhido || !alvo) return definirCarga(VAZIO)
     // arquivo que sumiu do disco continua na lista, mas não há o que ler
@@ -162,7 +188,8 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
         erro: t.erro ?? null,
         aviso,
         truncado: t.truncado,
-        patch: false
+        patch: false,
+        texto: t.erro ? null : t.conteudo
       })
     }
     if (no.modo === 'conteudo') {
@@ -174,7 +201,7 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
     void window.ork.codigo.diff(alvo).then(async (d) => {
       if (d.erro) return guardar({ ...VAZIO, erro: d.erro })
       if (d.patch) {
-        return guardar({ linhas: realcarDiff(lerPatch(d.patch), alvo), erro: null, aviso: null, truncado: false, patch: true })
+        return guardar({ linhas: realcarDiff(lerPatch(d.patch), alvo), erro: null, aviso: null, truncado: false, patch: true, texto: null })
       }
       // nada para comparar (pasta sem git, arquivo novo, ou sem mudança): mostra o arquivo e diz por quê
       await mostrarArquivo(
@@ -189,6 +216,49 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
       vivo = false
     }
   }, [alvo, apagado, no.modo, no.recolhido, rodada])
+
+  const quebra = no.quebra !== false
+  // só o arquivo inteiro (modo conteúdo) é formatado; o diff é sempre código
+  const ehMd = !!alvo && EH_MD.test(alvo) && no.modo === 'conteudo' && carga.texto !== null && !carga.patch
+  const querFormatado = ehMd && verCodigo !== alvo
+  // o markdown-it só é baixado quando um .md vai ser formatado (fora do pacote inicial)
+  const [renderizador, definirRenderizador] = useState<typeof import('../../../shared/markdown').renderizarMarkdown | null>(null)
+  // formatado só com o renderizador pronto: enquanto carrega (ou se o import falhar) o código fica à mostra
+  const formatado = querFormatado && renderizador !== null
+  useEffect(() => {
+    if (!querFormatado || renderizador) return
+    let vivo = true
+    import('../../../shared/markdown').then(
+      (m) => vivo && definirRenderizador(() => m.renderizarMarkdown),
+      () => undefined
+    )
+    return () => {
+      vivo = false
+    }
+  }, [querFormatado, renderizador])
+  const htmlMd = useMemo(
+    () => (formatado && renderizador !== null && carga.texto !== null ? renderizador(carga.texto, { realcar: realcarBloco }) : ''),
+    [formatado, renderizador, carga.texto]
+  )
+
+  /** Clique no Markdown formatado: nada navega a janela. Externo abre pelo main, que revalida http/https. */
+  const aoClicarMd = (e: React.MouseEvent): void => {
+    const a = (e.target as HTMLElement).closest('a')
+    if (!a) return
+    e.preventDefault()
+    const externo = a.getAttribute('data-externo')
+    const md = a.getAttribute('data-md')
+    // o main revalida (http, https e mailto limpo): mesma regra e mesma função do Leitor
+    if (externo) void window.ork.leitor.externo(externo)
+    // o Leitor resolve e confere o alvo no principal (lerLink); aqui só vai o pedido
+    else if (md && alvo) abrirNoLeitor(md)
+  }
+
+  /** Troca para a página do Leitor e pede o arquivo (ou o link relativo clicado dentro dele). */
+  function abrirNoLeitor(link?: string): void {
+    if (!alvo) return
+    pedirEIr({ de: alvo, link }, irParaPagina)
+  }
 
   const nome = alvo ? nomeDoArquivo(alvo) : visor ? 'nenhum arquivo ainda' : 'esperando o agente gravar'
   const relativo = alvo ? caminhoRelativo(pasta, alvo) ?? alvo : ''
@@ -257,6 +327,38 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
               <History size={12} />
             </button>
           )}
+          {alvo && EH_MD.test(alvo) && !apagado && (
+            <button
+              className="botao-mini codigo-abrir-leitor"
+              data-abrir-leitor
+              title="Abrir no Leitor"
+              aria-label="Abrir no Leitor"
+              {...semArrasto}
+              onClick={() => abrirNoLeitor()}
+            >
+              <BookOpen size={12} />
+            </button>
+          )}
+          {ehMd && (
+            <button
+              className="botao-mini"
+              title={querFormatado ? 'Ver o código do Markdown' : 'Ver formatado'}
+              {...semArrasto}
+              onClick={() => definirVerCodigo(querFormatado ? alvo : null)}
+            >
+              {querFormatado ?<Code2 size={12} /> : <FileCode size={12} />}
+            </button>
+          )}
+          {!formatado && (
+            <button
+              className={`botao-mini${quebra ? ' ativo' : ''}`}
+              title={quebra ? 'Quebra de linha ligada — voltar à rolagem para os lados' : 'Rolagem para os lados — quebrar as linhas'}
+              {...semArrasto}
+              onClick={() => atualizarNo(no.id, { quebra: !quebra }, false)}
+            >
+              <WrapText size={12} />
+            </button>
+          )}
           <button
             className="botao-mini"
             title={no.modo === 'diff' ? 'Mostrando o que mudou — ver o arquivo inteiro' : 'Mostrando o arquivo — ver o que mudou'}
@@ -302,15 +404,19 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
           ) : (
             <>
               {carga.aviso && <p className="codigo-aviso">{carga.aviso}</p>}
-              <pre className="codigo-linhas">
-                {carga.linhas.map((linha, i) => (
-                  <div key={i} className={`codigo-linha ${linha.tipo}`}>
-                    {/* no arquivo inteiro, a canaleta é o número da linha; no diff, o sinal do que mudou */}
-                    <span className="codigo-numero">{carga.patch ? SINAL[linha.tipo] : i + 1}</span>
-                    <code dangerouslySetInnerHTML={{ __html: linha.html }} />
-                  </div>
-                ))}
-              </pre>
+              {formatado ? (
+                <div className="codigo-md" onClick={aoClicarMd} dangerouslySetInnerHTML={{ __html: htmlMd }} />
+              ) : (
+                <pre className={`codigo-linhas${quebra ? ' quebra' : ''}`}>
+                  {carga.linhas.map((linha, i) => (
+                    <div key={i} className={`codigo-linha ${linha.tipo}`}>
+                      {/* no arquivo inteiro, a canaleta é o número da linha; no diff, o sinal do que mudou */}
+                      <span className="codigo-numero">{carga.patch ? SINAL[linha.tipo] : i + 1}</span>
+                      <code dangerouslySetInnerHTML={{ __html: linha.html }} />
+                    </div>
+                  ))}
+                </pre>
+              )}
               {carga.truncado && <p className="codigo-aviso">arquivo grande: só o começo está à mostra</p>}
             </>
           )}

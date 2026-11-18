@@ -221,6 +221,15 @@ export function definirPartituras(partituras: Partitura[]): void {
   void window.ork.dados.salvarPreferencias({ partituras })
 }
 
+/**
+ * As pastas fixadas do Leitor moram nas preferências. Grava no disco (o principal pode recusar: então lança e a loja
+ * fica como estava) e só então atualiza a loja, que é a fonte única que o Leitor lê.
+ */
+export async function definirPastasDoLeitor(pastas: string[]): Promise<void> {
+  await window.ork.dados.salvarPreferencias({ leitor: { pastas } })
+  definir({ preferencias: { ...estado.preferencias, leitor: { ...estado.preferencias.leitor, pastas } } })
+}
+
 /** Guarda como partitura os cartões escolhidos (ou todos os do andar, com `ids` nulo). */
 export function salvarPartitura(nome: string, ids: string[] | null): string | null {
   const plano = planoAtual()

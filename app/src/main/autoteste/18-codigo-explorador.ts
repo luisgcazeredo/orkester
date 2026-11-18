@@ -239,6 +239,15 @@ export const codigoExplorador = (e: Estado): Cenario[] => [
         const posicoes = (): Promise<Array<{ id: string; x: number; y: number; automatico: boolean }>> =>
           js(`window.__teste.loja.planoAtual().nos.filter((n) => n.tipo === 'codigo')
             .map((n) => ({ id: n.id, x: n.x, y: n.y, automatico: !!n.automatico }))`)
+        // A bolinha de irPara fica a ~5 px da borda do quadro, e a rolagem automática da borda (arrasto.ts, BORDA 64)
+        // andaria a câmera durante o arrasto: traz a bolinha para o centro do quadro antes (depurador-bolinha.md).
+        const bolinhaPerto = await centroDe('.vinculo-toque')
+        const quadro = await centroDe('.quadro')
+        if (bolinhaPerto && quadro) {
+          await js(`(() => { const L = window.__teste.loja; const c = L.lerEstado().espaco.camera
+            L.definirCamera({ x: c.x + (${quadro.x} - ${bolinhaPerto.x}) / c.zoom, y: c.y + (${quadro.y} - ${bolinhaPerto.y}) / c.zoom, zoom: c.zoom }) })()`)
+          await esperar(400)
+        }
         const antesDoArrasto = await posicoes()
         const bolinha = await centroDe('.vinculo-toque')
         if (bolinha) await arrastar(bolinha, { x: bolinha.x, y: bolinha.y + 120 })
@@ -257,6 +266,7 @@ export const codigoExplorador = (e: Estado): Cenario[] => [
         )
 
         // e arrastar o agente leva o visor dele junto, como o ramo vai com o nó que o segura
+        await irPara(dono) // a câmera ficou onde a bolinha foi centralizada: longe da borda de novo
         const cabecalhoDoDono = await centroDe(`[data-no-id="${dono}"] .terminal-cabecalho, [data-no-id="${dono}"] [data-arrasta]`)
         const antesDoAgente = await posicoes()
         if (cabecalhoDoDono) await arrastar(cabecalhoDoDono, { x: cabecalhoDoDono.x + 90, y: cabecalhoDoDono.y })

@@ -86,7 +86,9 @@ export function CorpoXterm({ id, ativo }: Props) {
       area.style.height = `${caixa.clientHeight * QUALIDADE}px`
       area.style.transform = `scale(${1 / QUALIDADE})`
       const proposta = ajuste.proposeDimensions()
-      if (!proposta || !ligado || !refazerColunas) return
+      if (!ligado || !refazerColunas) return
+      // pai sem layout (escondido): o FitAddon devolve NaN e o xterm lança "only accepts integers"
+      if (!proposta || !Number.isInteger(proposta.cols) || !Number.isInteger(proposta.rows) || proposta.cols < 1 || proposta.rows < 1) return
       if (proposta.cols !== terminal.cols || proposta.rows !== terminal.rows) terminal.resize(proposta.cols, proposta.rows)
     }
     termRef.current = { terminal, ajuste, ajustar }

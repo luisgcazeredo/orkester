@@ -1,4 +1,5 @@
-import { LayoutGrid } from 'lucide-react'
+import { BookOpen, LayoutGrid } from 'lucide-react'
+import { lazy, Suspense } from 'react'
 import * as loja from '../estado/loja'
 import {
   abrirNovaJanela, agrupar, apagarSelecao, definirEstiloDesenho, desagrupar, desfazer, duplicarSelecao, editar, empurrarSelecao,
@@ -16,6 +17,7 @@ import { BarraSelecao } from '../ui/BarraSelecao'
 import { BarraFerramentas } from '../ui/BarraFerramentas'
 import { BotaoLateral, CantoInferior, CantoSuperior } from '../ui/Controles'
 import { VistaAndares } from '../ui/Andares'
+import { atalhosDoLeitor } from '../paginas/leitor/atalhos'
 import { DIALOGOS } from './dialogos'
 import { acharPagina, ligarPaginaAtiva, paginaAtiva, paginasMontadas, PAGINA_INICIAL, registrarPagina, temPagina } from './paginas'
 
@@ -74,6 +76,17 @@ const atalhosDoQuadro = criarAtalhos(
   }
 )
 
+// O Leitor (e o markdown-it dele) só carrega quando a página abre; os atalhos vêm de um módulo pequeno à parte.
+const LeitorPreguicoso = lazy(() => import('../paginas/leitor/Leitor').then((m) => ({ default: m.Leitor })))
+
+function PaginaLeitor() {
+  return (
+    <Suspense fallback={null}>
+      <LeitorPreguicoso />
+    </Suspense>
+  )
+}
+
 /** A página `quadro`: o corpo que o App tinha, sem mudança. */
 function PaginaQuadro() {
   const carregado = usarLoja((e) => e.carregado)
@@ -99,6 +112,7 @@ function PaginaQuadro() {
 
 // o Fast Refresh reexecuta este módulo: sem a checagem, o registro lançaria por id repetido
 if (!temPagina(PAGINA_INICIAL)) registrarPagina({ id: PAGINA_INICIAL, titulo: 'Quadro', icone: LayoutGrid, nativa: true, manterMontada: true, atalhos: atalhosDoQuadro, Componente: PaginaQuadro })
+if (!temPagina('leitor')) registrarPagina({ id: 'leitor', titulo: 'Leitor de Markdown', icone: BookOpen, nativa: true, atalhos: atalhosDoLeitor, Componente: PaginaLeitor })
 
 /**
  * As páginas montadas: a ativa e as que pedem `manterMontada` (o quadro, para os terminais não caírem ao trocar).

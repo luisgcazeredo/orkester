@@ -73,6 +73,7 @@ export const caixaDeEntrada = (e: Estado): Cenario[] => [
 
         await comando(chefe, 'cls; ork fechar Caixa')
         await aguardar(() => telaNoApp(chefe), 'Fechei "Caixa"', 15_000)
+        await js(`window.__teste.loja.selecionar(null)`)
       }
     },
 ]

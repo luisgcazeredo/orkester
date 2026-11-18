@@ -6,7 +6,7 @@ import { encerrarNavegador } from '../navegador'
 import { encerrarTodos } from '../terminais'
 import { Cenario, Estado, criarDriver } from './util'
 import { quadroPortal } from './01-quadro-portal'
-import { ork } from './02-ork'
+import { apagarPastaDosTerminais, ork } from './02-ork'
 import { orkConexoes } from './03-ork-conexoes'
 import { orkQuadro } from './04-ork-quadro'
 import { orkPartituras } from './05-ork-partituras'
@@ -26,6 +26,8 @@ import { codigoExplorador } from './18-codigo-explorador'
 import { caixaDeEntrada } from './19-caixa-de-entrada'
 import { menuTerminal } from './20-menu-terminal'
 import { cascaPaginas } from './21-casca-paginas'
+import { menusDialogos } from './22-menus-dialogos'
+import { leitorMarkdown } from './23-leitor-markdown'
 import { barraPaginas } from './24-barra-paginas'
 import mapa from './mapa.json'
 import { apagarChromiumDaRodada, escolherCenarios } from './filtro'
@@ -128,19 +130,22 @@ export async function rodarAutoteste(
     ...caixaDeEntrada(e),
     ...menuTerminal(e),
     ...cascaPaginas(e),
+    ...menusDialogos(e),
+    ...leitorMarkdown(e),
     ...barraPaginas(e),
   ]
   // O mapa arquivo→cenários (autoteste:curto) não pode apontar para um cenário que não existe: um nome
   // errado faria o teste curto "passar" sem rodar nada. `aguardando` é o que outra tarefa ainda vai criar.
   const existentes = new Set(cenarios.map((cenario) => cenario.nome))
+  const aguardando: string[] = mapa.aguardando
   const citados = new Set([...mapa.padrao, ...mapa.regras.flatMap((regra) => regra.cenarios)])
-  const inexistentes = [...citados].filter((nome) => !existentes.has(nome) && !mapa.aguardando.includes(nome))
+  const inexistentes = [...citados].filter((nome) => !existentes.has(nome) && !aguardando.includes(nome))
   driver.conferir('mapa-de-cenarios', inexistentes.length === 0, inexistentes.length ? `cenário inexistente no mapa: ${inexistentes.join(', ')}` : `${citados.size} nomes conferidos`)
   const tetoMs = (Number(process.env.ORK_TETO_MIN) > 0 ? Number(process.env.ORK_TETO_MIN) : 15) * 60_000
   // Casamento por nome EXATO (filtro.ts). Pedir o que não existe é FALHA: nunca "PASSOU com 0 cenários".
   // O que o cenário pedido depende (`depende`) entra em cadeia: sem isto, `ORK_CENARIOS=ork-correio` só dizia
   // "não rodou: depende de ork".
-  const { selecionados, semPar, adiados } = escolherCenarios(cenarios, process.env.ORK_CENARIOS, mapa.aguardando)
+  const { selecionados, semPar, adiados } = escolherCenarios(cenarios, process.env.ORK_CENARIOS, aguardando)
   if (adiados.length) console.log(`AUTOTESTE AVISO cenário ainda não existe (está em aguardando no mapa), pulado: ${adiados.join(', ')}`)
   if (semPar.length || (process.env.ORK_CENARIOS?.trim() && !selecionados.length && !adiados.length)) {
     driver.conferir(
@@ -213,5 +218,6 @@ export async function rodarAutoteste(
   await encerrarNavegador()
   // app.exit não dispara process.on('exit'): a pasta do Chromium desta rodada (sem ORK_DADOS) é apagada aqui
   if (!process.env.ORK_DADOS) console.log(`AUTOTESTE pasta do Chromium ${apagarChromiumDaRodada(app.getPath('userData'), process.pid)}`)
+  apagarPastaDosTerminais() // os terminais já foram encerrados acima
   app.exit(passou ? 0 : 1)
 }

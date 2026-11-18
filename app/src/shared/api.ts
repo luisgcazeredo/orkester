@@ -396,6 +396,35 @@ export interface ApiCodigo {
   diff(caminho: string): Promise<DiffArquivo>
 }
 
+/** Os .md de uma raiz do Leitor, com caminho relativo à raiz e barras "/". `cortado`: a pasta é grande e a lista parou no teto. */
+export interface ArvoreMd {
+  arquivos: string[]
+  cortado: boolean
+  erro?: string
+}
+
+export interface TextoMd {
+  /** Caminho real do arquivo lido (vazio se o link não valeu). */
+  caminho: string
+  conteudo: string
+  tamanho: number
+  /** Passou do teto (400 KB): o conteúdo não vem, só o aviso. */
+  grande: boolean
+  erro?: string
+}
+
+/** Leitor de Markdown: só lê. Toda chamada leva a raiz, e o principal confere raiz e arquivo pelo caminho real. */
+export interface ApiLeitor {
+  arvore(raiz: string): Promise<ArvoreMd>
+  ler(raiz: string, caminho: string): Promise<TextoMd>
+  /** Link relativo de dentro do .md aberto (`data-md`, não confiável): o principal resolve, confere e lê. */
+  lerLink(raiz: string, mdAtual: string, valor: string): Promise<TextoMd>
+  /** Vigia o arquivo aberto (um por janela) e avisa quando ele muda. A função devolvida para a vigia. */
+  vigiar(raiz: string, caminho: string, ouvinte: (caminho: string) => void): () => void
+  /** Abre no navegador; o principal revalida http, https e mailto. */
+  externo(endereco: string): Promise<boolean>
+}
+
 /** Avisos que o processo principal manda para cada janela. */
 export type AvisoJanelas =
   /** Espaços foram criados ou apagados: ler a lista de novo. */
@@ -435,6 +464,7 @@ export interface ApiOrkester {
   terminal: ApiTerminal
   dados: ApiDados
   codigo: ApiCodigo
+  leitor: ApiLeitor
   andares: ApiAndares
   area: ApiArea
   janelas: ApiJanelas
@@ -524,6 +554,16 @@ export const CANAIS_CHAVES = {
   criar: 'chaves:criar',
   revogar: 'chaves:revogar',
   comando: 'chaves:comando'
+} as const
+
+export const CANAIS_LEITOR = {
+  arvore: 'leitor:arvore',
+  ler: 'leitor:ler',
+  lerLink: 'leitor:ler-link',
+  vigiar: 'leitor:vigiar',
+  pararDeVigiar: 'leitor:parar-de-vigiar',
+  aviso: 'leitor:aviso',
+  externo: 'leitor:externo'
 } as const
 
 export const CANAIS_CODIGO = {

@@ -13,6 +13,7 @@ export function App() {
   const tema = usarLoja((e) => e.preferencias.tema)
   const lateralAberta = usarLoja((e) => e.lateralAberta)
   const ferramenta = usarLoja((e) => e.ferramenta)
+  const pagina = usarLoja((e) => e.paginaAtiva)
   const nomeDoEspaco = usarLoja((e) => e.espaco?.nome)
 
   // Com várias janelas, a barra de tarefas e o Alt+Tab mostram qual espaço está em cada uma — e a versão
@@ -32,9 +33,10 @@ export function App() {
   }, [])
 
   return (
-    <div className={`app ${classeDoTema(tema)} ${lateralAberta ? '' : 'sem-lateral'} ferramenta-${ferramenta}`}>
-      {lateralAberta && <ListaDeEspacos />}
+    <div className={`app ${classeDoTema(tema)} ${lateralAberta && pagina === 'quadro' ? '' : 'sem-lateral'} ferramenta-${ferramenta}`}>
       <BarraPaginas />
+      {/* a lista de espaços só existe na página Quadro (decisão do Luís, 17/11); ao voltar, volta como estava */}
+      {lateralAberta && pagina === 'quadro' && <ListaDeEspacos />}
       <Casca />
       {temEspaco && <BarraExplorador />}
       <Dialogos />

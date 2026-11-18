@@ -99,6 +99,60 @@ export const barraPaginas = (_e: Estado): Cenario[] => [
         const fim = await estado()
         conferir('Space numa página que não é o quadro não chega ao quadro (no quadro, chega)', foiTeste && espacoNoQuadro === true && espacoFora === false, `quadro=${espacoNoQuadro} fora=${espacoFora}`)
         conferir('ao voltar ao quadro, o terminal ativo recebe o foco de novo', voltou2 && fim.quadroVisivel && focoAntes && focoDepois, `antes=${focoAntes} depois=${focoDepois} ${JSON.stringify(fim)}`)
+
+        // T10: a barra é GERAL — coluna mais à esquerda, antes da lista de espaços (aberta ou recolhida), com a engrenagem
+        // no pé; a engrenagem abre as Configurações de qualquer página. Prints nos 2 temas, em Quadro e em Leitor.
+        const geometria = (): Promise<{ barraX: number; barraEsq: number; listaEsq: number | null; paginaEsq: number; paginaDir: number; janelaLarg: number; engrenagemY: number; ultimoIconeY: number; barraBaixo: number; engrenagemNoCanto: boolean; temaEm: string }> =>
+          js(`(() => {
+            const b = document.querySelector('.barra-paginas').getBoundingClientRect()
+            const l = document.querySelector('.lateral')?.getBoundingClientRect()
+            const pg = document.querySelector('.pagina-ativa').getBoundingClientRect()
+            const g = document.querySelector('.barra-paginas [data-configuracoes]').getBoundingClientRect()
+            const icones = [...document.querySelectorAll('.barra-paginas .barra-pagina[data-pagina-id]')]
+            const u = icones[icones.length - 1].getBoundingClientRect()
+            return { barraX: b.right, barraEsq: b.left, listaEsq: l ? l.left : null, paginaEsq: pg.left, paginaDir: pg.right, janelaLarg: window.innerWidth, engrenagemY: g.bottom, ultimoIconeY: u.bottom,
+              barraBaixo: b.bottom, engrenagemNoCanto: !!document.querySelector('.canto-superior [data-configuracoes]'),
+              temaEm: document.querySelector('.app').className }
+          })()`)
+        const lateralAberta = (): Promise<boolean> => js(`window.__teste.loja.lerEstado().lateralAberta`)
+        const lateralPara = async (aberta: boolean): Promise<void> => {
+          if ((await lateralAberta()) !== aberta) await js(`window.__teste.loja.alternarLateral()`)
+          await esperar(350)
+        }
+        const temaAtual = await js<string>(`window.__teste.loja.lerEstado().preferencias.tema`)
+        try {
+          for (const tema of ['escuro', 'claro'] as const) {
+            await js(`window.__teste.loja.definirTema(${JSON.stringify(tema)})`)
+            await esperar(500)
+            for (const pagina of ['quadro', 'leitor'] as const) {
+              await js(`window.__teste.casca.irParaPagina(${JSON.stringify(pagina)})`)
+              await esperar(700)
+              for (const aberta of [true, false]) {
+                await lateralPara(aberta)
+                const g = await geometria()
+                const rotulo = `${tema} · ${pagina} · lista ${aberta ? 'aberta' : 'fechada'}`
+                conferir(
+                  `barra geral (${rotulo}): coluna mais à esquerda; engrenagem no pé, abaixo dos ícones, fora do canto; ${pagina === 'leitor' ? 'sem lista de espaços e a página ocupa a largura à direita da barra' : aberta ? 'lista logo depois da barra' : 'lista recolhida'}`,
+                  g.barraEsq <= 1 && g.engrenagemY > g.ultimoIconeY + 40 && g.engrenagemY > g.barraBaixo - 20 && !g.engrenagemNoCanto &&
+                    (pagina === 'leitor' ? g.listaEsq === null && Math.abs(g.paginaEsq - g.barraX) <= 1 && g.paginaDir >= g.janelaLarg - 1 : aberta ? g.listaEsq !== null && g.listaEsq >= g.barraX - 1 : g.listaEsq === null),
+                  JSON.stringify(g)
+                )
+                await print(`barra-geral-${pagina}-${aberta ? 'lista-aberta' : 'lista-fechada'}-${tema}`)
+              }
+            }
+          }
+          // a engrenagem abre as Configurações, mesmo no Leitor e com a lista recolhida
+          const abriu = await clicarEm('.barra-paginas [data-configuracoes]')
+          await esperar(400)
+          const dialogo = await js<boolean>(`!!document.querySelector('.configuracoes')`)
+          await teclar('Escape')
+          await esperar(300)
+          const fechou = !(await js<boolean>(`!!document.querySelector('.configuracoes')`))
+          conferir('a engrenagem do pé da barra abre as Configurações no Leitor e o Esc fecha', abriu && dialogo && fechou, `abriu=${abriu} dialogo=${dialogo} fechou=${fechou}`)
+        } finally {
+          await js(`window.__teste.loja.definirTema(${JSON.stringify(temaAtual)})`)
+          await lateralPara(true)
+        }
       } finally {
         await js(`(() => { const L = window.__teste.loja; window.__teste.casca.irParaPagina('quadro'); L.escolherFerramenta('selecionar')
           if (${JSON.stringify(cartao)} && L.acharNo(${JSON.stringify(cartao)})) { L.selecionar({ tipo: 'no', id: ${JSON.stringify(cartao)} }); L.apagarSelecao() }

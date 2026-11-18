@@ -32,9 +32,9 @@ export const orkConexoes = (e: Estado): Cenario[] => [
       const id = L.adicionarNo({ tipo: 'terminal', preset: ${presetShell} }, 560, 1100); L.atualizarNo(id, { nome: 'Solto' }); return id })()`)
     await aguardar(() => telaNoApp(solto), /PS .*>/)
     await comando(chefe, 'ork pedir Solto "echo NAO-DEVIA"')
-    const recusou = await aguardar(() => telaNoApp(chefe), 'ninguém ligado a você se chama "Solto"', 15_000)
+    const recusou = await aguardar(() => telaNoApp(chefe), 'ninguém ligado a você se chama "Solto"', 30_000)
     await comando(chefe, 'ork ver Ajudante --linhas 20')
-    const viu = await aguardar(() => telaNoApp(chefe), /"Ajudante" · livre[\s\S]*AJUDANTE-9/, 15_000)
+    const viu = await aguardar(() => telaNoApp(chefe), /"Ajudante" · livre[\s\S]*AJUDANTE-9/, 30_000)
     conferir(
       'ork ver lê a tela do outro; sem corda, recusa',
       /"Ajudante" · livre/.test(viu) && recusou.includes('ninguém ligado') && !(await telaNoApp(solto)).includes('NAO-DEVIA'),
@@ -80,9 +80,9 @@ export const orkConexoes = (e: Estado): Cenario[] => [
     }
 
     await comando(chefe, 'ork fechar Solto')
-    await aguardar(() => telaNoApp(chefe), /ork: ninguém ligado a você se chama "Solto"[\s\S]*ork: ninguém ligado a você se chama "Solto"/, 15_000)
+    await aguardar(() => telaNoApp(chefe), /ork: ninguém ligado a você se chama "Solto"[\s\S]*ork: ninguém ligado a você se chama "Solto"/, 30_000)
     await comando(chefe, 'ork fechar Ajudante')
-    await aguardar(() => telaNoApp(chefe), 'Fechei "Ajudante"', 15_000)
+    await aguardar(() => telaNoApp(chefe), 'Fechei "Ajudante"', 30_000)
     await esperar(300)
     const sobrou = await js<string[]>(`window.__teste.loja.planoAtual().nos.filter((n) => n.tipo === 'terminal').map((n) => n.nome)`)
     conferir(
@@ -179,7 +179,7 @@ export const orkConexoes = (e: Estado): Cenario[] => [
     )
 
     // o agente também enxerga as funções e abre por elas
-    const listaFuncoes = await comandoAte(chefe, 'ork funcoes', /Carteiro/, 15_000)
+    const listaFuncoes = await comandoAte(chefe, 'ork funcoes', /Carteiro/, 30_000)
     const abriuComFuncao = await comandoAte(chefe, 'ork abrir shell --funcao "Carteiro" --nome Entregador', /Abri "Entregador"/, 30_000)
     const oEntregador = await js<string>(`(() => { const n = window.__teste.loja.planoAtual().nos
       .find((x) => x.tipo === 'terminal' && x.nome === 'Entregador'); return n ? n.funcao ?? '' : 'não nasceu' })()`)

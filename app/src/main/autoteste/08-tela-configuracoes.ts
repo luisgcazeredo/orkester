@@ -30,7 +30,18 @@ export const telaConfiguracoes = (_e: Estado): Cenario[] => [
         await clicarEm('.chave-gerar input')
         await digitar('Autoteste tela')
         await esperar(200)
-        await print('configuracoes')
+        // o conteúdo dos terminais atrás do diálogo é vivo (recados do ork chegam em tempo variável): fica invisível só
+        // durante o print, para a base de telas não depender do relógio; o diálogo aparece inteiro; o estilo volta num finally
+        const esconderTerminais = (esconder: boolean): Promise<number> =>
+          js<number>(`(() => { const alvos = [...document.querySelectorAll('.no-terminal .terminal-corpo')]
+            for (const el of alvos) el.style.visibility = ${esconder ? "'hidden'" : "''"}
+            return alvos.length })()`)
+        await esconderTerminais(true)
+        try {
+          await print('configuracoes')
+        } finally {
+          await esconderTerminais(false)
+        }
         const fora1 = await vazamentos()
         conferir('nada vaza da caixa do diálogo (antes de gerar)', fora1.length === 0, fora1.join(' | '))
         const [fundoEsperado, fundoCampo] = await corDoToken('--lateral-filtro', 'backgroundColor', '.chave-gerar input')
@@ -43,7 +54,21 @@ export const telaConfiguracoes = (_e: Estado): Cenario[] => [
         for (let i = 0; i < 20 && !segredo; i++, await esperar(150))
           segredo = await js<string>("document.querySelector('.chave-config')?.textContent ?? ''")
         conferir('gerar pela tela mostra a configuração com o segredo', /ork_[0-9a-f]{64}/.test(segredo), segredo.slice(0, 60))
-        await print('configuracoes-chave')
+        // o comando com ORK_CHAVE e a impressão digital são sorteados a cada rodada (o segredo real já foi conferido acima):
+        // ficam transparentes só durante o print, para a base de telas não diferir sempre; o estilo é devolvido logo depois
+        const cobrirSorteado = (cobrir: boolean): Promise<number> =>
+          js<number>(`(() => { const alvos = [...document.querySelectorAll('.chave-config, .chave-linha .partitura-resumo')]
+            for (const el of alvos) el.style.color = ${cobrir ? "'transparent'" : "''"}
+            return alvos.length })()`)
+        const cobertos = await cobrirSorteado(true)
+        await esconderTerminais(true)
+        try {
+          await print('configuracoes-chave')
+        } finally {
+          await esconderTerminais(false)
+          await cobrirSorteado(false)
+        }
+        conferir('o print da chave cobre só o comando e a impressão digital (2 trechos)', cobertos === 2, `${cobertos} trecho(s) cobertos`)
         const fora2 = await vazamentos()
         conferir('nada vaza da caixa do diálogo (com a chave à mostra)', fora2.length === 0, fora2.join(' | '))
 

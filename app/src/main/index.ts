@@ -7,6 +7,7 @@ import { pararRotinas, registrarRotinas } from './rotinas'
 import { registrarArea, registrarEsquemaImagem, servirImagens } from './area'
 import { registrarChaves } from './chaves'
 import { registrarCodigo } from './codigo'
+import { registrarLeitor } from './leitor'
 import { registrarComandos } from './comandos'
 import { fecharCano } from './cano'
 import { fecharCorreio } from './correio'
@@ -258,6 +259,7 @@ if (!autoteste && !medindo && !app.requestSingleInstanceLock()) {
     registrarTerminais()
     registrarComandos()
     registrarCodigo()
+    registrarLeitor()
     registrarRotinas()
     quandoApagarEspaco(encerrarDoEspaco)
     if (medindo) void rodarMedicao()

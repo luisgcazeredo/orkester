@@ -1,8 +1,25 @@
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { sessaoPorId, telaDe } from '../terminais'
 import { Cenario, Estado } from './util'
+
+// Nome FIXO e curto, sem relógio: o caminho aparece escrito nos terminais e nos rodapés dos prints, e um nome que muda a
+// cada rodada fazia a base de telas diferir sempre. Seguro porque nunca rodam dois autotestes juntos.
+const NOME_DA_PASTA_DOS_TERMINAIS = 'orkester-autoteste-terminais'
+export const pastaDosTerminais = (): string => join(tmpdir(), NOME_DA_PASTA_DOS_TERMINAIS)
+
+/** Apaga a pasta dos terminais (só esse caminho exato, conferido pelo nome); devolve false se não deu (ex.: em uso). */
+export function apagarPastaDosTerminais(): boolean {
+  const pasta = pastaDosTerminais()
+  if (basename(pasta) !== NOME_DA_PASTA_DOS_TERMINAIS) return false
+  try {
+    rmSync(pasta, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+    return true
+  } catch {
+    return false
+  }
+}
 
 export const ork = (e: Estado): Cenario[] => [
     {
@@ -11,7 +28,8 @@ export const ork = (e: Estado): Cenario[] => [
         let { pastaTerminais, espacoTerminais, presetShell, chefe } = e
         try {
         const { esperar, js, print, centroDe, conferir, teclar, digitar, clicar } = d
-    pastaTerminais = join(tmpdir(), `orkester-autoteste-terminais-${Date.now()}`)
+    apagarPastaDosTerminais() // restos de uma rodada que não chegou ao fim
+    pastaTerminais = pastaDosTerminais()
     mkdirSync(pastaTerminais, { recursive: true })
     await js(`window.__teste.loja.criarEspaco('Terminais', ${JSON.stringify(pastaTerminais)})`)
     await esperar(300)
