@@ -36,7 +36,7 @@ test('raiz irmã com o mesmo prefixo não conta como dentro', () => {
 
 test('externo: só http, https e mailto, em qualquer caixa; o resto é recusado', () => {
   assert.equal(enderecoExterno('HTTPS://A.com/x'), 'https://a.com/x')
-  assert.equal(enderecoExterno('mailto:a@b.com'), 'mailto:a@b.com')
+  assert.equal(enderecoExterno('mailto:a@exemplo.invalid'), 'mailto:a@exemplo.invalid')
   for (const v of ['javascript:alert(1)', 'file:///c:/x', 'data:text/html,x', 'vbscript:x', '//a.com', 'C:\\x', 'ms-msdt:x', '', 3, null]) {
     assert.equal(enderecoExterno(v), null, String(v))
   }
@@ -48,10 +48,10 @@ test('extensão md em qualquer caixa', () => {
 })
 
 test('mailto: fica só subject, body, cc e bcc; attach e o resto caem', () => {
-  assert.equal(enderecoExterno('mailto:a@b.com?subject=Oi&attach=C:\\x.txt'), 'mailto:a@b.com?subject=Oi')
-  assert.equal(enderecoExterno('MAILTO:a@b.com?Attachment=C:/x&ATTACH=y&body=a%20b&cc=c@d.com&bcc=e@f.com'), 'mailto:a@b.com?body=a%20b&cc=c@d.com&bcc=e@f.com')
-  assert.equal(enderecoExterno('mailto:a@b.com?at%74ach=C:/x'), 'mailto:a@b.com')
-  assert.equal(enderecoExterno('mailto:a@b.com?to=x@y.com&in-reply-to=1'), 'mailto:a@b.com')
-  assert.equal(enderecoExterno('mailto:a@b.com#x'), 'mailto:a@b.com')
+  assert.equal(enderecoExterno('mailto:a@exemplo.invalid?subject=Oi&attach=C:\\x.txt'), 'mailto:a@exemplo.invalid?subject=Oi')
+  assert.equal(enderecoExterno('MAILTO:a@exemplo.invalid?Attachment=C:/x&ATTACH=y&body=a%20b&cc=c@exemplo.invalid&bcc=e@exemplo.invalid'), 'mailto:a@exemplo.invalid?body=a%20b&cc=c@exemplo.invalid&bcc=e@exemplo.invalid')
+  assert.equal(enderecoExterno('mailto:a@exemplo.invalid?at%74ach=C:/x'), 'mailto:a@exemplo.invalid')
+  assert.equal(enderecoExterno('mailto:a@exemplo.invalid?to=x@exemplo.invalid&in-reply-to=1'), 'mailto:a@exemplo.invalid')
+  assert.equal(enderecoExterno('mailto:a@exemplo.invalid#x'), 'mailto:a@exemplo.invalid')
   assert.equal(enderecoExterno('https://a.com/x?attach=1'), 'https://a.com/x?attach=1')
 })

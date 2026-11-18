@@ -85,10 +85,10 @@ test('link relativo que não é .md fica morto', () => {
 })
 
 test('http(s) e mailto viram data-externo, sem href', () => {
-  const html = renderizarMarkdown('[a](https://exemplo.com/a?b=1&c=2) [b](http://x.org) [m](mailto:a@b.co)')
+  const html = renderizarMarkdown('[a](https://exemplo.com/a?b=1&c=2) [b](http://x.org) [m](mailto:a@exemplo.invalid)')
   assert.ok(html.includes('data-externo="https://exemplo.com/a?b=1&amp;c=2"'))
   assert.ok(html.includes('data-externo="http://x.org"'))
-  assert.ok(html.includes('data-externo="mailto:a@b.co"'))
+  assert.ok(html.includes('data-externo="mailto:a@exemplo.invalid"'))
   assert.ok(!html.includes('href'))
 })
 
