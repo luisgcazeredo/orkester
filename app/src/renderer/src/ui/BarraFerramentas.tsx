@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Eraser,
   FolderTree,
@@ -21,9 +21,8 @@ import { anexarArquivoEm, arvoreEm, portalEm } from './menus'
 import { centroDaTela } from '../quadro/geometria'
 import { CORES_DE_DESENHO } from '../estado/coresDeDados'
 import { COR_AGENTE, ICONE_AGENTE } from '../nos/icones'
-import { abrirFuncoes } from './Funcoes'
-import { abrirPresets } from './Presets'
-import { abrirPartituras, subirPartituraNoCentro } from './Partituras'
+import { subirPartituraNoCentro } from './Partituras'
+import { abrirAgentes } from '../paginas/abrir'
 
 const FORMAS: Array<[PincelDesenho, LucideIcon, string]> = [
   ['lapis', Pencil, 'Lápis'],
@@ -77,6 +76,13 @@ export function BarraFerramentas() {
     abrirOuFecharMenu(aberto)
     if (!aberto) setFiltro('')
   }
+  // Esc fecha o menu mesmo com o foco fora dele (a casca avisa por este evento, ver casca/Casca)
+  useEffect(() => {
+    if (!menuTerminal) return
+    const fechar = (): void => setMenuTerminal(false)
+    window.addEventListener('ork:fechar-menu-terminal', fechar)
+    return () => window.removeEventListener('ork:fechar-menu-terminal', fechar)
+  }, [menuTerminal])
   const procurado = filtro.trim().toLocaleLowerCase('pt-BR')
   const funcoesFiltradas = procurado ? funcoes.filter((f) => f.nome.toLocaleLowerCase('pt-BR').includes(procurado)) : funcoes
 
@@ -225,7 +231,7 @@ export function BarraFerramentas() {
             className="menu-terminal-editar"
             onClick={() => {
               setMenuTerminal(false)
-              abrirPresets()
+              abrirAgentes('presets')
             }}
           >
             Editar presets…
@@ -234,7 +240,7 @@ export function BarraFerramentas() {
             className="menu-terminal-funcoes"
             onClick={() => {
               setMenuTerminal(false)
-              abrirFuncoes()
+              abrirAgentes('funcoes')
             }}
           >
             Editar funções…
@@ -243,7 +249,7 @@ export function BarraFerramentas() {
             className="menu-terminal-partituras"
             onClick={() => {
               setMenuTerminal(false)
-              abrirPartituras()
+              abrirAgentes('partituras')
             }}
           >
             Partituras…

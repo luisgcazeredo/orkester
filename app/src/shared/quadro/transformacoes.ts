@@ -1,4 +1,7 @@
 import type { PedidoDoAgente, RespostaAoAgente } from '../api'
+// Node executa as provas TypeScript diretamente e precisa da extensão neste único import de execução.
+// @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
+import { ESFORCOS, esforcoValido, modeloValido, resolverModelo, type Esforco } from '../modelos.ts'
 import type { Corda, Espaco, Funcao, No, NoCodigo, NoTerminal, Plano, PresetAgente } from '../modelo'
 // Node executa as provas TypeScript diretamente e precisa da extensão neste único import de execução.
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
@@ -75,6 +78,79 @@ function escolherPreset(
   return doTipo ? { preset: doTipo } : { erro: `não há preset de ${pedido.agente}` }
 }
 
+/**
+ * Modelo e esforço do cartão: o pedido manda, depois a função, depois o preset (cada campo sozinho). O pedido é
+ * conferido de verdade (formato e enum, com erro claro); o que vem da função ou do preset já foi conferido na
+ * gravação, e aqui só se ignora o que não vale. Esforço que o motor não tem (`ultra` no Claude) e modelo em shell
+ * são recusados.
+ */
+function escolherModelo(
+  pedido: PedidoAbrir,
+  funcao: Funcao | undefined,
+  preset: PresetAgente,
+  todos: PresetAgente[] = []
+): { modelo?: string; esforco?: Esforco; aviso?: string } | { erro: string } {
+  if (pedido.modelo !== undefined && !modeloValido(pedido.modelo)) {
+    return { erro: 'modelo inválido: só letras, números e . _ : - [ ] (até 80 caracteres), sem espaço nem aspas' }
+  }
+  if (pedido.esforco !== undefined && !esforcoValido(pedido.esforco)) {
+    return { erro: `esforço inválido "${String(pedido.esforco).slice(0, 40)}": use ${ESFORCOS.join(', ')}` }
+  }
+  // modelo e esforço da função valem para o motor do preset dela: aberta em outro motor, ficam de fora
+  const doPresetDaFuncao = funcao?.preset ? todos.find((p) => p.id === funcao.preset) : undefined
+  const deOutroMotor = !!doPresetDaFuncao && doPresetDaFuncao.agente !== preset.agente
+  const r = resolverModelo(pedido, deOutroMotor ? undefined : funcao, preset)
+  if (preset.agente === 'shell') {
+    return pedido.modelo !== undefined || pedido.esforco !== undefined ? { erro: 'shell não tem modelo nem esforço' } : {}
+  }
+  if (r.esforco === 'ultra' && preset.agente === 'claude') {
+    return { erro: 'o Claude não tem o esforço ultra (vai de low a max); ultra é só do Codex' }
+  }
+  const perdido = deOutroMotor ? [funcao!.modelo, funcao!.esforco].filter(Boolean).join(' · ') : ''
+  if (perdido) return { ...r, aviso: `a função "${funcao!.nome}" é de ${doPresetDaFuncao!.agente}; ignorei o modelo/esforço dela (${perdido}) porque este cartão é ${preset.agente}` }
+  return r
+}
+
+/**
+ * Troca o modelo e/ou o esforço de um cartão de agente que já existe. Só mexe no nó: **a `sessao` fica**, e é isso
+ * que faz a janela reabrir o processo retomando a mesma conversa. Quem chama garante que o agente está livre
+ * (isso só o processo principal enxerga). `dono`: quando dito, só vale em cartão aberto por ele.
+ */
+export function mudarModelo(
+  plano: Plano,
+  pedido: { id: string; modelo?: string; esforco?: string; dono?: string; porAgente?: boolean }
+): { erro: string } | { plano: Plano; id: string; nome: string; modelo?: string; esforco?: Esforco; texto: string } {
+  const no = plano.nos.find((n) => n.id === pedido.id)
+  if (!no) return { erro: 'esse cartão não está no andar à mostra' }
+  if (no.tipo !== 'terminal') return { erro: 'só cartão de agente tem modelo' }
+  if (no.agente === 'shell') return { erro: `"${no.nome}" é um shell: não tem modelo nem esforço` }
+  if (pedido.dono !== undefined && no.criadoPor !== pedido.dono) return { erro: `"${no.nome}" não foi aberto por você; só troco o modelo do que é seu` }
+  if (pedido.porAgente && no.travado) return { erro: `não troquei nada: "${no.nome}" está travado` }
+  if (pedido.modelo === undefined && pedido.esforco === undefined) return { erro: 'diga o modelo, o esforço ou os dois' }
+  if (no.agente === 'codex' && !no.sessao) {
+    return { erro: `não troquei nada: a conversa de "${no.nome}" (Codex) ainda não foi descoberta, e reabrir agora começaria outra do zero; espere ele responder uma vez e tente de novo` }
+  }
+  if (pedido.modelo !== undefined && !modeloValido(pedido.modelo)) {
+    return { erro: 'modelo inválido: só letras, números e . _ : - [ ] (até 80 caracteres), sem espaço nem aspas' }
+  }
+  if (pedido.esforco !== undefined && !esforcoValido(pedido.esforco)) {
+    return { erro: `esforço inválido "${String(pedido.esforco).slice(0, 40)}": use ${ESFORCOS.join(', ')}` }
+  }
+  if (pedido.esforco === 'ultra' && no.agente === 'claude') return { erro: 'o Claude não tem o esforço ultra (vai de low a max); ultra é só do Codex' }
+  const modelo = pedido.modelo ?? no.modelo
+  const esforco = (pedido.esforco as Esforco | undefined) ?? no.esforco
+  if (modelo === no.modelo && esforco === no.esforco) return { erro: `"${no.nome}" já está assim (${[modelo, esforco].filter(Boolean).join(' · ')})` }
+  const novo: NoTerminal = { ...no, ...(modelo !== undefined ? { modelo } : {}), ...(esforco !== undefined ? { esforco } : {}) }
+  return {
+    plano: { ...plano, nos: plano.nos.map((n) => (n.id === no.id ? novo : n)) },
+    id: no.id,
+    nome: no.nome,
+    modelo,
+    esforco,
+    texto: `"${no.nome}" reaberto com ${[modelo, esforco].filter(Boolean).join(' · ')}; a conversa continua.`
+  }
+}
+
 export function abrir(
   espaco: Espaco,
   pedido: PedidoAbrir,
@@ -97,6 +173,9 @@ export function abrir(
   const escolhido = escolherPreset(ambiente, pedido, funcao)
   if ('erro' in escolhido) return { espaco, resposta: { ok: false, erro: escolhido.erro } }
   const preset = escolhido.preset
+  const escolhaDeModelo = escolherModelo(pedido, funcao, preset, ambiente.presets.length ? ambiente.presets : ambiente.presetsPadrao)
+  if ('erro' in escolhaDeModelo) return { espaco, resposta: { ok: false, erro: escolhaDeModelo.erro } }
+  const { modelo, esforco, aviso } = escolhaDeModelo
   const nomes = new Set(planos.flatMap((atual) => atual.nos.flatMap((no) => (no.tipo === 'terminal' ? [no.nome.toLowerCase()] : []))))
   const base = pedido.nome || funcao?.nome || preset.nome
   let nome = base
@@ -128,6 +207,8 @@ export function abrir(
     comando: preset.comando,
     pasta: pedido.pasta || funcao?.pasta || undefined,
     funcao: funcao?.nome,
+    ...(modelo !== undefined ? { modelo } : {}),
+    ...(esforco !== undefined ? { esforco } : {}),
     sessao: preset.agente === 'claude' ? ambiente.novoId() : undefined,
     // criador vazio é o usuário (um cliente MCP, pela chave): o cartão nasce sem dono, como os que ele
     // cria pela tela — e sem dono ninguém o herda nem o fecha por engano
@@ -137,7 +218,8 @@ export function abrir(
   const proximo = mudarPlano(espaco, plano, (atual) => ({ ...atual, nos: [...atual.nos, no], cordas: corda ? [...atual.cordas, corda] : atual.cordas }))
   // sem função, a resposta não ganha campo nenhum a mais (há provas comparando o objeto inteiro)
   const comPrompt = funcao?.prompt ? { texto: funcao.prompt } : {}
-  return { espaco: proximo, resposta: { ok: true, id: no.id, nome, ...comPrompt } }
+  const comModelo = modelo !== undefined || esforco !== undefined ? { agente: preset.agente, ...(modelo !== undefined ? { modelo } : {}), ...(esforco !== undefined ? { esforco } : {}) } : {}
+  return { espaco: proximo, resposta: { ok: true, id: no.id, nome, ...comPrompt, ...comModelo, ...(aviso ? { aviso } : {}) } }
 }
 
 /**

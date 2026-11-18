@@ -1,4 +1,5 @@
 import type { Tema } from './temas.ts'
+import type { Esforco } from './modelos.ts'
 // O que fica salvo em disco. Toda mudança de formato sobe a `versao` e ganha uma migração.
 
 export type Agente = 'claude' | 'codex' | 'shell'
@@ -16,6 +17,10 @@ export interface Funcao {
   pasta?: string
   /** Preset preferido (id). Sem ele, a função usa o preset que o usuário escolher na hora. */
   preset?: string
+  /** Modelo do agente (ex.: opus, gpt-5.6-terra). Vazio: o que estiver no comando ou o padrão do motor. */
+  modelo?: string
+  /** Esforço de raciocínio. Vazio: o padrão do motor. */
+  esforco?: Esforco
 }
 
 /**
@@ -39,6 +44,10 @@ export type PecaDePartitura = {
       comando: string
       /** Nome da função (papel). O prompt vem da função na hora de subir, nunca de uma cópia velha. */
       funcao?: string
+      /** Modelo do agente (ex.: opus, gpt-5.6-terra). Vazio: o que estiver no comando ou o padrão do motor. */
+      modelo?: string
+      /** Esforço de raciocínio. Vazio: o padrão do motor. */
+      esforco?: Esforco
     }
   | { tipo: 'texto'; texto: string; tamanhoFonte: number; mono: boolean }
   | { tipo: 'postit'; texto: string; corPostIt: CorPostIt }
@@ -72,6 +81,10 @@ export interface PresetAgente {
   agente: Agente
   /** Linha de comando digitada quando o terminal abre (vazia = só o shell). */
   comando: string
+  /** Modelo do agente (ex.: opus, gpt-5.6-terra). Vazio: o que estiver no comando ou o padrão do motor. */
+  modelo?: string
+  /** Esforço de raciocínio. Vazio: o padrão do motor. */
+  esforco?: Esforco
 }
 
 interface NoBase {
@@ -104,6 +117,10 @@ export interface NoTerminal extends NoBase {
   criadoPor?: string
   /** Nome da função com que este cartão nasceu, para você e as partituras saberem o papel dele. */
   funcao?: string
+  /** Modelo do agente (ex.: opus, gpt-5.6-terra). Vazio: o que estiver no comando ou o padrão do motor. */
+  modelo?: string
+  /** Esforço de raciocínio. Vazio: o padrão do motor. */
+  esforco?: Esforco
   /** false: o usuário fechou o cartão de código deste agente, então ele não nasce mais sozinho. */
   codigoSozinho?: boolean
   /**

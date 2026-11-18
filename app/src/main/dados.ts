@@ -26,6 +26,7 @@ import {
   type EstadoJanela,
   type Partitura,
   type Preferencias,
+  type Rotina,
   type ResumoEspaco
 } from '../shared/modelo'
 import { CANAIS_DADOS } from '../shared/api'
@@ -161,6 +162,47 @@ function lerEspaco(id: string): Espaco | null {
 /** Ids dos espaços, na ordem da lista. */
 export function idsDosEspacos(): string[] {
   return lerManifesto()
+}
+
+const rotinasEmCache = new Map<string, { mtime: number; rotinas: Rotina[]; nomes: Record<string, string> }>()
+
+/**
+ * As rotinas de um espaço que nenhuma janela tem aberto (só o disco as conhece), com o nome dos cartões. Guardado
+ * pelo horário do arquivo: o painel pergunta de poucos em poucos segundos e não relê o que não mudou.
+ */
+export function rotinasSalvas(id: string): { rotinas: Rotina[]; nomes: Record<string, string> } {
+  if (!ID_VALIDO.test(String(id))) return { rotinas: [], nomes: {} }
+  const caminho = join(pastaDoEspaco(id), 'espaco.json')
+  let mtime = 0
+  try {
+    mtime = statSync(caminho).mtimeMs
+  } catch {
+    return { rotinas: [], nomes: {} }
+  }
+  const guardado = rotinasEmCache.get(id)
+  if (guardado && guardado.mtime === mtime) return guardado
+  const espaco = lerEspaco(id)
+  const nomes: Record<string, string> = {}
+  for (const p of espaco ? planos(espaco) : []) for (const n of p.nos) if (n.tipo === 'terminal') nomes[n.id] = n.nome
+  const feito = { mtime, rotinas: (espaco?.rotinas ?? []).filter(rotinaValida), nomes }
+  rotinasEmCache.set(id, feito)
+  return feito
+}
+
+/**
+ * Troca UMA rotina de um espaço SEM janela dona (com dono, quem grava é a janela). Mexe só no campo `rotinas` do arquivo
+ * como está em disco: não "completa" o espaço e não some com rotina inválida que ele já tinha.
+ */
+export function gravarRotinaSalva(id: string, rotina: Rotina): boolean {
+  if (!ID_VALIDO.test(String(id)) || !rotinaValida(rotina)) return false
+  const caminho = join(pastaDoEspaco(id), 'espaco.json')
+  const bruto = existsSync(caminho) ? lerJson<Record<string, unknown> | null>(caminho, null) : null
+  if (!bruto || !Array.isArray(bruto.rotinas)) return false
+  const lista = bruto.rotinas as Array<{ id?: unknown } | null>
+  if (!lista.some((r) => r?.id === rotina.id)) return false
+  gravarJson(caminho, { ...bruto, rotinas: lista.map((r) => (r?.id === rotina.id ? rotina : r)) })
+  rotinasEmCache.delete(id)
+  return true
 }
 
 /** O espaço como está em disco (os andares usam isto para achar ramo e pasta sem confiar na janela). */

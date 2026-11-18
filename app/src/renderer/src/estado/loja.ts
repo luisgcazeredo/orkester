@@ -7,7 +7,7 @@
 export { NADA, quantosSelecionados, lerEstado, usarLoja, planoDe, planoAtual, andarAtual, pastaDoPlano, salvarAgora, salvarParaFechar, desfazer, refazer, escreverPaginaAtiva } from './nucleo'
 export type { Ferramenta, Alvo, Selecao, EstadoUI, StatusDoAviso } from './nucleo'
 export { iniciar, abrirNovaJanela, abrirEspaco, criarEspaco, renomearEspaco, apagarEspaco, prepararLeitura, alternarExplorador, adicionarRaizExplorador, removerRaizExplorador, alternarPastaExplorador, alternarLateral, definirTema, alternarLinhasDoCodigo, definirFuncoes, definirPartituras, definirPastasDoLeitor, salvarPartitura, subirPartitura, chaveDoAviso, anotarAvisoDoPrimeiroPedido, dispensarAvisoDoPrimeiroPedido, entregarPrimeiroPedido } from './espacos'
-export { rotinasDoEspaco, criarRotina, mudarRotina, apagarRotina, alternarPausaDaRotina, testarRotina } from './rotinas'
+export { rotinasDoEspaco, criarRotina, mudarRotina, apagarRotina } from './rotinas'
 export { criarBandaNoQuadro, membrosDaBandaAtual, trocarAgenteDoCartao, definirPresets } from './bandas'
 export { abrirVistaAndares, irParaAndar, criarAndar, renomearAndar, definirStatusAndar, pousarAndar, apagarAndar } from './andares'
 export { escolherFerramenta, definirEstiloDesenho, estaSelecionado, selecionar, selecionarVarios, selecionarTudo, selecionarPeloClique, focarItem, infoDaSelecao, editar, alternarMiniMapa, ZOOM_MIN, ZOOM_MAX, definirCamera, enquadrarNo } from './selecao'

@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path'
 import { CANAIS_APP } from '../shared/api'
 import { registrarAndares } from './andares'
 import { pararRotinas, registrarRotinas } from './rotinas'
+import { registrarPanorama } from './panorama'
 import { registrarArea, registrarEsquemaImagem, servirImagens } from './area'
 import { registrarChaves } from './chaves'
 import { registrarCodigo } from './codigo'
@@ -16,8 +17,7 @@ import { encerrarNavegador, registrarNavegador, soltarAbasDaJanela } from './nav
 import { acompanharJanela, configurarJanelas, gravarSessaoAgora, lembrarInicial, reabrirJanelas, registrarJanelas, soltarJanela } from './janelas'
 import { janelasParaAbrir } from '../shared/janelas'
 import { encerrarDoEspaco, encerrarTodos, registrarTerminais } from './terminais'
-import { rodarAutoteste } from './autoteste'
-import { rodarMedicao } from './medir'
+import { rodarAutoteste, rodarMedicao } from './ferramentas-dev'
 
 /**
  * Endurecimento do executável (fuses, em `package.json` → `build.electronFuses`), decidido em 06/11/2026:
@@ -261,6 +261,7 @@ if (!autoteste && !medindo && !app.requestSingleInstanceLock()) {
     registrarCodigo()
     registrarLeitor()
     registrarRotinas()
+    registrarPanorama()
     quandoApagarEspaco(encerrarDoEspaco)
     if (medindo) void rodarMedicao()
     else abrirAsJanelasDaSessao()

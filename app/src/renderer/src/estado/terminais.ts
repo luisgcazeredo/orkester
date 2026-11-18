@@ -11,10 +11,10 @@ let firmaTerminais = ''
 /** O pedaço de assinatura de cada cartão, guardado pela identidade do objeto (ver sincronizarTerminais). */
 const assinaturas = new WeakMap<object, { pasta: string; texto: string }>()
 
-function firmaDoCartao(n: { id: string; nome: string; agente: string; comando?: string; sessao?: string; criadoPor?: string }, pasta: string): string {
+function firmaDoCartao(n: { id: string; nome: string; agente: string; comando?: string; sessao?: string; criadoPor?: string; modelo?: string; esforco?: string }, pasta: string): string {
   const guardado = assinaturas.get(n)
   if (guardado && guardado.pasta === pasta) return guardado.texto
-  const texto = [n.id, n.nome, n.agente, n.comando ?? '', pasta, n.sessao ?? '', n.criadoPor ?? ''].join('\u0001')
+  const texto = [n.id, n.nome, n.agente, n.comando ?? '', pasta, n.sessao ?? '', n.criadoPor ?? '', n.modelo ?? '', n.esforco ?? ''].join('\u0001')
   assinaturas.set(n, { pasta, texto })
   return texto
 }
@@ -59,8 +59,8 @@ export function sincronizarTerminais(): void {
   for (const plano of [e, ...e.andares]) {
     for (const n of plano.nos) {
       if (n.tipo !== 'terminal') continue
-      const { id, nome, agente, comando, sessao, criadoPor, funcao } = n
-      especs.push({ id, nome, agente, comando, pasta: n.pasta || pastaDe(e, plano), sessao, criadoPor, funcao })
+      const { id, nome, agente, comando, sessao, criadoPor, funcao, modelo, esforco } = n
+      especs.push({ id, nome, agente, comando, pasta: n.pasta || pastaDe(e, plano), sessao, criadoPor, funcao, modelo, esforco })
     }
     for (const par of efetivas.get(plano) ?? []) cordas.push(par)
   }

@@ -1,6 +1,6 @@
-import { type QuandoDaRotina, type ResultadoDaRotina, type Rotina } from '../../../shared/modelo'
-import { type AvisoRotina } from '../../../shared/api'
-import { MAX_ROTINAS, novaRotina, proximaDe } from '../../../shared/rotinas'
+import { type QuandoDaRotina, type Rotina } from '../../../shared/modelo'
+import { type AvisoDePausa, type AvisoRotina } from '../../../shared/api'
+import { MAX_ROTINAS, novaRotina } from '../../../shared/rotinas'
 import { novoId } from './nos'
 import { estado, mudarEspaco } from './nucleo'
 
@@ -41,24 +41,6 @@ export function apagarRotina(id: string): void {
   guardarRotinas(rotinasDoEspaco().filter((r) => r.id !== id))
 }
 
-/** Pausa ou volta a rotina. Pausada, ela some do relógio sem perder o que já aconteceu. */
-export function alternarPausaDaRotina(id: string): void {
-  const rotina = rotinasDoEspaco().find((r) => r.id === id)
-  if (!rotina) return
-  // ao voltar, a próxima vez é contada de agora: uma rotina pausada por dias não dispara tudo de uma vez
-  mudarRotina(id, {
-    pausada: !rotina.pausada,
-    ...(rotina.pausada ? { proxima: proximaDe(rotina.quando, new Date()).toISOString() } : {})
-  })
-}
-
-/** Dispara agora, sem mexer no relógio (o botão "testar"). */
-export async function testarRotina(id: string): Promise<ResultadoDaRotina> {
-  const espaco = estado.espaco
-  if (!espaco) return 'sem-cartao'
-  return window.ork.rotinas.testar(espaco.id, id)
-}
-
 /** O processo principal digitou (ou pulou): guarda o que aconteceu e a próxima vez. */
 export function anotarDisparo(aviso: AvisoRotina): void {
   if (!estado.espaco || estado.espaco.id !== aviso.espacoId) return
@@ -78,4 +60,11 @@ export function sincronizarRotinas(): void {
   if (firma === firmaRotinas) return
   firmaRotinas = firma
   if (e) window.ork.rotinas.definir(e.id, lista)
+}
+
+/** O principal pausou ou religou uma rotina deste espaço (pela página Rotinas): guarda no espaço. */
+export function aplicarPausa(aviso: AvisoDePausa): void {
+  if (!estado.espaco || estado.espaco.id !== aviso.espacoId) return
+  if (!rotinasDoEspaco().some((r) => r.id === aviso.id)) return
+  mudarRotina(aviso.id, { pausada: aviso.pausada, proxima: aviso.proxima })
 }

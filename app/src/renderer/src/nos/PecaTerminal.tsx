@@ -8,6 +8,7 @@ import { CorpoXterm } from '../terminal/CorpoXterm'
 import { abrirMenu } from '../ui/MenuContexto'
 import { anexarArquivosAoPrompt, anexarPastaAoPrompt } from '../ui/anexar'
 import { itensDoCodigoDoTerminal } from '../ui/menus'
+import { rotuloModelo } from '../../../shared/modelos'
 import { COR_AGENTE, ICONE_AGENTE } from './icones'
 
 const TEXTO_DO_AVISO = {
@@ -76,6 +77,11 @@ export const PecaTerminal = memo(function PecaTerminal({ no, selecionado, pastaD
         <Icone size={13} style={{ color: COR_AGENTE[no.agente] }} strokeWidth={2.2} />
         <span className="terminal-nome">{no.nome}</span>
         <span className="terminal-indice">{indice}</span>
+        {rotuloModelo(no) && (
+          <span className="terminal-selo" data-teste="rotulo-modelo" title="Modelo e esforço deste agente">
+            {rotuloModelo(no)}
+          </span>
+        )}
         {no.criadoPor && <span className="terminal-selo" title="Aberto por um agente pelo ork">agente</span>}
         {aviso && (
           <button

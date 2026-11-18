@@ -1,9 +1,10 @@
 import { ipcMain, webContents, type WebContents } from 'electron'
-import { CANAIS_ROTINAS, type AvisoRotina } from '../shared/api'
-import type { Rotina } from '../shared/modelo'
-import { aplicarDisparo, rotinaValida, vencidas } from '../shared/rotinas'
+import { CANAIS_PANORAMA, CANAIS_ROTINAS, type AcaoNaRotina, type AvisoDePausa, type AvisoRotina } from '../shared/api'
+import type { ResultadoDaRotina, Rotina } from '../shared/modelo'
+import { aplicarDisparo, proximaDe, rotinaValida, vencidas } from '../shared/rotinas'
+import { gravarRotinaSalva, rotinasSalvas } from './dados'
 import { dispararNoTerminal } from './espera'
-import { donoDe, exigirDono } from './janelas'
+import { donoDe } from './janelas'
 
 // O relógio das rotinas. Quem conta o tempo e digita é o processo principal, porque é ele que tem o processo
 // do cartão e sabe se o terminal está livre (a janela não sabe). A decisão de quando cada uma vence é da
@@ -47,7 +48,12 @@ async function conferir(): Promise<void> {
       for (const rotina of vencidas(dados.rotinas, agora)) {
         const resultado = await dispararNoTerminal(rotina.terminal, rotina.texto)
         const em = new Date()
-        const depois = aplicarDisparo(rotina, resultado, em)
+        // digitar leva tempo: a lista pode ter mudado no meio (pausa pela página, rotina apagada)
+        const atual = dados.rotinas.find((r) => r.id === rotina.id)
+        if (!atual) continue
+        const calculada = aplicarDisparo(rotina, resultado, em)
+        // quem mexeu durante o disparo manda: a pausa atual fica, e uma próxima vez já refeita (ao religar) também
+        const depois: Rotina = { ...calculada, pausada: atual.pausada, ...(atual.proxima !== rotina.proxima ? { proxima: atual.proxima } : {}) }
         // a conta nova fica aqui na hora: sem isso, a mesma rotina venceria de novo no passo seguinte,
         // antes de a janela devolver a lista atualizada
         dados.rotinas = dados.rotinas.map((r) => (r.id === rotina.id ? depois : r))
@@ -69,15 +75,6 @@ export function registrarRotinas(): void {
     else porEspaco.set(espacoId, { janela: evento.sender.id, rotinas })
   })
 
-  // disparar agora ("testar"), sem mexer no relógio: o resultado volta pelo mesmo aviso
-  ipcMain.handle(CANAIS_ROTINAS.testar, async (evento, espacoId: unknown, id: unknown) => {
-    if (typeof espacoId !== 'string' || typeof id !== 'string') return 'sem-cartao'
-    exigirDono(evento, espacoId)
-    const rotina = porEspaco.get(espacoId)?.rotinas.find((r) => r.id === id)
-    if (!rotina) return 'sem-cartao'
-    return dispararNoTerminal(rotina.terminal, rotina.texto)
-  })
-
   relogio = setInterval(() => void conferir(), PASSO)
   relogio.unref?.()
 }
@@ -87,4 +84,36 @@ export function pararRotinas(): void {
   if (relogio) clearInterval(relogio)
   relogio = null
   porEspaco.clear()
+}
+
+/** As rotinas que o relógio conhece de um espaço aberto numa janela (com a conta de agora); undefined se nenhuma janela o manda. */
+export function rotinasDoRelogio(espacoId: string): Rotina[] | undefined {
+  const dados = porEspaco.get(espacoId)
+  // a janela fechou ou trocou de espaço e o `conferir` ainda não limpou: o relógio velho não vale
+  return dados && donoDe(espacoId) === dados.janela ? dados.rotinas : undefined
+}
+
+/**
+ * Pausar, religar ou testar uma rotina de QUALQUER espaço (as páginas gerais). Espaço com janela: muda o relógio e
+ * avisa a janela dona, que grava no espaço. Espaço sem janela: grava no disco (o relógio dele já está parado).
+ */
+export async function agirNaRotina(espacoId: string, id: string, acao: AcaoNaRotina): Promise<ResultadoDaRotina | 'ok' | 'erro'> {
+  const dono = donoDe(espacoId)
+  const dados = dono !== undefined ? porEspaco.get(espacoId) : undefined
+  const lista = dados?.rotinas ?? (dono === undefined ? rotinasSalvas(espacoId).rotinas : [])
+  const rotina = lista.find((r) => r.id === id)
+  if (!rotina) return 'erro'
+  if (acao === 'testar') return dispararNoTerminal(rotina.terminal, rotina.texto)
+  const pausada = acao === 'pausar'
+  // ao voltar, a próxima vez é contada de agora: uma rotina pausada por dias não dispara tudo de uma vez
+  const nova: Rotina = { ...rotina, pausada, ...(pausada ? {} : { proxima: proximaDe(rotina.quando, new Date()).toISOString() }) }
+  if (!rotinaValida(nova)) return 'erro'
+  if (dados && dono !== undefined) {
+    dados.rotinas = lista.map((r) => (r.id === id ? nova : r))
+    const conteudo = webContents.fromId(dono)
+    const aviso: AvisoDePausa = { espacoId, id, pausada, proxima: nova.proxima }
+    if (conteudo && !conteudo.isDestroyed()) conteudo.send(CANAIS_PANORAMA.pausou, aviso)
+    return 'ok'
+  }
+  return dono === undefined && gravarRotinaSalva(espacoId, nova) ? 'ok' : 'erro'
 }

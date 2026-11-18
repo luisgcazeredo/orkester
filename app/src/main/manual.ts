@@ -82,6 +82,10 @@ aviso) chega sozinho no terminal dele, como uma mensagem que começa com \`[ork 
   \`MSYS2_ARG_CONV_EXCL='*' ork pedir "Nome" "/context"\`, ou grave o comando num arquivo e use \`--arquivo\`.
 - Ajuste \`--tempo\` ao limite da sua ferramenta de terminal (no Claude Code, o padrão da ferramenta é 2 min;
   passe um timeout maior nela ou rode em segundo plano). No Codex, use \`--tempo\` curto e repita \`ork esperar\`.
+- Modelo e esforço: \`ork abrir claude --modelo sonnet --esforco high\` (confira os nomes com \`ork modelos\`). Modelo fora
+  da lista abre com aviso; esforço que o motor não tem é recusado (\`ultra\` só no Codex). Sem os dois, vale o da
+  função, o do preset ou o padrão do motor. Para trocar depois, num cartão que você abriu e que está livre:
+  \`ork modelo "Nome" sonnet --esforco high\` (o cartão reabre e a conversa continua; ocupado, recusa).
 - \`ork abrir\` sem \`--pedido\` só abre; o agente pode levar alguns segundos para ficar pronto.
 - Quem está parado numa pergunta (confiar na pasta, servidores MCP, permissão de ferramenta, atualização) aparece como
   \`pergunta\` no \`ork quem\`, e o \`ork\` não digita pedido nenhum em cima dela: devolve a tela. Responda com

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent a
 import type { TextoMd } from '../../../../shared/api'
 import { renderizarMarkdown } from '../../../../shared/markdown'
 import '../../arquivos/realce' // registra as línguas no highlight.js (o núcleo vem vazio)
-import { definirPastasDoLeitor, usarLoja } from '../../estado/loja'
+import { definirPastasDoLeitor, lerEstado, usarLoja } from '../../estado/loja'
 import { buscarPorNome, caminhoAbsoluto, juntarRaizes, mesmaPasta, montarArvore, nomeDaPasta, paisDe, relativoAberto, type NoDaArvore } from './arvore'
 import { acoesDoLeitor } from './atalhos'
 import { AVISO_FORA_DAS_PASTAS, aoChegarPedido, haPedidoPendente, pegarPedido, raizDoCaminho, vigiaAindaVale } from './pedido'
@@ -232,7 +232,7 @@ export function Leitor() {
       // contador próprio: a vigia não cancela uma abertura em voo, e só aplica se o arquivo vigiado ainda é o mostrado
       const n = ++vigia.current
       void window.ork.leitor.ler(raizVigiada, caminhoVigiado).then((t) => {
-        if (n !== vigia.current || !vigiaAindaVale(docRef.current?.caminho, caminhoVigiado)) return
+        if (n !== vigia.current || !vigiaAindaVale(docRef.current, { raiz: raizVigiada, caminho: caminhoVigiado })) return
         setDoc(paraDocumento(raizVigiada, t))
         requestAnimationFrame(() => corpo.current && (corpo.current.scrollTop = posicao))
       })
@@ -293,14 +293,35 @@ export function Leitor() {
     setBusca('')
   }
 
-  async function gravarFixadas(pastas: string[]): Promise<boolean> {
-    try {
-      await definirPastasDoLeitor(pastas)
-      return true
-    } catch {
-      setAviso('O Orkester não aceitou essa pasta (precisa existir, não ser de rede nem a pasta do usuário inteira).')
-      return false
+  // Gravações em fila, cada uma partindo da lista que a loja tem NA HORA de gravar (não da lista da renderização):
+  // dois "Desafixar" seguidos rápido não deixam a primeira pasta voltar.
+  const filaDeGravacao = useRef<Promise<unknown>>(Promise.resolve())
+  function gravarFixadas(alterar: (atuais: string[]) => string[], quandoFalhar: () => Promise<string>): Promise<boolean> {
+    const vez = filaDeGravacao.current.then(async () => {
+      try {
+        await definirPastasDoLeitor(alterar(lerEstado().preferencias.leitor?.pastas ?? []))
+        return true
+      } catch {
+        setAviso(await quandoFalhar())
+        return false
+      }
+    })
+    filaDeGravacao.current = vez
+    return vez
+  }
+  const AVISO_PASTA_RECUSADA = 'O Orkester não aceitou essa pasta (precisa existir, não ser de rede nem a pasta do usuário inteira).'
+
+  /** O principal valida a lista inteira: se desafixar falha, a causa pode ser OUTRA fixada que sumiu do disco. Diz qual. */
+  async function avisoDaFalhaAoDesafixar(caminho: string): Promise<string> {
+    const outras = (lerEstado().preferencias.leitor?.pastas ?? []).filter((p) => !mesmaPasta(p, caminho))
+    const sumidas: string[] = []
+    for (const p of outras) {
+      const r = await window.ork.leitor.arvore(p).catch(() => ({ erro: 'falhou' }))
+      if (r.erro) sumidas.push(nomeDaPasta(p))
     }
+    return sumidas.length
+      ? `Não deu para desafixar: a pasta fixada "${sumidas.join('", "')}" não existe mais. Desafixe essa primeiro.`
+      : 'Não deu para desafixar essa pasta agora. Tente de novo.'
   }
 
   async function fixarPasta(): Promise<void> {
@@ -311,14 +332,14 @@ export function Leitor() {
       escolherRaiz(escolhida)
       return
     }
-    if (await gravarFixadas([...fixadas, escolhida])) {
+    if (await gravarFixadas((atuais) => (atuais.some((p) => mesmaPasta(p, escolhida)) ? atuais : [...atuais, escolhida]), async () => AVISO_PASTA_RECUSADA)) {
       setAviso(null)
       setRaiz(escolhida)
     }
   }
 
   async function desafixar(caminho: string): Promise<void> {
-    if (await gravarFixadas(fixadas.filter((p) => !mesmaPasta(p, caminho)))) {
+    if (await gravarFixadas((atuais) => atuais.filter((p) => !mesmaPasta(p, caminho)), () => avisoDaFalhaAoDesafixar(caminho))) {
       if (raizAtual && mesmaPasta(raizAtual, caminho)) setRaiz(null)
       if (doc && mesmaPasta(doc.raiz, caminho)) {
         setDoc(null)

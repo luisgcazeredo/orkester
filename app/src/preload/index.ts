@@ -20,6 +20,9 @@ import {
   type ApiLeitor,
   type ApiPortal,
   type ApiRotinas,
+  type ApiPanorama,
+  type AvisoDePausa,
+  CANAIS_PANORAMA,
   type AvisoRotina,
   type AvisoPortal,
   type AvisoJanelas,
@@ -39,9 +42,16 @@ const andares = chamadas<ApiAndares>(CANAIS_ANDARES)
 const area = chamadas<ApiArea>(CANAIS_AREA)
 const rotinas: ApiRotinas = {
   definir: (espacoId, lista) => ipcRenderer.send(CANAIS_ROTINAS.definir, espacoId, lista),
-  testar: (espacoId, id) => ipcRenderer.invoke(CANAIS_ROTINAS.testar, espacoId, id),
   aoAcontecer: (ouvinte) => {
     ipcRenderer.on(CANAIS_ROTINAS.aviso, (_evento, aviso: AvisoRotina) => ouvinte(aviso))
+  }
+}
+
+const panorama: ApiPanorama = {
+  ler: (opcoes) => ipcRenderer.invoke(CANAIS_PANORAMA.ler, opcoes),
+  agirNaRotina: (espacoId, id, acao) => ipcRenderer.invoke(CANAIS_PANORAMA.rotina, espacoId, id, acao),
+  aoPausar: (ouvinte) => {
+    ipcRenderer.on(CANAIS_PANORAMA.pausou, (_evento, aviso: AvisoDePausa) => ouvinte(aviso))
   }
 }
 
@@ -179,6 +189,7 @@ const api: ApiOrkester = {
   area,
   janelas,
   rotinas,
+  panorama,
   portal,
   aoPedirFechar: (salvar) => {
     ipcRenderer.on(CANAIS_APP.vaiFechar, async () => {

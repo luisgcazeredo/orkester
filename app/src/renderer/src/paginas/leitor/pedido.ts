@@ -67,7 +67,10 @@ export function haPedidoPendente(): boolean {
   return pendente !== null
 }
 
-/** A releitura da vigia só vale se o arquivo vigiado ainda é o que está em tela (não passa à frente de outra abertura). */
-export function vigiaAindaVale(mostrado: string | null | undefined, vigiado: string): boolean {
-  return !!mostrado && chave(mostrado) === chave(vigiado)
+/**
+ * A releitura da vigia só vale se o arquivo vigiado ainda é o que está em tela (não passa à frente de outra abertura).
+ * Compara a raiz E o caminho: o mesmo caminho lido por outra raiz é outro documento.
+ */
+export function vigiaAindaVale(mostrado: { raiz: string; caminho: string } | null | undefined, vigiado: { raiz: string; caminho: string }): boolean {
+  return !!mostrado && chave(mostrado.caminho) === chave(vigiado.caminho) && chave(mostrado.raiz) === chave(vigiado.raiz)
 }

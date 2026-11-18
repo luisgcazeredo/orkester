@@ -5,7 +5,7 @@ import { irParaAndar } from './andares'
 import { atenderAgente } from './caixa'
 import { agora, novoId } from './nos'
 import { cancelarSalvamentoPendente, definir, estado, mudarEspaco, mudarPlano, NADA, planoAtual, registrarHistorico, salvando, salvarAgora, type StatusDoAviso, zerarHistorico } from './nucleo'
-import { anotarDisparo } from './rotinas'
+import { anotarDisparo, aplicarPausa } from './rotinas'
 import { anotarSessoes } from './terminais'
 
 // ---------- início e espaços ----------
@@ -15,6 +15,7 @@ export async function iniciar(): Promise<void> {
   window.ork.terminal.aoDescobrirSessao((id, sessao) => anotarSessoes({ [id]: sessao }))
   window.ork.agentes.aoPedir(atenderAgente)
   window.ork.rotinas.aoAcontecer(anotarDisparo)
+  window.ork.panorama.aoPausar(aplicarPausa)
   const [preferencias, janela, espacos, inicio] = await Promise.all([
     window.ork.dados.carregarPreferencias(),
     window.ork.dados.carregarEstado(),

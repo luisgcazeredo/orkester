@@ -20,7 +20,7 @@ import {
   Sun,
   Type,
   Users,
-  type LucideIcon, Settings } from 'lucide-react'
+  type LucideIcon, Settings, Bot, Clock } from 'lucide-react'
 import type { No } from '../../../shared/modelo'
 import {
   abrirEspaco,
@@ -42,6 +42,7 @@ import { colar } from './area'
 import { abrirAtalhos } from './Atalhos'
 import { enquadrarTudo } from './Controles'
 import { abrirConfiguracoes } from './Configuracoes'
+import { abrirAgentes, abrirRotinas } from '../paginas/abrir'
 import { anexarArquivoEm, arvoreEm, portalEm } from './menus'
 
 // Ctrl+K: uma caixa de busca para achar qualquer coisa (cartão, andar, espaço) e rodar qualquer comando
@@ -162,6 +163,11 @@ function montarItens(): Item[] {
       ? { rotulo: 'Tema claro', grupo: 'Comando', icone: Sun, acao: () => definirTema('claro') }
       : { rotulo: 'Tema escuro', grupo: 'Comando', icone: Moon, acao: () => definirTema('escuro') },
     { rotulo: 'Atalhos do teclado', grupo: 'Comando', icone: Keyboard, detalhe: '?', acao: abrirAtalhos },
+    { rotulo: 'Rotinas (página)', grupo: 'Comando', icone: Clock, acao: () => abrirRotinas() },
+    { rotulo: 'Agentes (página)', grupo: 'Comando', icone: Bot, acao: () => abrirAgentes('agora') },
+    { rotulo: 'Funções (página Agentes)', grupo: 'Comando', icone: Bot, acao: () => abrirAgentes('funcoes') },
+    { rotulo: 'Presets (página Agentes)', grupo: 'Comando', icone: Bot, acao: () => abrirAgentes('presets') },
+    { rotulo: 'Partituras (página Agentes)', grupo: 'Comando', icone: Bot, acao: () => abrirAgentes('partituras') },
     { rotulo: 'Configurações (chaves MCP)…', grupo: 'Comando', icone: Settings, acao: abrirConfiguracoes },
     ...plano.nos.map(
       (n): Item => ({

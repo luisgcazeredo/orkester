@@ -41,11 +41,18 @@ function NovoEspaco({ aoFechar }: { aoFechar: () => void }) {
   )
 }
 
+// O filtro vive no módulo: a lista desmonta ao sair do Quadro (ir ao Leitor) e o texto digitado não se perde.
+let filtroGuardado = ''
+
 export function ListaDeEspacos() {
   const espacos = usarLoja((e) => e.espacos)
   const espacoAberto = usarLoja((e) => e.espaco)
   const emOutras = usarLoja((e) => e.emOutrasJanelas)
-  const [filtro, setFiltro] = useState('')
+  const [filtro, definirFiltro] = useState(filtroGuardado)
+  const setFiltro = (texto: string): void => {
+    filtroGuardado = texto
+    definirFiltro(texto)
+  }
   const [criando, setCriando] = useState(false)
   const [renomeando, setRenomeando] = useState<string | null>(null)
 

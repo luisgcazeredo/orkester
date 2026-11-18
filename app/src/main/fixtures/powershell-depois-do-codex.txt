@@ -1,5 +1,0 @@
-› Cole aqui a ficha do Revisor
-
-Unsent draft: # Revisor
-Error: timed out discarding buffered terminal input
-PS C:\Users\voce\projetos\Orkester>

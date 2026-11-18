@@ -88,9 +88,9 @@ For development:
 
 ```powershell
 npm run dev        # app with hot reload
-npm run provas     # unit tests for the pure modules
-npm run autoteste  # drives the real app with mouse and keyboard, checks everything, exits (0 = passed)
 ```
+
+The project's test tools are not part of this repository.
 
 ## The `ork` command
 
@@ -120,13 +120,11 @@ team sheets, acting as you. Orkester has to be open.
 
 Electron · React · TypeScript · xterm.js · node-pty.
 
-The canvas logic lives in pure modules, covered by tests that run in plain Node without opening the app. On
-top of those, a self-test launches the real app, builds a canvas, drives it with mouse and keyboard and
-checks the result on screen.
+The canvas logic lives in pure modules, separate from the screen.
 
 ```text
 app/src/shared/    pure canvas rules (bands, scores, agent swap, routines, windows, files)
-app/src/main/      main process: terminals, `ork` verbs, data on disk, self-test
+app/src/main/      main process: terminals, `ork` verbs, data on disk
 app/src/renderer/  the canvas, in React
 app/src/cli/       the `ork` command the agent calls
 app/src/mcp/       the MCP server an outside client runs

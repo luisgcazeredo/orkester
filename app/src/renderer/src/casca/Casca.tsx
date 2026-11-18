@@ -1,4 +1,4 @@
-import { BookOpen, LayoutGrid } from 'lucide-react'
+import { BookOpen, Bot, Clock, LayoutGrid } from 'lucide-react'
 import { lazy, Suspense } from 'react'
 import * as loja from '../estado/loja'
 import {
@@ -18,6 +18,7 @@ import { BarraFerramentas } from '../ui/BarraFerramentas'
 import { BotaoLateral, CantoInferior, CantoSuperior } from '../ui/Controles'
 import { VistaAndares } from '../ui/Andares'
 import { atalhosDoLeitor } from '../paginas/leitor/atalhos'
+import { pegarPedido } from '../paginas/leitor/pedido'
 import { DIALOGOS } from './dialogos'
 import { acharPagina, ligarPaginaAtiva, paginaAtiva, paginasMontadas, PAGINA_INICIAL, registrarPagina, temPagina } from './paginas'
 
@@ -36,6 +37,19 @@ function terminalComOTeclado(): HTMLElement | null {
   return document.querySelector('.no-terminal.selecionado.sozinho .xterm-helper-textarea')
 }
 
+/** Camadas do quadro que são donas do teclado: só as passageiras (Vista dos andares, Menu do Terminal), enquanto abertas. As fixas
+ *  (Lateral, Explorador, Mini mapa) NÃO prendem o teclado por um clique: só calam o quadro com o foco num campo de texto
+ *  (filtro, renomear), e isso já é o `digitando`. */
+function camadaAberta(): boolean {
+  return !!document.querySelector('.vista-andares, .menu-terminal')
+}
+
+/** Esc: fecha uma camada por vez — Menu do Terminal, depois a Vista dos andares. */
+function fecharCamada(): void {
+  if (document.querySelector('.menu-terminal')) window.dispatchEvent(new Event('ork:fechar-menu-terminal'))
+  else if (document.querySelector('.vista-andares')) loja.abrirVistaAndares(false)
+}
+
 const atalhosDoQuadro = criarAtalhos(
   () => ({
     pagina: paginaAtiva(),
@@ -43,11 +57,13 @@ const atalhosDoQuadro = criarAtalhos(
     menuAberto: menuAberto(),
     dialogoAberto: !!document.querySelector('.dialogo-fundo'),
     terminalComTeclado: terminalComOTeclado() !== null,
-    emGesto: emGesto()
+    emGesto: emGesto(),
+    camadaAberta: camadaAberta()
   }),
   {
     devolverFoco: () => terminalComOTeclado()?.focus(),
     cancelarGesto: cancelarGestos,
+    fecharCamada,
     zoom: zoomPeloCentro,
     enquadrarTudo,
     desfazer,
@@ -77,12 +93,43 @@ const atalhosDoQuadro = criarAtalhos(
 )
 
 // O Leitor (e o markdown-it dele) só carrega quando a página abre; os atalhos vêm de um módulo pequeno à parte.
-const LeitorPreguicoso = lazy(() => import('../paginas/leitor/Leitor').then((m) => ({ default: m.Leitor })))
+// Se o carregamento falha, o pedido "abrir no Leitor" é descartado (irParaPagina já devolveu true) e a página mostra o erro
+// em vez de deixar a tela em branco.
+const LeitorPreguicoso = lazy(() =>
+  import('../paginas/leitor/Leitor').then(
+    (m) => ({ default: m.Leitor }),
+    () => {
+      pegarPedido()
+      return { default: () => <p className="leitor-vazio" role="alert">Não deu para carregar o Leitor. Feche e abra o Orkester de novo.</p> }
+    }
+  )
+)
 
 function PaginaLeitor() {
   return (
     <Suspense fallback={null}>
       <LeitorPreguicoso />
+    </Suspense>
+  )
+}
+
+// Rotinas e Agentes também carregam sob demanda. Falha ao carregar: mostra o erro em vez de deixar a tela em branco.
+const falhou = (nome: string) => () => ({ default: () => <p className="leitor-vazio" role="alert">Não deu para carregar {nome}. Feche e abra o Orkester de novo.</p> })
+const RotinasPreguicosa = lazy(() => import('../paginas/rotinas/Rotinas').then((m) => ({ default: m.Rotinas }), falhou('as Rotinas')))
+const AgentesPreguicosa = lazy(() => import('../paginas/agentes/Agentes').then((m) => ({ default: m.Agentes }), falhou('os Agentes')))
+
+function PaginaRotinas() {
+  return (
+    <Suspense fallback={null}>
+      <RotinasPreguicosa />
+    </Suspense>
+  )
+}
+
+function PaginaAgentes() {
+  return (
+    <Suspense fallback={null}>
+      <AgentesPreguicosa />
     </Suspense>
   )
 }
@@ -113,6 +160,8 @@ function PaginaQuadro() {
 // o Fast Refresh reexecuta este módulo: sem a checagem, o registro lançaria por id repetido
 if (!temPagina(PAGINA_INICIAL)) registrarPagina({ id: PAGINA_INICIAL, titulo: 'Quadro', icone: LayoutGrid, nativa: true, manterMontada: true, atalhos: atalhosDoQuadro, Componente: PaginaQuadro })
 if (!temPagina('leitor')) registrarPagina({ id: 'leitor', titulo: 'Leitor de Markdown', icone: BookOpen, nativa: true, atalhos: atalhosDoLeitor, Componente: PaginaLeitor })
+if (!temPagina('rotinas')) registrarPagina({ id: 'rotinas', titulo: 'Rotinas', icone: Clock, nativa: true, Componente: PaginaRotinas })
+if (!temPagina('agentes')) registrarPagina({ id: 'agentes', titulo: 'Agentes', icone: Bot, nativa: true, Componente: PaginaAgentes })
 
 /**
  * As páginas montadas: a ativa e as que pedem `manterMontada` (o quadro, para os terminais não caírem ao trocar).

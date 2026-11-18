@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import hljs from 'highlight.js/lib/core'
 import { ChevronsDownUp, ChevronsUpDown, Code2, FileCode, GitCompare, BookOpen, History, Pin, Radio, RefreshCw, WrapText } from 'lucide-react'
 import type { MudancaArquivo } from '../../../shared/api'
@@ -136,13 +136,14 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
     return () => clearInterval(t)
   }, [visor, no.recolhido])
   const [recentes, definirRecentes] = useState<MudancaArquivo[]>([])
-  const [carga, definirCarga] = useState<Carga>(VAZIO)
+  // a carga guarda de QUE arquivo é: ao trocar de alvo ela já vale VAZIO na mesma renderização (zerar num efeito deixava 1 quadro velho)
+  const [guardada, definirGuardada] = useState<{ de: string | null; carga: Carga }>({ de: null, carga: VAZIO })
   const [rodada, definirRodada] = useState(0)
-  const alvoDaCarga = useRef<string | null>(null)
   // `.md` no modo arquivo sai formatado; "ver código" vale para o arquivo em que foi pedido
   const [verCodigo, definirVerCodigo] = useState<string | null>(null)
 
   const alvo = no.caminho ?? null
+  const carga = guardada.de === alvo ? guardada.carga : VAZIO
   const apagado = !!lista.find((a) => a.caminho === alvo)?.sumiu
 
   // a lista do botão de histórico: os arquivos que a pasta já tem
@@ -168,11 +169,7 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
   }, [pasta, no.caminho, visor])
 
   useEffect(() => {
-    // outro arquivo: a carga do anterior não fica na tela até a nova chegar
-    if (alvoDaCarga.current !== alvo) {
-      alvoDaCarga.current = alvo
-      definirCarga(VAZIO)
-    }
+    const definirCarga = (c: Carga): void => definirGuardada({ de: alvo, carga: c })
     // recolhido não lê nada: o bloquinho fica só com o nome e para de custar leitura de disco
     if (no.recolhido || !alvo) return definirCarga(VAZIO)
     // arquivo que sumiu do disco continua na lista, mas não há o que ler
@@ -225,12 +222,13 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
   const [renderizador, definirRenderizador] = useState<typeof import('../../../shared/markdown').renderizarMarkdown | null>(null)
   // formatado só com o renderizador pronto: enquanto carrega (ou se o import falhar) o código fica à mostra
   const formatado = querFormatado && renderizador !== null
+  const [falhaMd, definirFalhaMd] = useState(false)
   useEffect(() => {
     if (!querFormatado || renderizador) return
     let vivo = true
     import('../../../shared/markdown').then(
       (m) => vivo && definirRenderizador(() => m.renderizarMarkdown),
-      () => undefined
+      () => vivo && definirFalhaMd(true)
     )
     return () => {
       vivo = false
@@ -342,11 +340,12 @@ export const Codigo = memo(function Codigo({ no, selecionado }: { no: NoCodigo; 
           {ehMd && (
             <button
               className="botao-mini"
-              title={querFormatado ? 'Ver o código do Markdown' : 'Ver formatado'}
+              title={falhaMd ? 'Não deu para carregar o formatador de Markdown: o código fica à mostra' : querFormatado ? 'Ver o código do Markdown' : 'Ver formatado'}
+              disabled={falhaMd}
               {...semArrasto}
               onClick={() => definirVerCodigo(querFormatado ? alvo : null)}
             >
-              {querFormatado ?<Code2 size={12} /> : <FileCode size={12} />}
+              {querFormatado && !falhaMd ? <Code2 size={12} /> : <FileCode size={12} />}
             </button>
           )}
           {!formatado && (

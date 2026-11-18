@@ -22,6 +22,8 @@ import type { Corda, Funcao, No, NoBanda, NoPostIt, NoTerminal, NoTexto, Partitu
 // Node executa as provas TypeScript diretamente e precisa da extensão nestes imports de execução.
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
 import { MAX_NOS } from './agente.ts'
+// @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
+import { resolverModelo, rotuloModelo } from '../modelos.ts'
 // @ts-expect-error idem.
 import { caixaDoNo, proximoZ, tocam, type Caixa } from './geometria.ts'
 
@@ -128,7 +130,7 @@ export function partituraDe(
       ...(grupoDe(no.grupo) === undefined ? {} : { grupo: grupoDe(no.grupo) })
     }
     if (no.tipo === 'terminal') {
-      return { ...base, tipo: 'terminal', nome: no.nome, agente: no.agente, comando: no.comando, ...(no.funcao ? { funcao: no.funcao } : {}) }
+      return { ...base, tipo: 'terminal', nome: no.nome, agente: no.agente, comando: no.comando, ...(no.funcao ? { funcao: no.funcao } : {}), ...(no.modelo ? { modelo: no.modelo } : {}), ...(no.esforco ? { esforco: no.esforco } : {}) }
     }
     if (no.tipo === 'texto') {
       return { ...base, tipo: 'texto', texto: limitar(no.texto), tamanhoFonte: no.tamanhoFonte, mono: no.mono }
@@ -245,7 +247,14 @@ export function aplicarPartitura(
     const doPapel = funcao?.preset ? amb.presets?.find((pr) => pr.id === funcao.preset) : undefined
     const agente = doPapel?.agente ?? peca.agente
     const comando = doPapel ? doPapel.comando : peca.comando
-    linhas.push(`  "${nome}" (${agente})${peca.funcao ? ` · função "${peca.funcao}"${funcao ? '' : ' (não existe mais)'}` : ''}`)
+    // modelo e esforço: a função manda (e o preset dela); o que ela não diz vem da peça, só se o motor é o mesmo
+    // de quando foi salva (um modelo de Codex não pode virar flag de Claude)
+    const daFuncao = resolverModelo(undefined, funcao, doPapel)
+    const escolhido = resolverModelo(daFuncao, agente === peca.agente ? peca : undefined)
+    const modelo = agente === 'shell' ? undefined : escolhido.modelo
+    const esforco = agente === 'shell' || (agente === 'claude' && escolhido.esforco === 'ultra') ? undefined : escolhido.esforco
+    const rotulo = rotuloModelo({ modelo, esforco })
+    linhas.push(`  "${nome}" (${agente})${rotulo ? ` · ${rotulo}` : ''}${peca.funcao ? ` · função "${peca.funcao}"${funcao ? '' : ' (não existe mais)'}` : ''}`)
     return {
       ...base,
       tipo: 'terminal',
@@ -253,6 +262,8 @@ export function aplicarPartitura(
       agente,
       comando,
       funcao: peca.funcao,
+      ...(modelo ? { modelo } : {}),
+      ...(esforco ? { esforco } : {}),
       pasta: funcao?.pasta || undefined,
       sessao: agente === 'claude' ? amb.novoId() : undefined,
       criadoPor: dono ? dono.id : undefined

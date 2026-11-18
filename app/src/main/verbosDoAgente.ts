@@ -1,11 +1,13 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import type { Agente } from '../shared/modelo'
+import type { Esforco } from '../shared/modelos'
 import { MAX_FICHAS, lerFicha, type FichaDeCatalogo } from '../shared/catalogo'
 import type { PedidoNoQuadro } from '../shared/quadro/agente'
 import { criarEspacoDoAgente, resumosDosEspacos } from './dados'
 import { arquivoAcompanhado } from './codigo'
 import { AJUDA } from './manual'
+import { conferirModelo, lerModelos, modeloDasOpcoes, textoDoModelo, textoDosModelos } from './modelos'
 import { type NomeDeVerbo } from './verbos'
 import { encerrarAgora, escreverNoProcesso, esperarSessao, sessoesCriadasPor, telaDe, type Sessao } from './terminais'
 import { esperar, janelaDoEspaco, abrirJanelaPronta, pedirAJanela } from './quadroDoAgente'
@@ -45,6 +47,28 @@ const TECLAS: Record<string, string> = {
   backspace: '\x7f',
   espaco: ' ',
   space: ' '
+}
+
+/**
+ * Confere e troca o modelo/esforço de um cartão vivo (agente ou usuário): formato e enum (erro claro), agente livre
+ * (trocar reabre o processo, e reabrir no meio de um trabalho o perderia), e só então pede à janela. Devolve o texto.
+ */
+export async function trocarModeloDe(
+  alvo: Sessao,
+  modeloPedido: string | undefined,
+  opcoes: Record<string, string | number | true>,
+  enviar: (modelo: string | undefined, esforco: Esforco | undefined) => Promise<{ ok: true; texto?: string } | { ok: false; erro: string }>
+): Promise<string> {
+  if (alvo.espec.agente === 'shell') throw new Error(`"${alvo.espec.nome}" é um shell: não tem modelo nem esforço`)
+  const { modelo, esforco } = modeloDasOpcoes({ ...(modeloPedido ? { modelo: modeloPedido } : {}), ...(opcoes.esforco !== undefined ? { esforco: opcoes.esforco } : {}) }, alvo.espec.agente)
+  if (modelo === undefined && esforco === undefined) throw new Error('diga o modelo, o esforço ou os dois: ork modelo <cartão> <modelo> [--esforco nível]')
+  const livre = await situacao(alvo)
+  if (livre !== 'livre') throw new Error(`"${alvo.espec.nome}" não está livre (${livre}); trocar reabre o processo e perderia o que ele está fazendo. Espere ele terminar.`)
+  await abrirJanelaPronta(alvo.espacoId)
+  const r = await enviar(modelo, esforco)
+  if (!r.ok) throw new Error(r.erro)
+  const aviso = conferirModelo(alvo.espec.agente, modelo, esforco, lerModelos()).aviso
+  return `${r.texto ?? 'Pronto.'}${aviso ? ` Aviso: ${aviso}.` : ''}`
 }
 
 export function agenteDe(texto: string | undefined): Agente | null {
@@ -175,6 +199,7 @@ export const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
       throw new Error('diga qual agente: ork abrir claude|codex|shell, ou use --funcao "Papel"')
     }
     const pasta = pastaPedida(eu, opcoes.pasta)
+    const { modelo, esforco } = modeloDasOpcoes(opcoes, agente ?? undefined)
     const nome = typeof opcoes.nome === 'string' ? opcoes.nome.trim().slice(0, 80) || undefined : undefined
     const preset = typeof opcoes.preset === 'string' ? opcoes.preset.trim() || undefined : undefined
     const funcao = typeof opcoes.funcao === 'string' ? opcoes.funcao.trim() || undefined : undefined
@@ -182,20 +207,25 @@ export const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
     let pedidoInicial = texto
     const espaco = typeof opcoes.espaco === 'string' ? espacoPorNome(opcoes.espaco) : { id: eu.espacoId, nome: '' }
     let novo: Sessao | undefined
+    let avisoDaJanela: string | undefined
     {
       await abrirJanelaPronta(espaco.id)
-      const r = await pedirAJanela({ tipo: 'abrir', espacoId: espaco.id, criador: eu.id, agente: agente ?? undefined, preset, nome, pasta, funcao })
+      const r = await pedirAJanela({ tipo: 'abrir', espacoId: espaco.id, criador: eu.id, agente: agente ?? undefined, preset, nome, pasta, funcao, modelo, esforco })
       if (!r.ok) throw new Error(r.erro)
+      avisoDaJanela = r.aviso
       // o prompt da função é o primeiro pedido; com --pedido junto, a função vem antes e o pedido depois
       if (r.texto) pedidoInicial = [r.texto, pedidoInicial].filter(Boolean).join('\n\n')
       novo = r.id ? await esperarSessao(r.id, 5000) : undefined
     }
     if (!novo) throw new Error('o cartão foi criado, mas o processo não abriu')
     registrar(eu, novo, 'abrir', pedidoInicial)
+    const avisoDoModelo =
+      [conferirModelo(novo.espec.agente, novo.espec.modelo, novo.espec.esforco, lerModelos()).aviso, avisoDaJanela].filter(Boolean).join('; ') || undefined
     const aberto =
-      novo.espacoId === eu.espacoId
+      (novo.espacoId === eu.espacoId
         ? `Abri "${novo.espec.nome}" (${agente}), ligado a você.`
-        : `Abri "${novo.espec.nome}" (${agente}) no espaço "${espaco.nome}"; você pode falar com ele porque o abriu.`
+        : `Abri "${novo.espec.nome}" (${agente}) no espaço "${espaco.nome}"; você pode falar com ele porque o abriu.`) +
+      textoDoModelo(novo.espec.modelo, novo.espec.esforco, avisoDoModelo)
     if (!pedidoInicial) return { saida: `${aberto} Mande o primeiro pedido com: ork pedir "${novo.espec.nome}" "…"` }
     const comecouEsperar = Date.now()
     const pronto = await aguardarPronto(novo, 90_000, cancelado)
@@ -385,6 +415,13 @@ export const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
     return { saida: r.texto ?? 'Pronto.' }
   },
 
+  /** Troca o modelo/esforço de um cartão **que ele abriu**, com o agente livre: o cartão reabre e a conversa continua. */
+  modelo: async ({ eu, pos, opcoes }) => {
+    const alvo = acharEntre(sessoesCriadasPor(eu.id), pos[0])
+    if (alvo.id === eu.id) throw new Error('você não troca o seu próprio cartão: isso encerraria você no meio deste comando')
+    return { saida: await trocarModeloDe(alvo, pos[1], opcoes, async (modelo, esforco) => pedirAJanela({ tipo: 'modelo', espacoId: alvo.espacoId, id: eu.id, alvo: alvo.id, modelo, esforco })) }
+  },
+
   /** Bandas: grupo de agentes como moldura no quadro. Quem sabe o que está dentro dela é a janela. */
   banda: async ({ eu, pos }) => {
     const pedida = (pos[0] ?? 'lista').toLowerCase()
@@ -441,6 +478,8 @@ export const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
     const sobras = pulados.length ? ['', 'Arquivos pulados (sem cabeçalho de ficha):', ...pulados.map((p) => `  ${p}`)] : []
     return { saida: [r.texto ?? '', ...sobras].join(String.fromCharCode(10)).trim() }
   },
+
+  modelos: async () => ({ saida: textoDosModelos(lerModelos()) }),
 
   funcoes: async ({ eu }) => {
     await abrirJanelaPronta(eu.espacoId)

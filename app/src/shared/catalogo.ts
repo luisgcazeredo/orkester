@@ -8,6 +8,9 @@
 // Puro de propósito: ler arquivo é do processo principal, gravar preferência é da janela, e a decisão —
 // o que esta ficha vira, com que motor e que nível — fica aqui, onde as provas alcançam.
 import type { Funcao, PresetAgente } from './modelo.ts'
+// Node executa as provas TypeScript diretamente e precisa da extensão neste único import de execução.
+// @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
+import { MODELOS_PADRAO, esforcoValido, modeloValido, type Esforco, type ListaDeModelos } from './modelos.ts'
 
 /** Uma ficha lida de um arquivo: o cabeçalho dela mais o corpo, que vira o prompt da função. */
 export interface FichaDeCatalogo {
@@ -18,6 +21,10 @@ export interface FichaDeCatalogo {
   /** Como veio escrito ("forte", "médio (forte em migração)", "não se aplica"). */
   nivel: string
   pasta?: string
+  /** Cabeçalho opcional `modelo:` (como veio escrito; é conferido na importação). */
+  modelo?: string
+  /** Cabeçalho opcional `esforco:`/`esforço:` (idem). */
+  esforco?: string
   prompt: string
 }
 
@@ -56,6 +63,8 @@ export function lerFicha(arquivo: string, texto: string): LeituraDeFicha {
       motor: cabecalho.get('motor') ?? '',
       nivel: cabecalho.get('nivel') ?? '',
       pasta: cabecalho.get('pasta') || undefined,
+      modelo: cabecalho.get('modelo') || undefined,
+      esforco: cabecalho.get('esforco') || undefined,
       prompt: partes[2].trim()
     }
   }
@@ -134,11 +143,46 @@ interface LinhaDoRelatorio {
   acao: 'criada' | 'atualizada' | 'igual'
   preset?: string
   aviso?: string
+  /** O que a função ficou com: `modelo · esforço` (o que aparece no lugar do nível). */
+  modelo?: string
 }
 
 interface CatalogoJuntado {
   funcoes: Funcao[]
   relatorio: LinhaDoRelatorio[]
+}
+
+/**
+ * Modelo e esforço da função que nasce da ficha, campo a campo: o que a ficha escreve (`modelo:`/`esforco:`) manda;
+ * o que falta vem do padrão do nível (`nivel: forte|médio|rápido` é traduzido pelos atalhos). Valor inválido é
+ * descartado com aviso, porque ele acaba digitado no shell; `ultra` no Claude também. Shell não tem modelo.
+ */
+function modeloDaFicha(
+  ficha: FichaDeCatalogo,
+  motor: 'claude' | 'codex' | 'shell',
+  nivel: string | undefined,
+  atalhos: ListaDeModelos['atalhos']
+): { modelo?: string; esforco?: Esforco; avisos: string[] } {
+  const avisos: string[] = []
+  if (motor === 'shell') return { avisos: ficha.modelo || ficha.esforco ? ['shell não tem modelo nem esforço; ignorei'] : [] }
+  let modelo: string | undefined
+  if (ficha.modelo !== undefined) {
+    if (modeloValido(ficha.modelo)) modelo = ficha.modelo
+    else avisos.push(`modelo "${String(ficha.modelo).slice(0, 40)}" inválido; ignorei`)
+  }
+  let esforco: Esforco | undefined
+  if (ficha.esforco !== undefined) {
+    const e = ficha.esforco.trim().toLowerCase()
+    if (!esforcoValido(e)) avisos.push(`esforço "${ficha.esforco.slice(0, 40)}" inválido; ignorei`)
+    else if (e === 'ultra' && motor === 'claude') avisos.push('o Claude não tem o esforço ultra; ignorei')
+    else esforco = e
+  }
+  const atalho = nivel ? atalhos[motor][nivel === 'medio' ? 'medio' : nivel === 'rapido' ? 'rapido' : 'forte'] : undefined
+  if (atalho) {
+    if (modelo === undefined && modeloValido(atalho.modelo)) modelo = atalho.modelo
+    if (esforco === undefined && esforcoValido(atalho.esforco)) esforco = atalho.esforco
+  }
+  return { ...(modelo ? { modelo } : {}), ...(esforco ? { esforco } : {}), avisos }
 }
 
 /**
@@ -153,7 +197,8 @@ export function juntarCatalogo(
   funcoes: readonly Funcao[],
   fichas: readonly FichaDeCatalogo[],
   presets: readonly PresetAgente[],
-  novoId: () => string
+  novoId: () => string,
+  atalhos: ListaDeModelos['atalhos'] = MODELOS_PADRAO.atalhos
 ): CatalogoJuntado {
   const porNome = new Map(funcoes.map((f) => [f.nome.trim().toLowerCase(), f]))
   const relatorio: LinhaDoRelatorio[] = []
@@ -173,25 +218,31 @@ export function juntarCatalogo(
       const escolha = presetParaFicha(presets, motor, nivel)
       const chave = nome.trim().toLowerCase()
       const antes = porNome.get(chave)
+      const escolhaDeModelo = modeloDaFicha(ficha, motor, nivel, atalhos)
       const nova: Funcao = {
         id: antes?.id ?? novoId(),
         nome,
         prompt: motor === 'shell' ? '' : ficha.prompt,
         ...(ficha.pasta ? { pasta: ficha.pasta } : {}),
-        ...(escolha.preset ? { preset: escolha.preset.id } : {})
+        ...(escolha.preset ? { preset: escolha.preset.id } : {}),
+        ...(escolhaDeModelo.modelo ? { modelo: escolhaDeModelo.modelo } : {}),
+        ...(escolhaDeModelo.esforco ? { esforco: escolhaDeModelo.esforco } : {})
       }
       const igual =
         antes !== undefined &&
         antes.nome === nova.nome &&
         antes.prompt === nova.prompt &&
         (antes.pasta ?? undefined) === (nova.pasta ?? undefined) &&
-        (antes.preset ?? undefined) === (nova.preset ?? undefined)
+        (antes.preset ?? undefined) === (nova.preset ?? undefined) &&
+        (antes.modelo ?? undefined) === (nova.modelo ?? undefined) &&
+        (antes.esforco ?? undefined) === (nova.esforco ?? undefined)
       porNome.set(chave, nova)
       relatorio.push({
         nome,
         acao: igual ? 'igual' : antes ? 'atualizada' : 'criada',
         preset: escolha.preset?.nome,
-        aviso: escolha.aviso
+        modelo: [nova.modelo, nova.esforco].filter(Boolean).join(' · ') || undefined,
+        aviso: [escolha.aviso, ...escolhaDeModelo.avisos].filter(Boolean).join('; ') || undefined
       })
     }
   }
@@ -203,6 +254,6 @@ export function juntarCatalogo(
 export function textoDoRelatorio(relatorio: readonly LinhaDoRelatorio[]): string {
   if (!relatorio.length) return 'Nenhuma ficha para importar.'
   const conta = (acao: LinhaDoRelatorio['acao']): number => relatorio.filter((l) => l.acao === acao).length
-  const linhas = relatorio.map((l) => `  ${l.nome} — ${l.acao}${l.preset ? ` · ${l.preset}` : ''}${l.aviso ? ` · ATENÇÃO: ${l.aviso}` : ''}`)
+  const linhas = relatorio.map((l) => `  ${l.nome} — ${l.acao}${l.modelo ? ` · ${l.modelo}` : l.preset ? ` · ${l.preset}` : ''}${l.aviso ? ` · ATENÇÃO: ${l.aviso}` : ''}`)
   return [`${conta('criada')} criada(s), ${conta('atualizada')} atualizada(s), ${conta('igual')} sem mudança:`, ...linhas].join('\n')
 }

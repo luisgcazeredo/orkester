@@ -158,24 +158,55 @@ servidor.registerTool(
   {
     title: 'Abrir um agente no quadro',
     description:
-      'Abre uma sessão nova. Com `funcao`, o motor e o nível saem do papel; sem ela, diga o agente. O cartão nasce solto: sem dono e sem corda, como os que o usuário cria pela tela.',
+      'Abre uma sessão nova. Com `funcao`, o motor, o modelo e o esforço saem do papel; sem ela, diga o agente. `modelo`/`esforco` mandam sobre o papel. O cartão nasce solto: sem dono e sem corda, como os que o usuário cria pela tela.',
     inputSchema: {
       agente: z.enum(['claude', 'codex', 'shell']).optional().describe('Só é necessário sem `funcao`.'),
       funcao: z.string().optional().describe('Nome de um papel guardado (veja a ferramenta funcoes).'),
-      preset: z.string().optional().describe('Força um preset pelo nome, por exemplo "Claude forte".'),
+      preset: z.string().optional().describe('Força um preset pelo nome, por exemplo "Claude Code".'),
       nome: z.string().optional().describe('Nome do cartão. Sem isto, vale o nome do papel.'),
       pasta: z.string().optional().describe('Pasta do agente, relativa à do espaço. Sem isto, vale a do espaço ou a do papel.'),
+      modelo: z.string().optional().describe('Modelo (veja a ferramenta modelos), por exemplo "opus" ou "sonnet". Fora da lista abre com aviso.'),
+      esforco: z.enum(['low', 'medium', 'high', 'xhigh', 'max', 'ultra']).optional().describe('Esforço de raciocínio. O Claude vai de low a max; ultra é só do Codex.'),
       espaco
     }
   },
-  ({ agente, funcao, preset, nome, pasta, espaco: ondeEspaco }) =>
+  ({ agente, funcao, preset, nome, pasta, modelo, esforco, espaco: ondeEspaco }) =>
     rodar('abrir', agente ? [agente] : [], {
       ...(funcao ? { funcao } : {}),
       ...(preset ? { preset } : {}),
       ...(nome ? { nome } : {}),
       ...(pasta ? { pasta } : {}),
+      ...(modelo ? { modelo } : {}),
+      ...(esforco ? { esforco } : {}),
       ...(ondeEspaco ? { espaco: ondeEspaco } : {})
     })
+)
+
+servidor.registerTool(
+  'modelos',
+  {
+    title: 'Listar modelos',
+    description: 'Os modelos de Claude e Codex, os esforços que cada um aceita e os padrões. Use os ids em abrir_cartao.',
+    inputSchema: { espaco }
+  },
+  ({ espaco: nome }) => rodar('modelos', [], nome ? { espaco: nome } : {})
+)
+
+servidor.registerTool(
+  'trocar_modelo',
+  {
+    title: 'Trocar o modelo de um cartão',
+    description:
+      'Troca o modelo e/ou o esforço de um agente que está livre: o cartão reabre e a conversa continua. Com ele ocupado, recusa. Veja os nomes na ferramenta modelos.',
+    inputSchema: {
+      cartao: z.string().describe('Nome do cartão (ou o começo dele).'),
+      modelo: z.string().optional().describe('Modelo novo, por exemplo "sonnet".'),
+      esforco: z.enum(['low', 'medium', 'high', 'xhigh', 'max', 'ultra']).optional().describe('Esforço novo. ultra é só do Codex.'),
+      espaco
+    }
+  },
+  ({ cartao, modelo, esforco, espaco: ondeEspaco }) =>
+    rodar('modelo', modelo ? [cartao, modelo] : [cartao], { ...(esforco ? { esforco } : {}), ...(ondeEspaco ? { espaco: ondeEspaco } : {}) })
 )
 
 servidor.registerTool(

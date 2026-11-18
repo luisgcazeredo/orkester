@@ -1,0 +1,247 @@
+/* ------------------------------------------------------------------ Páginas gerais: Rotinas e Agentes (1.9.1, U3)
+ * Só tokens (R7): nenhuma cor literal aqui. Importado depois do leitor.css.
+ */
+
+.pagina-geral {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--quadro-fundo);
+  color: var(--texto);
+  font-family: var(--fonte-interface);
+}
+
+.pagina-cabecalho {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  padding: var(--espaco-4) var(--espaco-5) var(--espaco-3);
+  border-bottom: 1px solid var(--borda);
+}
+
+.pagina-cabecalho h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.pagina-cabecalho p {
+  margin: 0;
+  max-width: 78ch;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pagina-corpo {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+  padding: var(--espaco-4) var(--espaco-5);
+}
+
+.pagina-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  max-width: 980px;
+}
+
+.pagina-grupo > p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.pagina-grupo-titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pagina-grupo-cor {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pagina-grupo-nota {
+  margin-left: var(--espaco-2);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.pagina-vazio {
+  font-size: 13px;
+}
+
+.pagina-acoes {
+  display: flex;
+  gap: var(--espaco-2);
+}
+
+.pagina-geral .rotina-linha.so-leitura {
+  grid-template-columns: 1fr;
+}
+
+/* abas da página Agentes */
+.pagina-abas {
+  display: flex;
+  gap: var(--espaco-1);
+}
+
+.pagina-aba {
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--texto-suave);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pagina-aba:hover {
+  background: var(--hover);
+  color: var(--texto);
+}
+
+.pagina-aba.ativo {
+  background: var(--lateral-ativo);
+  color: var(--texto);
+  border-color: var(--borda);
+}
+
+/* linhas de agente */
+.agente-linha {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.2fr) minmax(90px, 1fr) 100px minmax(110px, 1fr) 130px minmax(110px, 1fr);
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: 8px 10px;
+  border: 1px solid var(--pilula-borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--pilula-fundo);
+  font-size: 13px;
+}
+
+.agente-linha-simples {
+  grid-template-columns: minmax(140px, 1.4fr) 110px minmax(120px, 1fr);
+}
+
+.agente-linha > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agente-nome {
+  font-weight: 600;
+}
+
+.agente-situacao {
+  font-size: 12px;
+}
+
+.agente-situacao.situacao-livre {
+  color: var(--vivo);
+}
+
+.agente-situacao.situacao-trabalhando {
+  color: var(--atencao);
+}
+
+.agente-situacao.situacao-pergunta {
+  color: var(--destaque);
+}
+
+.agente-situacao.situacao-encerrado {
+  color: var(--perigo);
+}
+
+.agente-situacao.situacao-fora,
+.agente-situacao.situacao-desconhecida {
+  color: var(--texto-suave);
+}
+
+/* campos e botões dentro das páginas (nos diálogos vêm do contêiner do diálogo; aqui, só tokens) */
+.pagina-geral input,
+.pagina-geral select,
+.pagina-geral textarea {
+  padding: 6px 8px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+}
+
+.pagina-geral input:focus,
+.pagina-geral select:focus,
+.pagina-geral textarea:focus {
+  outline: none;
+  border-color: var(--destaque);
+}
+
+.pagina-geral .preset-novo {
+  margin-bottom: 0;
+  border: 1px solid var(--borda);
+  background: var(--painel);
+  color: var(--texto);
+}
+
+.pagina-geral .preset-novo:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pagina-geral .partitura-linha {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: 8px 10px;
+  border: 1px solid var(--pilula-borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--pilula-fundo);
+}
+
+.pagina-geral .partitura-dados {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pagina-geral .partitura-subir {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pagina-geral .partitura-subir:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pagina-geral .preset-apagar {
+  width: 30px;
+}

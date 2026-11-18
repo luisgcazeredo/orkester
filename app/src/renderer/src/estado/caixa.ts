@@ -1,7 +1,8 @@
 import { type ArvoreDeCodigo, type NoTerminal, PRESETS_PADRAO } from '../../../shared/modelo'
 import { type PedidoDoAgente, type RespostaAoAgente } from '../../../shared/api'
+import { rotuloModelo } from '../../../shared/modelos'
 import { juntarCatalogo, textoDoRelatorio } from '../../../shared/catalogo'
-import { abrir, fechar, passar } from '../../../shared/quadro/transformacoes'
+import { abrir, fechar, mudarModelo, passar } from '../../../shared/quadro/transformacoes'
 import { acharAlvos, mexerNoQuadro } from '../../../shared/quadro/agente'
 import { resumoDaPartitura } from '../../../shared/quadro/partituras'
 import { alcanca, alcancaveisPor, bandasDoPlano, cordasDaBanda, membrosDaBanda } from '../../../shared/quadro/bandas'
@@ -101,6 +102,22 @@ function atenderTroca(pedido: Extract<PedidoDoAgente, { tipo: 'trocar' }>): Resp
   return 'erro' in feito ? { ok: false, erro: feito.erro } : { ok: true, texto: feito.texto }
 }
 
+/**
+ * Troca de modelo/esforço de um cartão vivo: grava no nó (a `sessao` fica) e manda o main reabrir o processo, que
+ * retoma a conversa. `dono` vazio é o usuário (MCP), que mexe em qualquer cartão; de agente, só no que ele abriu.
+ * Que o agente está livre quem confere é o processo principal, antes de o pedido chegar aqui.
+ */
+function atenderModelo(pedido: { alvo: string; modelo?: string; esforco?: string; dono?: string }): RespostaAoAgente {
+  const plano = planoAtual()
+  if (!plano) return { ok: false, erro: 'nenhum espaço aberto nesta janela' }
+  const feito = mudarModelo(plano, { id: pedido.alvo, modelo: pedido.modelo, esforco: pedido.esforco, dono: pedido.dono, porAgente: pedido.dono !== undefined })
+  if ('erro' in feito) return { ok: false, erro: feito.erro }
+  mudarPlano(() => feito.plano, false)
+  // o `sincronizar` sai no mesmo instante, então o main já tem a espec nova quando o pedido de reabrir chega
+  window.ork.terminal.trocar(feito.id)
+  return { ok: true, texto: feito.texto }
+}
+
 /** Bandas pelo `ork`: listar as do andar à mostra (com quem está dentro) e criar uma em volta de cartões. */
 function atenderBanda(pedido: Extract<PedidoDoAgente, { tipo: 'banda' }>): RespostaAoAgente {
   const plano = planoAtual()
@@ -160,6 +177,8 @@ function atenderUsuario(pedido: Extract<PedidoDoAgente, { tipo: 'usuario' }>): R
     return 'erro' in feito ? { ok: false, erro: feito.erro } : { ok: true, texto: feito.texto }
   }
 
+  if (pedido.acao === 'modelo') return atenderModelo({ alvo: pedido.alvo ?? '', modelo: pedido.modelo, esforco: pedido.esforco })
+
   if (pedido.acao === 'partitura') {
     const nome = (pedido.nome ?? '').trim()
     if (!nome) return { ok: false, erro: 'diga o nome da partitura' }
@@ -192,7 +211,9 @@ function atenderUsuario(pedido: Extract<PedidoDoAgente, { tipo: 'usuario' }>): R
     preset: pedido.preset,
     nome: pedido.nome,
     pasta: pedido.pasta,
-    funcao: pedido.funcao
+    funcao: pedido.funcao,
+    modelo: pedido.modelo,
+    esforco: pedido.esforco
   }, ambiente)
   if (!resultado.resposta.ok) return resultado.resposta
   mudarEspaco(() => resultado.espaco, false)
@@ -277,6 +298,7 @@ export function atenderAgente(pedido: PedidoDoAgente): RespostaAoAgente {
   if (pedido.tipo === 'quadro') return atenderQuadroDoAgente(pedido)
   if (pedido.tipo === 'partitura') return atenderPartitura(pedido)
   if (pedido.tipo === 'trocar') return atenderTroca(pedido)
+  if (pedido.tipo === 'modelo') return atenderModelo({ alvo: pedido.alvo, modelo: pedido.modelo, esforco: pedido.esforco, dono: pedido.id })
   if (pedido.tipo === 'banda') return atenderBanda(pedido)
   if (pedido.tipo === 'usuario') return atenderUsuario(pedido)
   if (pedido.tipo === 'catalogo') {
@@ -286,7 +308,10 @@ export function atenderAgente(pedido: PedidoDoAgente): RespostaAoAgente {
   }
   if (pedido.tipo === 'funcoes') {
     const lista = estado.preferencias.funcoes ?? []
-    const linhas = lista.map((f) => `  "${f.nome}"${f.pasta ? ` · pasta ${f.pasta}` : ''} — ${primeiraLinha(f.prompt)}`)
+    const linhas = lista.map((f) => {
+      const modelo = rotuloModelo(f)
+      return `  "${f.nome}"${modelo ? ` · ${modelo}` : ''}${f.pasta ? ` · pasta ${f.pasta}` : ''} — ${primeiraLinha(f.prompt)}`
+    })
     return {
       ok: true,
       texto: lista.length

@@ -128,7 +128,11 @@ export function MenuContexto() {
       if (!(e.target as HTMLElement).closest?.('.menu-contexto')) fecharMenu()
     }
     const tecla = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') fecharMenu()
+      if (e.key === 'Escape') {
+        // o Esc é só do menu: sem isto a camada de baixo (Lateral, Vista dos andares…) fecharia junto
+        e.stopPropagation()
+        fecharMenu()
+      }
     }
     window.addEventListener('pointerdown', fora, true)
     window.addEventListener('wheel', fecharMenu, true)

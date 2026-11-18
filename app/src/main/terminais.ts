@@ -8,6 +8,7 @@ import * as pty from 'node-pty'
 import { Terminal as Espelho } from '@xterm/headless'
 import { SerializeAddon } from '@xterm/addon-serialize'
 import { CANAIS, type EspecTerminal, type RetratoTerminal } from '../shared/api'
+import { aplicarModelo, esforcoValido, modeloValido } from '../shared/modelos'
 import { ambienteDoComando } from './instalarOrk'
 import { ofertaDeAtualizacao, resolverOferta } from './codex-regras'
 import { AMBIENTE_DO_CLAUDE, juntarLinhasDaTela, tuiDoCodexPronta } from './envio'
@@ -48,6 +49,8 @@ export interface Sessao {
   vistas: Set<WebContents>
   /** Passou do teto: o cartão existe, mas o processo só nasce quando abrir vaga. */
   esperandoVaga?: boolean
+  /** Modelo/esforço inválido descartado na última sincronização: reaparece na tela se o cartão for reaberto (troca). */
+  avisoModelo?: string
   /** Cartões se ligando: a saída fica guardada até o retrato ficar pronto. */
   chegando: Map<WebContents, string[]>
   ultimaSaida: number
@@ -113,7 +116,8 @@ function conversaDoClaudeExiste(sessao: string): boolean {
  * agente**. Cada cartão é um agente com identidade própria; servidor compartilhado apaga isso.
  */
 export function linhaDeComando(espec: EspecTerminal): string {
-  const comando = espec.comando.trim()
+  // modelo e esforço do cartão entram antes de sessão/retomada: a flag velha do comando sai e a nova fica no lugar
+  const comando = aplicarModelo(espec.agente, espec.comando.trim(), espec.modelo, espec.esforco)
   const sessao = espec.sessao && ID_VALIDO.test(espec.sessao) ? espec.sessao : null
   if (espec.agente === 'claude' && sessao && /^claude(\s|$)/i.test(comando)) {
     return `${comando} ${conversaDoClaudeExiste(sessao) ? '--resume' : '--session-id'} ${sessao}`
@@ -190,7 +194,7 @@ function iniciarProcesso(s: Sessao): void {
   if (deVerdade && s.espec.agente === 'codex') s.puloDaAtualizacao = vigiarAtualizacaoDoCodex(s, processo)
 }
 
-function criarSessao(espacoId: string, espec: EspecTerminal): Sessao {
+function criarSessao(espacoId: string, espec: EspecTerminal, aviso?: string): Sessao {
   const espelho = new Espelho({ cols: 100, rows: 28, scrollback: HISTORICO, allowProposedApi: true })
   const serializar = new SerializeAddon()
   espelho.loadAddon(serializar as unknown as Parameters<Espelho['loadAddon']>[0])
@@ -211,6 +215,7 @@ function criarSessao(espacoId: string, espec: EspecTerminal): Sessao {
     usuario: entradaVazia()
   }
   sessoes.set(s.id, s)
+  if (aviso) escreverAviso(s, aviso)
   if (processosVivos() >= MAX_TERMINAIS) porNaFila(s)
   else iniciarProcesso(s)
   return s
@@ -383,8 +388,36 @@ function especValida(e: unknown): e is EspecTerminal {
     !/[\r\n]/.test(x.comando) &&
     typeof x.pasta === 'string' &&
     (x.sessao === undefined || (typeof x.sessao === 'string' && ID_VALIDO.test(x.sessao))) &&
-    (x.criadoPor === undefined || (typeof x.criadoPor === 'string' && ID_VALIDO.test(x.criadoPor)))
+    (x.criadoPor === undefined || (typeof x.criadoPor === 'string' && ID_VALIDO.test(x.criadoPor))) &&
+    // modelo e esforço inválidos não derrubam o cartão: `limparModelo` tira só esses campos (e avisa)
+    (x.modelo === undefined || typeof x.modelo === 'string') &&
+    (x.esforco === undefined || typeof x.esforco === 'string')
   )
+}
+
+/**
+ * Modelo e esforço viram texto digitado no shell: só o que passa no filtro entra. O que não passa (quadro editado à
+ * mão) sai da espec, o cartão abre sem isso, e o aviso diz o que foi descartado.
+ */
+export function limparModelo(espec: EspecTerminal): { espec: EspecTerminal; aviso?: string } {
+  const ruim: string[] = []
+  const { modelo, esforco, ...resto } = espec
+  const limpa: EspecTerminal = { ...resto }
+  if (modelo !== undefined) {
+    if (modeloValido(modelo)) limpa.modelo = modelo
+    else ruim.push('modelo')
+  }
+  if (esforco !== undefined) {
+    if (esforcoValido(esforco)) limpa.esforco = esforco
+    else ruim.push('esforço')
+  }
+  if (!ruim.length) return { espec: limpa }
+  return { espec: limpa, aviso: `\x1b[33m— o ${ruim.join(' e o ')} deste cartão não é válido (quadro editado à mão?); abri sem ${ruim.length > 1 ? 'eles' : 'ele'}. —\x1b[0m\r\n` }
+}
+
+function escreverAviso(s: Sessao, aviso: string): void {
+  s.espelho.write(aviso)
+  avisarVistas(s, CANAIS.dados, aviso)
 }
 
 /** Só a janela dona do espaço do terminal mexe nele. */
@@ -416,7 +449,8 @@ export function registrarTerminais(): void {
     exigirDono(evento, espacoId)
     const especs = lista.filter(especValida)
     const ids = new Set(especs.map((e) => e.id))
-    for (const espec of especs) {
+    for (const bruta of especs) {
+      const { espec, aviso } = limparModelo(bruta)
       const s = sessoes.get(espec.id)
       // o mesmo id em outro espaço (não deveria acontecer): não mexe no de lá
       if (s && s.espacoId !== espacoId) continue
@@ -424,8 +458,10 @@ export function registrarTerminais(): void {
         if (s.fim) clearTimeout(s.fim)
         s.fim = null
         s.espec = { ...espec, sessao: espec.sessao ?? s.espec.sessao }
+        s.avisoModelo = aviso
       } else {
-        criarSessao(espacoId, espec)
+        const nova = criarSessao(espacoId, espec, aviso)
+        nova.avisoModelo = aviso
       }
     }
     darVagaAosQueEsperam()
@@ -503,6 +539,7 @@ export function registrarTerminais(): void {
     const aviso = `\x1b[2m— trocado para ${s.espec.nome}: ${s.espec.agente} —\x1b[0m\r\n`
     s.espelho.write(aviso)
     avisarVistas(s, CANAIS.dados, `\x1b[2J\x1b[H${aviso}`)
+    if (s.avisoModelo) escreverAviso(s, s.avisoModelo)
     iniciarProcesso(s)
   })
 

@@ -110,7 +110,7 @@ import {
 import { ehVisor } from '../../../shared/quadro/visor'
 import { anexarAoPrompt, anexarArquivosAoPrompt, anexarPastaAoPrompt } from './anexar'
 import { abrirAtalhos } from './Atalhos'
-import { abrirRotinas } from './Rotinas'
+import { abrirRotinas } from '../paginas/abrir'
 import { colar, copiarSelecao } from './area'
 import { alternarRecolhido } from '../nos/Codigo'
 import { CORES_DE_CARTAO } from '../estado/coresDeDados'

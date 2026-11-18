@@ -26,11 +26,14 @@ export interface Contexto {
   terminalComTeclado: boolean
   /** No meio de um arrasto ou desenho. */
   emGesto: boolean
+  /** Uma camada do quadro é dona do teclado: Vista dos andares e Menu do Terminal abertos; Explorador, Mini mapa e Lateral com o foco dentro. */
+  camadaAberta: boolean
 }
 
 export type Acao =
   | { tipo: 'devolverFoco' }
   | { tipo: 'cancelarGesto' }
+  | { tipo: 'fecharCamada' }
   | { tipo: 'zoom'; fator: number | 'inicial' }
   | { tipo: 'enquadrarTudo' }
   | { tipo: 'desfazer' }
@@ -92,6 +95,8 @@ export function decidir(e: TeclaEv, c: Contexto): Decisao | null {
   if (ctrl && e.shiftKey && tecla === 'n') return com({ tipo: 'novaJanela' })
   if (ctrl && e.shiftKey && tecla === 'e') return com({ tipo: 'alternarExplorador' })
   if (ctrl || e.altKey) return null
+  // camada aberta: Esc a fecha e as teclas simples (n, v, t, d, e, setas, Delete, ?) não mexem no quadro
+  if (c.camadaAberta) return e.key === 'Escape' ? sem({ tipo: 'fecharCamada' }) : null
   const seta = SETAS[e.key]
   if (seta) {
     const passo = e.shiftKey ? 10 : 1
@@ -109,6 +114,7 @@ export function decidir(e: TeclaEv, c: Contexto): Decisao | null {
 export interface Executores {
   devolverFoco: () => void
   cancelarGesto: () => void
+  fecharCamada: () => void
   zoom: (fator: number | 'inicial') => void
   enquadrarTudo: () => void
   desfazer: () => void
@@ -134,6 +140,7 @@ export function executar(a: Acao, x: Executores): void {
   switch (a.tipo) {
     case 'devolverFoco': return x.devolverFoco()
     case 'cancelarGesto': return x.cancelarGesto()
+    case 'fecharCamada': return x.fecharCamada()
     case 'zoom': return x.zoom(a.fator)
     case 'enquadrarTudo': return x.enquadrarTudo()
     case 'desfazer': return x.desfazer()

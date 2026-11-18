@@ -5,9 +5,10 @@ import { resumosDosEspacos } from './dados'
 import { registroDoEnvio } from './envio'
 import { validarChamada, type NomeDeVerbo } from './verbos'
 import { esperarSessao, sessoesDoEspaco, telaDe } from './terminais'
+import { conferirModelo, lerModelos, modeloDasOpcoes, textoDoModelo, textoDosModelos } from './modelos'
 import { janelaDoEspaco, abrirJanelaPronta, pedirAJanela } from './quadroDoAgente'
 import { situacao, aguardarPronto, digitarPedido, registrar, acharEntre } from './espera'
-import { agenteDe, espacoPorNome, lerFichasDaPasta, type Pedido, type ResultadoDoComando } from './verbosDoAgente'
+import { agenteDe, espacoPorNome, lerFichasDaPasta, trocarModeloDe, type Pedido, type ResultadoDoComando } from './verbosDoAgente'
 
 // ---------- o usuário pelo cano, com uma chave ----------
 
@@ -50,6 +51,15 @@ const HANDLERS_DO_USUARIO: Partial<Record<NomeDeVerbo, (ctx: ContextoDoUsuario) 
     return { saida: r.texto ?? '' }
   },
 
+  modelos: async () => ({ saida: textoDosModelos(lerModelos()) }),
+
+  modelo: async ({ pos, opcoes }) => {
+    const espaco = espacoDoUsuario(opcoes)
+    // o usuário mexe em qualquer cartão do espaço; só o agente precisa estar livre
+    const alvo = acharEntre(sessoesDoEspaco(espaco.id), pos[0])
+    return { saida: await trocarModeloDe(alvo, pos[1], opcoes, async (modelo, esforco) => pedirAJanela({ tipo: 'usuario', espacoId: espaco.id, acao: 'modelo', alvo: alvo.id, modelo, esforco })) }
+  },
+
   funcoes: async ({ opcoes }) => {
     const espaco = espacoDoUsuario(opcoes)
     const r = await pedirAJanela({ tipo: 'funcoes', espacoId: espaco.id })
@@ -87,6 +97,7 @@ const HANDLERS_DO_USUARIO: Partial<Record<NomeDeVerbo, (ctx: ContextoDoUsuario) 
     if (pos[0] && !agente) throw new Error(`não existe o agente "${pos[0]}"; use claude, codex ou shell`)
     const funcao = typeof opcoes.funcao === 'string' ? opcoes.funcao.trim() : undefined
     if (!agente && !funcao && !opcoes.preset) throw new Error('diga o agente (claude, codex ou shell) ou use --funcao "Papel"')
+    const { modelo, esforco } = modeloDasOpcoes(opcoes, agente ?? undefined)
     await abrirJanelaPronta(espaco.id)
     const r = await pedirAJanela({
       tipo: 'usuario',
@@ -96,14 +107,17 @@ const HANDLERS_DO_USUARIO: Partial<Record<NomeDeVerbo, (ctx: ContextoDoUsuario) 
       preset: typeof opcoes.preset === 'string' ? opcoes.preset : undefined,
       nome: typeof opcoes.nome === 'string' ? opcoes.nome.trim().slice(0, 80) : undefined,
       pasta: typeof opcoes.pasta === 'string' ? resolve(espaco.pasta, opcoes.pasta) : undefined,
-      funcao
+      funcao,
+      modelo,
+      esforco
     })
     if (!r.ok) throw new Error(r.erro)
     // A função traz o primeiro pedido (o papel). Até a 1.4.0 ele voltava da janela e era ignorado aqui: o
     // cartão aberto pelo MCP nascia com o agente certo e sem saber quem era. Quem digita é este processo,
     // como no `ork abrir`, mas sem segurar a resposta do cliente (o agente leva até um minuto para ficar pronto).
     if (r.texto && r.id) void digitarPrimeiroPedidoDoUsuario(r.id, r.texto)
-    return { saida: `Abri "${r.nome}".${r.texto ? ' O papel da função vai ser digitado assim que o agente ficar pronto.' : ''}` }
+    const aviso = [conferirModelo(r.agente ?? agente ?? undefined, r.modelo, r.esforco, lerModelos()).aviso, r.aviso].filter(Boolean).join('; ') || undefined
+    return { saida: `Abri "${r.nome}".${textoDoModelo(r.modelo, r.esforco, aviso)}${r.texto ? ' O papel da função vai ser digitado assim que o agente ficar pronto.' : ''}` }
   },
 
   ver: async ({ pos, opcoes }) => {

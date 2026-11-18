@@ -45,9 +45,9 @@ export const VERBOS = [
     nome: 'abrir', aliases: [], posicionais: [{ nome: 'claude|codex|shell' }],
     // `--sem-esperar` é o normal aqui (o `abrir` só espera com `--esperar`), mas existe porque é assim que
     // se diz no `ork pedir`: o agente que aprendeu lá escreve igual aqui, e recusar por isso é pedantismo
-    opcoes: [texto('espaco'), texto('nome'), texto('pasta'), texto('funcao'), texto('preset'), texto('pedido'), texto('arquivo'), bandeira('esperar'), bandeira('sem-esperar'), numero('tempo', 1, 3600)],
+    opcoes: [texto('espaco'), texto('nome'), texto('pasta'), texto('funcao'), texto('preset'), texto('modelo'), texto('esforco'), texto('pedido'), texto('arquivo'), bandeira('esperar'), bandeira('sem-esperar'), numero('tempo', 1, 3600)],
     descricao: 'abre uma sessão nova; em outro espaço, você continua sendo o dono',
-    ajuda: '  ork abrir [claude|codex|shell] [--espaco "Nome"] [--nome N] [--pasta P] [--funcao "Papel"] [--preset "Claude forte"] [--pedido "texto" | --arquivo pedido.md] [--esperar] [--tempo S]\n                                       abre uma sessão nova; com --funcao, o motor e o nível saem da função'
+    ajuda: '  ork abrir [claude|codex|shell] [--espaco "Nome"] [--nome N] [--pasta P] [--funcao "Papel"] [--preset "Claude Code"] [--modelo opus] [--esforco high] [--pedido "texto" | --arquivo pedido.md] [--esperar] [--tempo S]\n                                       abre uma sessão nova; com --funcao, o motor, o modelo e o esforço saem da função;\n                                       --modelo/--esforco mandam sobre ela (veja `ork modelos`)'
   },
   {
     nome: 'pedir', aliases: [], posicionais: [obrigatorio('nome'), { nome: 'texto', resto: true }],
@@ -116,6 +116,12 @@ export const VERBOS = [
     nome: 'partitura', aliases: ['partituras'], posicionais: [{ nome: 'usar|salvar' }, { nome: 'nome' }, { nome: 'cartão', resto: true }], opcoes: [],
     descricao: 'times salvos: lista, sobe um time no quadro ou guarda o que está nele',
     ajuda: '  ork partitura                      lista os times salvos (agentes, funções, cordas e recados)\n  ork partitura usar "Nome"          sobe esse time ao seu lado, ligado a você\n  ork partitura salvar "Nome" [cartão]...\n                                      guarda como partitura os cartões (ou o andar à mostra todo)'
+  },
+  { nome: 'modelos', aliases: [], posicionais: [], opcoes: [texto('espaco')], descricao: 'lista os modelos de cada motor, com os esforços que aceitam', ajuda: '  ork modelos                        lista os modelos de Claude e Codex, os esforços de cada um e os padrões; use em `ork abrir --modelo X --esforco Y`' },
+  {
+    nome: 'modelo', aliases: [], posicionais: [obrigatorio('cartão'), { nome: 'modelo' }], opcoes: [texto('esforco'), texto('espaco')],
+    descricao: 'troca o modelo e/ou o esforço de um cartão livre, mantendo a conversa',
+    ajuda: '  ork modelo <cartão> [<modelo>] [--esforco nível]\n                                      troca o modelo e/ou o esforço de um cartão que você abriu (só com ele livre);\n                                      o cartão reabre e a conversa continua'
   },
   { nome: 'funcoes', aliases: ['funcao'], posicionais: [], opcoes: [], descricao: 'lista as funções (papéis) que o usuário guardou', ajuda: '  ork funcoes                        lista as funções (papéis) guardadas, para usar em `ork abrir --funcao`' },
   {

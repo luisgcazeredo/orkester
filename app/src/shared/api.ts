@@ -15,6 +15,7 @@ import type {
 import type { PedidoNoQuadro } from './quadro/agente'
 import type { FichaDeCatalogo } from './catalogo'
 import type { PreferenciasParciais } from './preferencias'
+import type { Esforco } from './modelos'
 
 /** O que o processo principal precisa para manter o processo de um cartão de terminal. */
 
@@ -68,6 +69,10 @@ export interface EspecTerminal {
   criadoPor?: string
   /** Função (papel) com que o cartão nasceu, para o `ork quem` dizer quem é quem. */
   funcao?: string
+  /** Modelo do agente (ex.: opus, gpt-5.6-terra). Vazio: o que estiver no comando ou o padrão do motor. */
+  modelo?: string
+  /** Esforço de raciocínio. Vazio: o padrão do motor. */
+  esforco?: Esforco
 }
 
 /** Retrato do terminal para um cartão que acabou de se ligar a ele. */
@@ -147,7 +152,7 @@ export type PedidoDoAgente =
    * função pedida — é o que deixa `ork abrir --funcao "Revisor"` nascer em Codex forte sem o agente
    * precisar saber que preset existe.
    */
-  | { tipo: 'abrir'; espacoId: string; criador: string; agente?: Agente; preset?: string; nome?: string; pasta?: string; funcao?: string }
+  | { tipo: 'abrir'; espacoId: string; criador: string; agente?: Agente; preset?: string; nome?: string; pasta?: string; funcao?: string; modelo?: string; esforco?: Esforco }
   /** As funções (papéis) guardadas nas preferências desta janela. */
   | { tipo: 'funcoes'; espacoId: string }
   /**
@@ -159,7 +164,7 @@ export type PedidoDoAgente =
    * Quem fala é o **usuário**, por uma chave (um cliente MCP), não um cartão: não há `eu` no quadro, e
    * por isso nada nasce com dono nem com corda — é a mesma coisa que o usuário fazer pela tela.
    */
-  | { tipo: 'usuario'; espacoId: string; acao: 'quadro' | 'partitura' | 'abrir'; nome?: string; agente?: Agente; preset?: string; pasta?: string; funcao?: string }
+  | { tipo: 'usuario'; espacoId: string; acao: 'quadro' | 'partitura' | 'abrir' | 'modelo'; nome?: string; alvo?: string; agente?: Agente; preset?: string; pasta?: string; funcao?: string; modelo?: string; esforco?: Esforco }
   | { tipo: 'fechar'; espacoId: string; id: string }
   /** Árvores de código do cartão do próprio agente: listar, criar, usar, mostrar arquivos e desfazer. */
   | {
@@ -184,6 +189,8 @@ export type PedidoDoAgente =
    * Trocar o agente de um cartão que ele abriu (nunca o seu nem o do usuário): o cartão fica, o agente muda.
    */
   | { tipo: 'trocar'; espacoId: string; id: string; alvo: string; agente: Agente }
+  /** Troca o modelo/esforço de um cartão que o agente abriu: o cartão reabre com a mesma conversa (só com ele livre; o principal confere). */
+  | { tipo: 'modelo'; espacoId: string; id: string; alvo: string; modelo?: string; esforco?: string }
   /** Bandas (grupos de agentes): listar as do andar à mostra ou criar uma em volta de cartões. */
   | { tipo: 'banda'; espacoId: string; id: string; acao: 'lista' | 'criar'; nome?: string; alvos?: string[] }
   | {
@@ -198,7 +205,8 @@ export type PedidoDoAgente =
       donoDoSucessor?: string | null
     }
 
-export type RespostaAoAgente = { ok: true; id?: string; nome?: string; texto?: string } | { ok: false; erro: string }
+/** `modelo`/`esforco`/`agente`: o que o cartão aberto recebeu (só quando há modelo ou esforço), para o aviso de modelo fora da lista. */
+export type RespostaAoAgente = { ok: true; id?: string; nome?: string; texto?: string; modelo?: string; esforco?: Esforco; agente?: Agente; aviso?: string } | { ok: false; erro: string }
 
 interface ApiAgentes {
   /** A janela atende os pedidos dos agentes para o espaço que ela mostra. */
@@ -219,10 +227,62 @@ export interface AvisoRotina {
 export interface ApiRotinas {
   /** A janela dona do espaço manda as rotinas; é com elas que o processo principal conta o tempo. */
   definir(espacoId: string, rotinas: Rotina[]): void
-  /** Dispara agora ("testar"), sem mexer no relógio. */
-  testar(espacoId: string, id: string): Promise<ResultadoDaRotina>
   aoAcontecer(ouvinte: (aviso: AvisoRotina) => void): void
 }
+
+/** Um agente vivo, como o processo principal o vê (qualquer espaço, em qualquer janela). */
+export interface AgenteDoPanorama {
+  id: string
+  espacoId: string
+  nome: string
+  funcao?: string
+  agente: Agente
+  modelo?: string
+  esforco?: Esforco
+  situacao: ResumoContextoTerminal['situacao']
+  /** Recados esperando na caixa de entrada dele. */
+  fila: number
+}
+
+/** Uma rotina de qualquer espaço, com o estado que o relógio do processo principal conhece. */
+export interface RotinaDoPanorama extends Rotina {
+  espacoId: string
+  /** Nome do cartão onde ela digita; null se o cartão saiu do quadro. */
+  nomeDoCartao: string | null
+}
+
+export interface Panorama {
+  agentes: AgenteDoPanorama[]
+  rotinas: RotinaDoPanorama[]
+}
+
+export type AcaoNaRotina = 'pausar' | 'ligar' | 'testar'
+
+/** O processo principal pausou ou religou uma rotina do espaço desta janela: a janela grava a mudança no espaço. */
+export interface AvisoDePausa {
+  espacoId: string
+  id: string
+  pausada: boolean
+  proxima: string
+}
+
+/**
+ * Visão de TODOS os espaços para as páginas gerais (Agentes, Rotinas). Só leitura, exceto as ações de rotina
+ * (ligar, desligar, testar), que passam pela mesma validação do relógio. Agentes de outro espaço não se comandam.
+ */
+export interface ApiPanorama {
+  /** `agentes: false` pula a leitura das sessões (a página Rotinas não usa): devolve `agentes` vazio. */
+  ler(opcoes?: { agentes?: boolean }): Promise<Panorama>
+  /** "ok" para pausar/ligar; o resultado do disparo para testar; "erro" se a rotina não existe. */
+  agirNaRotina(espacoId: string, id: string, acao: AcaoNaRotina): Promise<ResultadoDaRotina | 'ok' | 'erro'>
+  aoPausar(ouvinte: (aviso: AvisoDePausa) => void): void
+}
+
+export const CANAIS_PANORAMA = {
+  ler: 'panorama:ler',
+  rotina: 'panorama:rotina',
+  pausou: 'panorama:pausou'
+} as const
 
 export interface ApiDados {
   listarEspacos(): Promise<ResumoEspaco[]>
@@ -469,6 +529,7 @@ export interface ApiOrkester {
   area: ApiArea
   janelas: ApiJanelas
   rotinas: ApiRotinas
+  panorama: ApiPanorama
   portal: ApiPortal
   agentes: ApiAgentes
   chaves: ApiChaves
@@ -586,7 +647,6 @@ export const CANAIS_AREA = {
 
 export const CANAIS_ROTINAS = {
   definir: 'rotinas:definir',
-  testar: 'rotinas:testar',
   aviso: 'rotinas:aviso'
 } as const
 

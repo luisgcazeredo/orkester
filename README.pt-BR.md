@@ -87,9 +87,9 @@ Para desenvolver:
 
 ```powershell
 npm run dev        # app com recarga automática
-npm run provas     # testes dos módulos puros
-npm run autoteste  # dirige o app de verdade com mouse e teclado, confere tudo e fecha (0 = passou)
 ```
+
+As ferramentas de teste do projeto não fazem parte deste repositório.
 
 ## O comando `ork`
 
@@ -120,13 +120,11 @@ como se fosse você. O Orkester precisa estar aberto.
 
 Electron · React · TypeScript · xterm.js · node-pty.
 
-O cálculo do quadro mora em módulos puros, cobertos por testes que rodam em Node sem abrir o app. Em cima
-deles, o autoteste abre o app de verdade, monta um quadro, mexe com mouse e teclado e confere o resultado na
-tela.
+O cálculo do quadro mora em módulos puros, separados da tela.
 
 ```text
 app/src/shared/    regras puras do quadro (bandas, partituras, trocar, rotinas, janelas, arquivos)
-app/src/main/      processo principal: terminais, verbos do `ork`, dados em disco, autoteste
+app/src/main/      processo principal: terminais, verbos do `ork`, dados em disco
 app/src/renderer/  o quadro em React
 app/src/cli/       o comando `ork` que o agente chama
 app/src/mcp/       o servidor MCP que um cliente de fora roda
