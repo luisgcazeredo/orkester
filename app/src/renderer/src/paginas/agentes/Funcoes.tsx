@@ -25,7 +25,17 @@ export function EditorDeFuncoes() {
   const esforcoOk = (f: Funcao): boolean => f.esforco === undefined || niveis(f).includes(f.esforco)
   // nome repetido quebraria o `--funcao "Nome"`, que é como o agente fala dela
   const nomes = lista.map((f) => f.nome.trim().toLowerCase())
-  const valida = lista.every((f) => f.nome.trim() && f.prompt.trim() && (f.modelo === undefined || modeloValido(f.modelo)) && esforcoOk(f)) && new Set(nomes).size === nomes.length
+  const problema = (f: Funcao): string | null => {
+    if (!f.nome.trim()) return 'sem nome'
+    if (nomes.filter((n) => n === f.nome.trim().toLowerCase()).length > 1) return 'nome repetido'
+    if (!f.prompt.trim()) return 'prompt vazio'
+    if (f.modelo !== undefined && !modeloValido(f.modelo)) return 'modelo inválido'
+    if (!esforcoOk(f)) return 'esforço não vale para este modelo/motor'
+    return null
+  }
+  const culpada = lista.find((f) => problema(f) !== null)
+  const valida = !culpada
+  const aviso = culpada ? `${culpada.nome.trim() ? `“${culpada.nome.trim()}”` : `Função ${lista.indexOf(culpada) + 1}`}: ${problema(culpada)}` : null
 
   function salvar(): void {
     if (!valida) return
@@ -45,7 +55,7 @@ export function EditorDeFuncoes() {
       </p>
       <div className="funcoes">
         {lista.map((f) => (
-          <div key={f.id} className="funcao-linha" data-funcao={f.id}>
+          <div key={f.id} className={`funcao-linha${problema(f) ? ' funcao-invalida' : ''}`} data-funcao={f.id} title={problema(f) ?? undefined}>
             <div className="funcao-topo">
               <input
                 className="funcao-nome"
@@ -74,7 +84,7 @@ export function EditorDeFuncoes() {
                   </option>
                 ))}
               </select>
-              <button className="funcao-pasta" title="Pasta própria desta função" onClick={() => void escolherPasta(f.id)}>
+              <button className="funcao-pasta" title={f.pasta ? `Pasta própria: ${f.pasta}` : 'Pasta própria desta função (vazio: a do espaço)'} onClick={() => void escolherPasta(f.id)}>
                 <FolderOpen size={14} />
                 <span>{f.pasta ? f.pasta.split(/[/\\]/).filter(Boolean).slice(-1)[0] : 'pasta do espaço'}</span>
               </button>
@@ -85,21 +95,26 @@ export function EditorDeFuncoes() {
             <textarea
               className="funcao-prompt"
               value={f.prompt}
-              rows={4}
+              rows={9}
               placeholder="O que ele é, o que se espera dele, o que não fazer…"
               onChange={(e) => mudar(f.id, { prompt: e.target.value })}
             />
           </div>
         ))}
       </div>
-      <button
-        className="preset-novo"
-        onClick={() => setLista((l) => [...l, { id: crypto.randomUUID(), nome: '', prompt: '' }])}
-      >
-        <Plus size={14} /> Nova função
-      </button>
       <div className="dialogo-acoes">
+        <button
+          className="preset-novo"
+          onClick={() => setLista((l) => [...l, { id: crypto.randomUUID(), nome: '', prompt: '' }])}
+        >
+          <Plus size={14} /> Nova função
+        </button>
         <span className="espaco-flex" />
+        {aviso && (
+          <span className="funcao-aviso" role="status">
+            {aviso}
+          </span>
+        )}
         <button onClick={() => setLista(doEstado())}>Desfazer alterações</button>
         <button className="primario" disabled={!valida} onClick={salvar}>
           Salvar

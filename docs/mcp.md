@@ -16,7 +16,7 @@ Two rules apply to everything below:
 
 ## Connecting a client
 
-1. In Orkester, click the gear in the top-right corner (or search **Settings** in the command palette).
+1. In Orkester, click the gear (or the plug icon) in the page bar on the left to open the **Conexões** (Connections) page, or search **Conexões** in the command palette.
 2. Name the key after whoever will use it — "Claude Code", "laptop" — and click **Generate key**.
 3. Pick your client's tab, click **Copy**, paste. Start a **new** session of the client: tools are loaded when
    a session starts.
@@ -94,7 +94,7 @@ whose text says why — the client sees it and can correct itself.
 |---|---|
 | `o Orkester não está aberto nesta máquina` | The app is closed (or is a version older than 1.3). Open it. |
 | `falta a chave` | `ORK_CHAVE` is missing from the server's configuration. |
-| `chave inválida ou revogada` | Wrong key, or revoked in Settings. Generate another. |
+| `chave inválida ou revogada` | Wrong key, or revoked in the Conexões page. Generate another. |
 | `o Orkester fechou desde a última vez` | The app was closed after the client connected. Reopen it; no restart of the client needed. |
 | `o Orkester não respondeu em 30 s` | The app is open but stuck. |
 
@@ -103,7 +103,7 @@ The messages are in Portuguese, like the rest of the interface.
 ## What the key is and is not
 
 - **Is:** intent (nothing outside the canvas reaches the board without one), a name, revocation that takes
-  effect on the next call, and a record — Settings shows when each key was created and last used. Revoked
+  effect on the next call, and a record — the Conexões page shows when each key was created and last used. Revoked
   keys are marked, not deleted, so the record of who had access survives.
 - **Is not:** a boundary against programs already running as you. Anything that runs under your user can
   read `~/.orkester` anyway. The key is about knowing who did what and cutting access, not about keeping

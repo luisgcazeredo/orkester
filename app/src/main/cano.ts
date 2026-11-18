@@ -35,7 +35,7 @@ export async function responderAoPedido(
     // agente. Um pedido traz chave **ou** crachá, nunca os dois.
     if (pedido.chave !== undefined) {
       const chave = usuarioPorChave(pedido.chave)
-      if (!chave) throw new Error('chave inválida ou revogada; gere outra em Configurações, no Orkester')
+      if (!chave) throw new Error('chave inválida ou revogada; gere outra em Conexões, no Orkester')
       const resultado = await executarComoUsuario(chave, pedido)
       return { resposta: { ok: true, saida: resultado.saida } }
     }

@@ -28,7 +28,7 @@ import {
   type AvisoJanelas,
   type MudancaArquivo,
   type ApiOrkester,
-  type PedidoDoAgente, CANAIS_CHAVES, type ApiChaves, type ResumoDaCaixa } from '../shared/api'
+  type PedidoDoAgente, CANAIS_CHAVES, type ApiChaves, CANAIS_PORTAIS, type ApiPortais, type ResumoDaCaixa } from '../shared/api'
 
 /** Cada canal vira uma função que chama o processo principal e devolve a resposta. */
 function chamadas<T>(canais: Record<string, string>): T {
@@ -145,6 +145,12 @@ const chaves: ApiChaves = {
   comandoDoMcp: () => ipcRenderer.invoke(CANAIS_CHAVES.comando)
 }
 
+// Os portais do navegador embutido: a página Conexões lista as partições e limpa o login de uma.
+const portais: ApiPortais = {
+  listar: () => ipcRenderer.invoke(CANAIS_PORTAIS.listar),
+  limpar: (particao) => ipcRenderer.invoke(CANAIS_PORTAIS.limpar, particao)
+}
+
 // A janela não tem acesso ao Node: só a estas funções, nesta forma.
 const api: ApiOrkester = {
   terminal: {
@@ -185,6 +191,7 @@ const api: ApiOrkester = {
   codigo,
   leitor,
   chaves,
+  portais,
   andares,
   area,
   janelas,

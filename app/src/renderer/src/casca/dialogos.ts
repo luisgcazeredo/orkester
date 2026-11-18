@@ -1,7 +1,6 @@
 import type { JSX } from 'react'
 import { DialogoNovoAndar } from '../ui/Andares'
 import { Atalhos } from '../ui/Atalhos'
-import { Configuracoes } from '../ui/Configuracoes'
 import { MenuContexto } from '../ui/MenuContexto'
 import { Paleta } from '../ui/Paleta'
 import { Perguntas } from '../ui/Perguntas'
@@ -12,6 +11,5 @@ export const DIALOGOS: { id: string; Componente: () => JSX.Element | null }[] = 
   { id: 'novo-andar', Componente: DialogoNovoAndar },
   { id: 'perguntas', Componente: Perguntas },
   { id: 'atalhos', Componente: Atalhos },
-  { id: 'paleta', Componente: Paleta },
-  { id: 'configuracoes', Componente: Configuracoes }
+  { id: 'paleta', Componente: Paleta }
 ]

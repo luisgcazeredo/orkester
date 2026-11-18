@@ -19,6 +19,7 @@ import { connect } from 'node:net'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { z } from 'zod'
+import { metaDaFerramenta } from '../shared/ferramentasMcp'
 
 const PASTA = process.env.ORK_DADOS || join(homedir(), '.orkester')
 const CANO = join(PASTA, 'cano.json')
@@ -43,7 +44,7 @@ function enderecoDoCano(): string {
 function chave(): string {
   const k = (process.env.ORK_CHAVE ?? '').trim()
   if (!k) {
-    throw new Error('falta a chave: ponha ORK_CHAVE na configuração deste servidor (gere uma em Configurações, no Orkester)')
+    throw new Error('falta a chave: ponha ORK_CHAVE na configuração deste servidor (gere uma em Conexões, no Orkester)')
   }
   return k
 }
@@ -111,8 +112,7 @@ const espaco = z.string().optional().describe('Nome do espaço. Sem isto, vale o
 servidor.registerTool(
   'espacos',
   {
-    title: 'Listar espaços',
-    description: 'Os espaços do Orkester, com quantos cartões cada um tem e se está aberto numa janela.',
+    ...metaDaFerramenta('espacos'),
     inputSchema: {}
   },
   () => rodar('espacos')
@@ -121,8 +121,7 @@ servidor.registerTool(
 servidor.registerTool(
   'quadro',
   {
-    title: 'Ler o quadro',
-    description: 'O que há no andar à mostra: os cartões numerados, com o lugar e a situação de cada um.',
+    ...metaDaFerramenta('quadro'),
     inputSchema: { espaco }
   },
   ({ espaco: nome }) => rodar('quadro', [], nome ? { espaco: nome } : {})
@@ -131,8 +130,7 @@ servidor.registerTool(
 servidor.registerTool(
   'funcoes',
   {
-    title: 'Listar funções',
-    description: 'Os papéis guardados, que o abrir_cartao usa pelo nome.',
+    ...metaDaFerramenta('funcoes'),
     inputSchema: { espaco }
   },
   ({ espaco: nome }) => rodar('funcoes', [], nome ? { espaco: nome } : {})
@@ -141,8 +139,7 @@ servidor.registerTool(
 servidor.registerTool(
   'ver_cartao',
   {
-    title: 'Ler a tela de um cartão',
-    description: 'O que está na tela de um agente agora, e se ele está livre, trabalhando ou numa pergunta.',
+    ...metaDaFerramenta('ver_cartao'),
     inputSchema: {
       cartao: z.string().describe('Nome do cartão (ou o começo dele).'),
       linhas: z.number().int().min(1).max(2000).optional().describe('Quantas linhas do fim da tela. Padrão 50.'),
@@ -156,9 +153,7 @@ servidor.registerTool(
 servidor.registerTool(
   'abrir_cartao',
   {
-    title: 'Abrir um agente no quadro',
-    description:
-      'Abre uma sessão nova. Com `funcao`, o motor, o modelo e o esforço saem do papel; sem ela, diga o agente. `modelo`/`esforco` mandam sobre o papel. O cartão nasce solto: sem dono e sem corda, como os que o usuário cria pela tela.',
+    ...metaDaFerramenta('abrir_cartao'),
     inputSchema: {
       agente: z.enum(['claude', 'codex', 'shell']).optional().describe('Só é necessário sem `funcao`.'),
       funcao: z.string().optional().describe('Nome de um papel guardado (veja a ferramenta funcoes).'),
@@ -185,8 +180,7 @@ servidor.registerTool(
 servidor.registerTool(
   'modelos',
   {
-    title: 'Listar modelos',
-    description: 'Os modelos de Claude e Codex, os esforços que cada um aceita e os padrões. Use os ids em abrir_cartao.',
+    ...metaDaFerramenta('modelos'),
     inputSchema: { espaco }
   },
   ({ espaco: nome }) => rodar('modelos', [], nome ? { espaco: nome } : {})
@@ -195,9 +189,7 @@ servidor.registerTool(
 servidor.registerTool(
   'trocar_modelo',
   {
-    title: 'Trocar o modelo de um cartão',
-    description:
-      'Troca o modelo e/ou o esforço de um agente que está livre: o cartão reabre e a conversa continua. Com ele ocupado, recusa. Veja os nomes na ferramenta modelos.',
+    ...metaDaFerramenta('trocar_modelo'),
     inputSchema: {
       cartao: z.string().describe('Nome do cartão (ou o começo dele).'),
       modelo: z.string().optional().describe('Modelo novo, por exemplo "sonnet".'),
@@ -212,8 +204,7 @@ servidor.registerTool(
 servidor.registerTool(
   'partituras',
   {
-    title: 'Listar times salvos',
-    description: 'As partituras guardadas, com quantos agentes, que funções e quantas cordas cada uma tem.',
+    ...metaDaFerramenta('partituras'),
     inputSchema: { espaco }
   },
   ({ espaco: nome }) => rodar('partitura', [], nome ? { espaco: nome } : {})
@@ -222,8 +213,7 @@ servidor.registerTool(
 servidor.registerTool(
   'subir_partitura',
   {
-    title: 'Subir um time salvo',
-    description: 'Sobe uma partitura no andar à mostra. O time nasce do usuário: sem dono e sem corda para fora.',
+    ...metaDaFerramenta('subir_partitura'),
     inputSchema: { nome: z.string().describe('Nome da partitura.'), espaco }
   },
   ({ nome, espaco: ondeEspaco }) => rodar('partitura', ['usar', nome], ondeEspaco ? { espaco: ondeEspaco } : {})
@@ -232,9 +222,7 @@ servidor.registerTool(
 servidor.registerTool(
   'importar_catalogo',
   {
-    title: 'Importar fichas de time',
-    description:
-      'Lê as fichas .md de uma pasta (cabeçalho com nome, motor, nível, pasta) e as transforma em funções. Atualiza pelo nome em vez de duplicar, e não apaga nada.',
+    ...metaDaFerramenta('importar_catalogo'),
     inputSchema: { pasta: z.string().describe('Pasta das fichas, relativa à do espaço.'), espaco }
   },
   ({ pasta, espaco: ondeEspaco }) => rodar('catalogo', ['importar', pasta], ondeEspaco ? { espaco: ondeEspaco } : {})

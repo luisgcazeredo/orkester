@@ -110,7 +110,7 @@ Those are six of about thirty verbs. **The full reference is in [`docs/ork.md`](
 ## Connect your own Claude (MCP)
 
 The `ork` command is for agents *on* the canvas. To drive the canvas from **outside** — your own Claude Code,
-Claude Desktop, Codex, any MCP client — click the gear in the top-right corner, generate a key and paste the
+Claude Desktop, Codex, any MCP client — open the Conexões (Connections) page (the gear), generate a key and paste the
 snippet the app gives you. The client can then read the board, open agents, raise saved teams and import
 team sheets, acting as you. Orkester has to be open.
 

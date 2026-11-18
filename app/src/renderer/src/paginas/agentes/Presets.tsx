@@ -32,6 +32,15 @@ export function EditorDePresets() {
     <div className="editor-pagina" data-editor="presets">
       <p className="dialogo-texto suave">O comando é digitado no PowerShell quando o terminal abre, na pasta do espaço.</p>
       <div className="presets">
+        <div className="preset-titulos" aria-hidden>
+          <span />
+          <span>Nome</span>
+          <span>Motor</span>
+          <span>Comando digitado no PowerShell</span>
+          <span>Modelo</span>
+          <span>Esforço</span>
+          <span />
+        </div>
         {lista.map((p) => {
           const Icone = ICONE_AGENTE[p.agente]
           return (
@@ -52,6 +61,7 @@ export function EditorDePresets() {
               <input
                 className="preset-comando"
                 value={p.comando}
+                title={p.comando || undefined}
                 placeholder={p.agente === 'shell' ? '(nada: só o shell)' : p.agente}
                 spellCheck={false}
                 onChange={(e) => mudar(p.id, { comando: e.target.value })}
@@ -89,13 +99,13 @@ export function EditorDePresets() {
           )
         })}
       </div>
-      <button
-        className="preset-novo"
-        onClick={() => setLista((l) => [...l, { id: crypto.randomUUID(), nome: 'Novo agente', agente: 'claude', comando: 'claude' }])}
-      >
-        <Plus size={14} /> Novo preset
-      </button>
       <div className="dialogo-acoes">
+        <button
+          className="preset-novo"
+          onClick={() => setLista((l) => [...l, { id: crypto.randomUUID(), nome: 'Novo agente', agente: 'claude', comando: 'claude' }])}
+        >
+          <Plus size={14} /> Novo preset
+        </button>
         <button onClick={() => setLista(PRESETS_PADRAO.map((p) => ({ ...p })))}>Restaurar padrão</button>
         <span className="espaco-flex" />
         <button onClick={() => setLista(doEstado())}>Desfazer alterações</button>

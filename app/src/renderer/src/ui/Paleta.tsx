@@ -20,7 +20,7 @@ import {
   Sun,
   Type,
   Users,
-  type LucideIcon, Settings, Bot, Clock } from 'lucide-react'
+  type LucideIcon, Settings, Bot, Clock, Plug } from 'lucide-react'
 import type { No } from '../../../shared/modelo'
 import {
   abrirEspaco,
@@ -41,8 +41,8 @@ import { abrirNovoAndar } from './acoesAndar'
 import { colar } from './area'
 import { abrirAtalhos } from './Atalhos'
 import { enquadrarTudo } from './Controles'
-import { abrirConfiguracoes } from './Configuracoes'
 import { abrirAgentes, abrirRotinas } from '../paginas/abrir'
+import { irParaPagina } from '../casca/paginas'
 import { anexarArquivoEm, arvoreEm, portalEm } from './menus'
 
 // Ctrl+K: uma caixa de busca para achar qualquer coisa (cartão, andar, espaço) e rodar qualquer comando
@@ -168,7 +168,8 @@ function montarItens(): Item[] {
     { rotulo: 'Funções (página Agentes)', grupo: 'Comando', icone: Bot, acao: () => abrirAgentes('funcoes') },
     { rotulo: 'Presets (página Agentes)', grupo: 'Comando', icone: Bot, acao: () => abrirAgentes('presets') },
     { rotulo: 'Partituras (página Agentes)', grupo: 'Comando', icone: Bot, acao: () => abrirAgentes('partituras') },
-    { rotulo: 'Configurações (chaves MCP)…', grupo: 'Comando', icone: Settings, acao: abrirConfiguracoes },
+    { rotulo: 'Conexões (página)', grupo: 'Comando', icone: Plug, acao: () => irParaPagina('conexoes') },
+    { rotulo: 'Configurações…', grupo: 'Comando', icone: Settings, detalhe: 'abre Conexões', acao: () => irParaPagina('conexoes') },
     ...plano.nos.map(
       (n): Item => ({
         rotulo: nomeDoCartao(n, notas),

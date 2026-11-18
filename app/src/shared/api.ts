@@ -520,6 +520,13 @@ export interface ApiChaves {
   comandoDoMcp(): Promise<import('./chaves').ComandoDoMcp>
 }
 
+/** Os portais do navegador embutido: onde ficam os logins, e como limpá-los. Nada de valor de cookie passa por aqui. */
+export interface ApiPortais {
+  listar(): Promise<import('./portais').ResumoDePortal[]>
+  /** Apaga cookies e armazenamento da partição. false: partição que o app não conhece. */
+  limpar(particao: string): Promise<boolean>
+}
+
 export interface ApiOrkester {
   terminal: ApiTerminal
   dados: ApiDados
@@ -533,6 +540,7 @@ export interface ApiOrkester {
   portal: ApiPortal
   agentes: ApiAgentes
   chaves: ApiChaves
+  portais: ApiPortais
   /** Chamado quando a janela vai fechar; `salvar` diz se gravou. Se não gravou, o app pergunta antes de fechar. */
   aoPedirFechar(salvar: () => Promise<boolean>): void
   autoteste: boolean
@@ -541,6 +549,12 @@ export interface ApiOrkester {
 export const CANAIS_APP = {
   vaiFechar: 'app:vai-fechar',
   podeFechar: 'app:pode-fechar'
+} as const
+
+/** Os portais do navegador embutido (ver shared/portais.ts). */
+export const CANAIS_PORTAIS = {
+  listar: 'portais:listar',
+  limpar: 'portais:limpar'
 } as const
 
 export const CANAIS = {

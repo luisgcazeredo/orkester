@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import { Pencil, Play, Trash2 } from 'lucide-react'
-import type { Partitura, ResumoEspaco } from '../../../../shared/modelo'
+import { useEffect, useState, type ReactNode } from 'react'
+import { ChevronDown, ChevronRight, Inbox, Pencil, Play, Trash2 } from 'lucide-react'
+import type { Agente, Partitura, ResumoEspaco } from '../../../../shared/modelo'
 import type { AgenteDoPanorama } from '../../../../shared/api'
 import { rotuloModelo } from '../../../../shared/modelos'
 import { resumoDaPartitura } from '../../../../shared/quadro/partituras'
@@ -12,10 +12,12 @@ import { subirPartituraNoCentro } from '../../ui/Partituras'
 import { irParaPagina } from '../../casca/paginas'
 import { aoChegarPedidoDePagina, pegarAbaPedida, type AbaAgentes } from '../abrir'
 import { usarPanorama } from '../panorama'
+import { COR_AGENTE, ICONE_AGENTE } from '../../nos/icones'
 
 // Agentes (página geral): os agentes de todos os espaços, agrupados por espaço, e as peças que os montam —
 // Funções, Presets e Partituras. Todos os espaços vêm do processo principal, com livre/ocupado e a caixa de
-// entrada de cada agente vivo, em qualquer janela. Só leitura: agente de outro espaço não se comanda daqui.
+// entrada de cada agente vivo, em qualquer janela. Só leitura: daqui não se comanda agente nenhum.
+// Leitura (1.9.2, C2): cartões numa grade que usa a largura toda, um grupo recolhível por espaço e filtros no topo.
 
 const ABAS: Array<[AbaAgentes, string]> = [
   ['agora', 'Agentes'],
@@ -24,47 +26,176 @@ const ABAS: Array<[AbaAgentes, string]> = [
   ['partituras', 'Partituras']
 ]
 
-const MOTOR: Record<string, string> = { claude: 'Claude Code', codex: 'Codex', shell: 'PowerShell' }
+const MOTOR: Record<Agente, string> = { claude: 'Claude Code', codex: 'Codex', shell: 'PowerShell' }
 const SITUACAO: Record<AgenteDoPanorama['situacao'], string> = { livre: 'livre', trabalhando: 'ocupado', pergunta: 'numa pergunta', encerrado: 'encerrado' }
 
-function LinhaAgente({ ag }: { ag: AgenteDoPanorama }) {
-  const modelo = rotuloModelo(ag)
+const plural = (n: number, palavra: string): string => `${n} ${palavra}${n === 1 ? '' : 's'}`
+const recados = (n: number): string => (n ? `${plural(n, 'recado')} esperando` : 'caixa vazia')
+
+// Um campo do cartão: rótulo pequeno em cima, valor embaixo. O valor quebra linha em vez de cortar no meio.
+function Campo({ rotulo, children, classe }: { rotulo: string; children: ReactNode; classe: string }) {
   return (
-    <div className="agente-linha" data-agente={ag.id}>
-      <span className="agente-nome">{ag.nome}</span>
-      <span className="agente-funcao suave">{ag.funcao ?? 'sem função'}</span>
-      <span className="agente-motor">{MOTOR[ag.agente] ?? ag.agente}</span>
-      <span className="agente-modelo suave">{modelo || 'padrão do motor'}</span>
-      <span className={`agente-situacao situacao-${ag.situacao}`}>{SITUACAO[ag.situacao]}</span>
-      <span className="agente-caixa suave">{ag.fila ? `${ag.fila} recado${ag.fila > 1 ? 's' : ''} esperando` : 'caixa vazia'}</span>
+    <div className="agente-campo">
+      <dt>{rotulo}</dt>
+      <dd className={classe}>{children}</dd>
     </div>
   )
 }
 
-function GrupoAgentes({ espaco, atual, agentes }: { espaco: ResumoEspaco; atual: boolean; agentes: AgenteDoPanorama[] | null }) {
+function CartaoAgente({ ag, cor }: { ag: AgenteDoPanorama; cor: string }) {
+  const modelo = rotuloModelo(ag)
+  const Icone = ICONE_AGENTE[ag.agente]
   return (
-    <section className="pagina-grupo" data-espaco={espaco.id}>
+    <article className="agente-card" data-agente={ag.id} style={{ borderLeftColor: cor }}>
+      <header className="agente-card-topo">
+        <h4 className="agente-nome">{ag.nome}</h4>
+        <span className={`agente-situacao situacao-${ag.situacao}`}>{SITUACAO[ag.situacao]}</span>
+      </header>
+      <dl className="agente-campos">
+        <Campo rotulo="Função" classe={ag.funcao ? 'agente-funcao' : 'agente-funcao suave'}>
+          {ag.funcao ?? 'sem função'}
+        </Campo>
+        <Campo rotulo="Motor" classe="agente-motor">
+          {Icone && <Icone size={13} style={{ color: COR_AGENTE[ag.agente] }} aria-hidden />}
+          {MOTOR[ag.agente] ?? ag.agente}
+        </Campo>
+        <Campo rotulo="Modelo · esforço" classe={modelo ? 'agente-modelo' : 'agente-modelo suave'}>
+          {modelo || 'padrão do motor'}
+        </Campo>
+        <Campo rotulo="Caixa" classe={ag.fila ? 'agente-caixa com-recado' : 'agente-caixa suave'}>
+          <Inbox size={13} aria-hidden />
+          {recados(ag.fila)}
+        </Campo>
+      </dl>
+    </article>
+  )
+}
+
+function contagem(lista: AgenteDoPanorama[], total: number, filtrando: boolean): string {
+  const ocupados = lista.filter((a) => a.situacao === 'trabalhando').length
+  const base = filtrando ? `${lista.length} de ${plural(total, 'agente')}` : plural(total, 'agente')
+  return ocupados ? `${base} · ${ocupados} ocupado${ocupados > 1 ? 's' : ''}` : base
+}
+
+interface PropsGrupo {
+  espaco: ResumoEspaco
+  atual: boolean
+  /** Os agentes do espaço que passam nos filtros; null enquanto o panorama não chegou. */
+  agentes: AgenteDoPanorama[] | null
+  /** Todos os agentes vivos do espaço, sem filtro. */
+  total: number
+  filtrando: boolean
+  aberto: boolean
+  alternar: () => void
+}
+
+function GrupoAgentes({ espaco, atual, agentes, total, filtrando, aberto, alternar }: PropsGrupo) {
+  const Seta = aberto ? ChevronDown : ChevronRight
+  return (
+    <section className="pagina-grupo agentes-grupo" data-espaco={espaco.id}>
       <h3 className="pagina-grupo-titulo">
-        <span className="pagina-grupo-cor" style={{ background: espaco.cor }} />
-        {espaco.nome}
+        <button type="button" className="agentes-grupo-botao" aria-expanded={aberto} onClick={alternar} title={aberto ? 'Recolher este espaço' : 'Mostrar os agentes deste espaço'}>
+          <Seta size={15} aria-hidden />
+          <span className="pagina-grupo-cor" style={{ background: espaco.cor }} />
+          <span className="agentes-grupo-nome">{espaco.nome}</span>
+          <span className="agentes-grupo-contagem">{agentes ? contagem(agentes, total, filtrando) : '…'}</span>
+        </button>
         <span className="suave pagina-grupo-nota">{atual ? 'aberto aqui' : 'só leitura: comande no quadro do espaço'}</span>
       </h3>
-      {(agentes ?? []).map((ag) => (
-        <LinhaAgente key={ag.id} ag={ag} />
-      ))}
-      {agentes && !agentes.length && <p className="suave pagina-vazio">Nenhum agente vivo neste espaço.</p>}
-      {!agentes && <p className="suave pagina-vazio">Lendo…</p>}
+      {aberto && agentes && agentes.length > 0 && (
+        <div className="agentes-grade">
+          {agentes.map((ag) => (
+            <CartaoAgente key={ag.id} ag={ag} cor={espaco.cor} />
+          ))}
+        </div>
+      )}
+      {aberto && agentes && !agentes.length && <p className="suave pagina-vazio">{filtrando && total ? 'Nenhum agente deste espaço com esses filtros.' : 'Nenhum agente vivo neste espaço.'}</p>}
+      {aberto && !agentes && <p className="suave pagina-vazio">Lendo…</p>}
     </section>
   )
 }
 
+type FiltroSituacao = 'todas' | AgenteDoPanorama['situacao']
+
+// Recolher por espaço, e não paginar: o time de um espaço fica junto (página não parte o grupo ao meio) e a leitura
+// de 3 em 3 s não faz um agente pular de página quando muda de situação. Os filtros encurtam a lista quando ela cresce.
 function AbaAgora() {
   const { espacos, atualId, panorama } = usarPanorama()
+  const [espacoEscolhido, setEspacoFiltro] = useState('todos')
+  // espaço que sumiu (fechado/apagado) volta sozinho para "Todos", sem página em branco
+  const espacoFiltro = espacos.some((e) => e.id === espacoEscolhido) ? espacoEscolhido : 'todos'
+  const [situacao, setSituacao] = useState<FiltroSituacao>('todas')
+  const [motor, setMotor] = useState<'todos' | Agente>('todos')
+  const [recolhidos, setRecolhidos] = useState<ReadonlySet<string>>(() => new Set())
+  const filtrando = situacao !== 'todas' || motor !== 'todos'
+  const passa = (a: AgenteDoPanorama): boolean => (situacao === 'todas' || a.situacao === situacao) && (motor === 'todos' || a.agente === motor)
+  const visiveis = espacos.filter((e) => espacoFiltro === 'todos' || e.id === espacoFiltro)
+  const alternar = (id: string): void =>
+    setRecolhidos((r) => {
+      const n = new Set(r)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return n
+    })
+  const todos = panorama?.agentes ?? []
+  const ocupados = todos.filter((a) => a.situacao === 'trabalhando').length
   return (
     <>
-      {espacos.map((e) => (
-        <GrupoAgentes key={e.id} espaco={e} atual={e.id === atualId} agentes={panorama ? panorama.agentes.filter((x) => x.espacoId === e.id) : null} />
-      ))}
+      <div className="agentes-filtros" role="toolbar" aria-label="Filtros dos agentes">
+        <label>
+          <span>Espaço</span>
+          <select value={espacoFiltro} onChange={(e) => setEspacoFiltro(e.target.value)} data-filtro="espaco" title={espacos.find((x) => x.id === espacoFiltro)?.nome ?? 'Todos os espaços'}>
+            <option value="todos">Todos ({espacos.length})</option>
+            {espacos.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.nome}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Situação</span>
+          <select value={situacao} onChange={(e) => setSituacao(e.target.value as FiltroSituacao)} data-filtro="situacao">
+            <option value="todas">Todas</option>
+            {(Object.keys(SITUACAO) as Array<AgenteDoPanorama['situacao']>).map((s) => (
+              <option key={s} value={s}>
+                {SITUACAO[s]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Motor</span>
+          <select value={motor} onChange={(e) => setMotor(e.target.value as 'todos' | Agente)} data-filtro="motor">
+            <option value="todos">Todos</option>
+            {(Object.keys(MOTOR) as Agente[]).map((m) => (
+              <option key={m} value={m}>
+                {MOTOR[m]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span className="espaco-flex" />
+        <span className="suave agentes-total">{panorama ? `${plural(todos.length, 'agente')} · ${ocupados} ocupado${ocupados === 1 ? '' : 's'}` : 'Lendo…'}</span>
+        <button type="button" className="agentes-recolher" onClick={() => setRecolhidos(recolhidos.size ? new Set() : new Set(espacos.map((e) => e.id)))}>
+          {recolhidos.size ? 'Abrir todos' : 'Recolher todos'}
+        </button>
+      </div>
+      {visiveis.map((e) => {
+        const doEspaco = panorama ? todos.filter((x) => x.espacoId === e.id) : null
+        return (
+          <GrupoAgentes
+            key={e.id}
+            espaco={e}
+            atual={e.id === atualId}
+            agentes={doEspaco ? doEspaco.filter(passa) : null}
+            total={doEspaco?.length ?? 0}
+            filtrando={filtrando}
+            aberto={!recolhidos.has(e.id)}
+            alternar={() => alternar(e.id)}
+          />
+        )
+      })}
       {!espacos.length && <p className="suave pagina-vazio">Nenhum espaço ainda.</p>}
     </>
   )
@@ -117,31 +248,37 @@ function AbaPartituras() {
         Um time salvo: os agentes com as funções e os comandos deles, os recados e as cordas entre eles. Para guardar um, selecione os cartões no quadro e use{' '}
         <b>Salvar como partitura…</b>. A pasta não é salva: cada cartão abre na pasta do espaço (ou na da função).
       </p>
-      {partituras.map((p) => (
-        <div key={p.id} className="partitura-linha" data-partitura={p.id}>
-          <div className="partitura-dados">
-            <span className="partitura-nome">{p.nome}</span>
-            <span className="partitura-resumo suave">{resumoDaPartitura(p)}</span>
-          </div>
-          <button
-            className="partitura-subir"
-            disabled={!temEspaco}
-            title={temEspaco ? 'Subir este time no andar à mostra do quadro' : 'Abra um espaço para subir o time'}
-            onClick={() => {
-              irParaPagina('quadro')
-              subirPartituraNoCentro(p)
-            }}
-          >
-            <Play size={13} /> Subir
-          </button>
-          <button className="preset-apagar" title="Renomear" onClick={() => void renomear(p)}>
-            <Pencil size={14} />
-          </button>
-          <button className="preset-apagar" title="Apagar partitura" onClick={() => void apagar(p)}>
-            <Trash2 size={14} />
-          </button>
+      {partituras.length > 0 && (
+        <div className="partituras-grade">
+          {partituras.map((p) => (
+            <div key={p.id} className="partitura-linha" data-partitura={p.id}>
+              <div className="partitura-dados">
+                <span className="partitura-nome">{p.nome}</span>
+                <span className="partitura-resumo suave">{resumoDaPartitura(p)}</span>
+              </div>
+              <div className="partitura-acoes">
+                <button
+                  className="partitura-subir"
+                  disabled={!temEspaco}
+                  title={temEspaco ? 'Subir este time no andar à mostra do quadro' : 'Abra um espaço para subir o time'}
+                  onClick={() => {
+                    irParaPagina('quadro')
+                    subirPartituraNoCentro(p)
+                  }}
+                >
+                  <Play size={13} /> Subir
+                </button>
+                <button className="preset-apagar" title="Renomear" onClick={() => void renomear(p)}>
+                  <Pencil size={14} />
+                </button>
+                <button className="preset-apagar" title="Apagar partitura" onClick={() => void apagar(p)}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
       {!partituras.length && <p className="suave pagina-vazio">Nenhuma partitura guardada ainda.</p>}
     </section>
   )

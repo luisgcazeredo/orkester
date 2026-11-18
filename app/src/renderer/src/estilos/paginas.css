@@ -1,4 +1,4 @@
-/* ------------------------------------------------------------------ Páginas gerais: Rotinas e Agentes (1.9.1, U3)
+/* ------------------------------------------------------------------ Páginas gerais: Rotinas e Agentes (1.9.1, U3; Agentes refeita na 1.9.2, C2)
  * Só tokens (R7): nenhuma cor literal aqui. Importado depois do leitor.css.
  */
 
@@ -55,6 +55,11 @@
 .pagina-grupo > p {
   margin: 0;
   font-size: 13px;
+}
+
+[data-pagina-geral='agentes'] .pagina-grupo > p {
+  max-width: 110ch;
+  line-height: 1.5;
 }
 
 .pagina-grupo-titulo {
@@ -120,57 +125,228 @@
   border-color: var(--borda);
 }
 
-/* linhas de agente */
-.agente-linha {
-  display: grid;
-  grid-template-columns: minmax(120px, 1.2fr) minmax(90px, 1fr) 100px minmax(110px, 1fr) 130px minmax(110px, 1fr);
-  align-items: center;
-  gap: var(--espaco-2);
-  padding: 8px 10px;
-  border: 1px solid var(--pilula-borda);
-  border-radius: var(--raio-pequeno);
-  background: var(--pilula-fundo);
-  font-size: 13px;
+/* ------------------------------------------------------------------ página Agentes (1.9.2, C2)
+ * Usa a largura toda: cartões numa grade que se ajusta à janela, um grupo recolhível por espaço, filtros no topo.
+ * Texto quebra linha em vez de cortar no meio. Escopo `[data-pagina-geral="agentes"]`: a página Rotinas não muda.
+ */
+
+[data-pagina-geral='agentes'] .pagina-grupo {
+  max-width: none;
 }
 
-.agente-linha-simples {
-  grid-template-columns: minmax(140px, 1.4fr) 110px minmax(120px, 1fr);
+/* filtros */
+.agentes-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--espaco-3);
+  padding-bottom: var(--espaco-3);
+  border-bottom: 1px solid var(--borda-suave);
 }
 
-.agente-linha > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.agente-nome {
-  font-weight: 600;
-}
-
-.agente-situacao {
+.agentes-filtros label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  color: var(--texto-suave);
   font-size: 12px;
 }
 
+.agentes-filtros select {
+  min-width: 160px;
+  max-width: 340px;
+}
+
+.agentes-filtros .espaco-flex {
+  flex: 1;
+}
+
+.agentes-total {
+  align-self: center;
+  font-size: 13px;
+}
+
+.agentes-recolher {
+  height: 32px;
+  padding: 0 var(--espaco-3);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.agentes-recolher:hover {
+  background: var(--hover);
+}
+
+/* grupo por espaço */
+.agentes-grupo {
+  gap: var(--espaco-3);
+}
+
+.agentes-grupo .pagina-grupo-titulo {
+  flex-wrap: wrap;
+}
+
+.agentes-grupo-botao {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-width: 0;
+  margin-left: calc(-1 * var(--espaco-1));
+  padding: var(--espaco-1) var(--espaco-2) var(--espaco-1) var(--espaco-1);
+  border: 0;
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agentes-grupo-botao:hover {
+  background: var(--hover);
+}
+
+.agentes-grupo-botao:focus-visible,
+.agentes-recolher:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 1px;
+}
+
+.agentes-grupo-botao svg {
+  flex-shrink: 0;
+  color: var(--texto-suave);
+}
+
+.agentes-grupo-nome {
+  overflow-wrap: anywhere;
+}
+
+.agentes-grupo-contagem {
+  flex-shrink: 0;
+  padding: 1px var(--espaco-2);
+  border-radius: var(--raio-pilula);
+  background: var(--painel-alto);
+  color: var(--texto-suave);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* cartões de agente */
+.agentes-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: var(--espaco-3);
+}
+
+.agente-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  min-width: 0;
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 1px solid var(--pilula-borda);
+  border-left: 3px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--pilula-fundo);
+}
+
+.agente-card-topo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--espaco-2);
+}
+
+.agente-card .agente-nome {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+/* selo da situação: o texto fica na cor do texto (lê bem nos 2 temas); a cor vai no ponto, no fundo e na borda */
+.agente-situacao {
+  --cor-situacao: var(--texto-suave);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--cor-situacao) 45%, transparent);
+  border-radius: var(--raio-pilula);
+  background: color-mix(in srgb, var(--cor-situacao) 16%, transparent);
+  color: var(--texto);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.agente-situacao::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cor-situacao);
+}
+
 .agente-situacao.situacao-livre {
-  color: var(--vivo);
+  --cor-situacao: var(--vivo);
 }
 
 .agente-situacao.situacao-trabalhando {
-  color: var(--atencao);
+  --cor-situacao: var(--atencao);
 }
 
 .agente-situacao.situacao-pergunta {
-  color: var(--destaque);
+  --cor-situacao: var(--destaque);
 }
 
 .agente-situacao.situacao-encerrado {
-  color: var(--perigo);
+  --cor-situacao: var(--perigo);
 }
 
-.agente-situacao.situacao-fora,
-.agente-situacao.situacao-desconhecida {
+.agente-campos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--espaco-2) var(--espaco-3);
+  margin: 0;
+}
+
+.agente-campo {
+  min-width: 0;
+}
+
+.agente-campo dt {
   color: var(--texto-suave);
+  font-size: 11px;
+}
+
+.agente-campo dd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.agente-campo dd svg {
+  flex-shrink: 0;
+}
+
+.agente-caixa.com-recado {
+  color: var(--destaque);
+  font-weight: 600;
 }
 
 /* campos e botões dentro das páginas (nos diálogos vêm do contêiner do diálogo; aqui, só tokens) */
@@ -205,13 +381,22 @@
   cursor: default;
 }
 
+/* partituras: cartões numa grade; o resumo quebra linha em vez de cortar */
+.partituras-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+  gap: var(--espaco-3);
+}
+
 .pagina-geral .partitura-linha {
   display: flex;
-  align-items: center;
-  gap: var(--espaco-2);
-  padding: 8px 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--espaco-3);
+  min-width: 0;
+  padding: var(--espaco-3) var(--espaco-4);
   border: 1px solid var(--pilula-borda);
-  border-radius: var(--raio-pequeno);
+  border-radius: var(--raio);
   background: var(--pilula-fundo);
 }
 
@@ -220,7 +405,27 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--espaco-1);
+}
+
+.pagina-geral .partitura-nome {
+  font-size: 15px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.pagina-geral .partitura-resumo {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.partitura-acoes {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-1);
 }
 
 .pagina-geral .partitura-subir {
@@ -244,4 +449,120 @@
 
 .pagina-geral .preset-apagar {
   width: 30px;
+}
+
+/* editores de Funções e Presets na página: sem a caixa de 46vh do diálogo, a barra de ações sempre à vista */
+[data-pagina-geral='agentes'] .editor-pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+[data-pagina-geral='agentes'] .editor-pagina .dialogo-texto {
+  margin: 0;
+  max-width: 110ch;
+}
+
+[data-pagina-geral='agentes'] .editor-pagina .dialogo-acoes {
+  position: sticky;
+  bottom: calc(-1 * var(--espaco-4));
+  z-index: 1;
+  align-items: center;
+  margin: 0;
+  padding: var(--espaco-3) 0 var(--espaco-4);
+  border-top: 1px solid var(--borda);
+  background: var(--quadro-fundo);
+}
+
+[data-pagina-geral='agentes'] .funcoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(520px, 100%), 1fr));
+  gap: var(--espaco-3);
+  max-height: none;
+  margin: 0;
+  overflow: visible;
+}
+
+[data-pagina-geral='agentes'] .funcao-linha {
+  gap: var(--espaco-2);
+  padding: var(--espaco-3);
+  border-radius: var(--raio);
+}
+
+/* função que impede o Salvar: cartão marcado + motivo ao lado do botão */
+[data-pagina-geral='agentes'] .funcao-linha.funcao-invalida {
+  border-color: var(--perigo);
+}
+
+[data-pagina-geral='agentes'] .funcao-aviso {
+  color: var(--perigo);
+  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* nome sozinho na 1ª linha (não espreme); modelo, esforço, pasta e apagar na 2ª */
+[data-pagina-geral='agentes'] .funcao-topo {
+  grid-template-columns: 130px 110px minmax(0, 1fr) 30px;
+}
+
+[data-pagina-geral='agentes'] .funcao-nome {
+  grid-column: 1 / -1;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+[data-pagina-geral='agentes'] .funcao-pasta {
+  justify-self: start;
+  max-width: 100%;
+  height: 32px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel);
+  color: var(--texto-suave);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+[data-pagina-geral='agentes'] .funcao-pasta:hover {
+  background: var(--hover);
+  color: var(--texto);
+}
+
+/* altura em linhas inteiras (rows × line-height): parado no topo, nenhuma linha fica cortada ao meio */
+[data-pagina-geral='agentes'] .funcao-prompt {
+  padding-bottom: 0;
+  line-height: 20px;
+}
+
+/* presets: tabela larga com os nomes das colunas */
+[data-pagina-geral='agentes'] .presets {
+  margin: 0;
+}
+
+[data-pagina-geral='agentes'] .preset-linha,
+.preset-titulos {
+  grid-template-columns: 18px minmax(150px, 1fr) 170px minmax(260px, 2.6fr) minmax(130px, 0.9fr) 110px 30px;
+}
+
+.preset-titulos {
+  display: grid;
+  align-items: end;
+  gap: 8px;
+  color: var(--texto-suave);
+  font-size: 12px;
+}
+
+/* modelo e esforço das funções: no diálogo a borda é transparente; na página o cartão tem fundo igual ao campo */
+[data-pagina-geral='agentes'] .funcao-topo .preset-modelo,
+[data-pagina-geral='agentes'] .funcao-topo .preset-esforco {
+  border-color: var(--borda);
+}
+
+[data-pagina-geral='agentes'] .funcao-topo .preset-modelo:focus,
+[data-pagina-geral='agentes'] .funcao-topo .preset-esforco:focus {
+  border-color: var(--destaque);
 }

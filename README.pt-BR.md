@@ -110,7 +110,7 @@ São seis de cerca de trinta verbos. **A referência completa está em
 ## Ligar o seu Claude (MCP)
 
 O `ork` é para os agentes *dentro* do quadro. Para mexer no quadro **de fora** — o seu Claude Code, o Claude
-Desktop, o Codex, qualquer cliente MCP — clique na engrenagem no canto de cima, gere uma chave e cole o bloco
+Desktop, o Codex, qualquer cliente MCP — abra a página Conexões (a engrenagem), gere uma chave e cole o bloco
 que o app te dá. O cliente passa a ler o quadro, abrir agentes, subir times salvos e importar fichas de time,
 como se fosse você. O Orkester precisa estar aberto.
 

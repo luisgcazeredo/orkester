@@ -16,7 +16,7 @@ Duas regras valem para tudo abaixo:
 
 ## Ligar um cliente
 
-1. No Orkester, clique na engrenagem no canto de cima, à direita (ou procure **Configurações** na paleta).
+1. No Orkester, clique na engrenagem (ou no ícone de plugue) na barra de páginas, à esquerda, para abrir a página **Conexões**; ou procure **Conexões** na paleta.
 2. Dê à chave o nome de quem vai usá-la — "Claude Code", "notebook" — e clique em **Gerar chave**.
 3. Escolha a aba do seu cliente, clique em **Copiar** e cole. Abra uma sessão **nova** do cliente: as
    ferramentas são carregadas quando a sessão começa.
@@ -94,14 +94,14 @@ As respostas são texto puro, o mesmo que o `ork` imprime. Uma recusa volta como
 |---|---|
 | `o Orkester não está aberto nesta máquina` | O app está fechado (ou é de antes da 1.3). Abra. |
 | `falta a chave` | Falta `ORK_CHAVE` na configuração do servidor. |
-| `chave inválida ou revogada` | Chave errada, ou revogada em Configurações. Gere outra. |
+| `chave inválida ou revogada` | Chave errada, ou revogada na página Conexões. Gere outra. |
 | `o Orkester fechou desde a última vez` | O app fechou depois que o cliente se ligou. Abra de novo; não precisa reiniciar o cliente. |
 | `o Orkester não respondeu em 30 s` | O app está aberto, mas travado. |
 
 ## O que a chave é e o que não é
 
 - **É:** intenção (nada de fora do quadro chega nele sem uma), um nome, revogação que vale na próxima chamada
-  e um registro — Configurações mostra quando cada chave foi criada e usada pela última vez. A chave revogada é
+  e um registro — a página Conexões mostra quando cada chave foi criada e usada pela última vez. A chave revogada é
   marcada, não apagada, para o registro de quem teve acesso continuar existindo.
 - **Não é:** uma fronteira contra programas que já rodam como você. Qualquer coisa que rode no seu usuário já
   lê `~/.orkester`. A chave serve para saber quem fez o quê e cortar o acesso, não para barrar programa mal-

@@ -1,0 +1,301 @@
+/* ------------------------------------------------------------------ Página Conexões (1.9.2, C1)
+ * Só tokens (R7): nenhuma cor literal aqui. Carregado junto com a página (import dentro de Conexoes.tsx).
+ * Tudo sob `.conexoes`, para não mexer em nada fora dela.
+ */
+
+.conexoes {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--quadro-fundo);
+  color: var(--texto);
+  font-family: var(--fonte-interface);
+}
+
+.conexoes .suave {
+  color: var(--texto-suave);
+}
+
+.conexoes-cabecalho {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  padding: var(--espaco-4) var(--espaco-5) var(--espaco-3);
+  border-bottom: 1px solid var(--borda);
+}
+
+.conexoes-cabecalho h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.conexoes-cabecalho p {
+  margin: 0;
+  max-width: 78ch;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.conexoes-corpo {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-5);
+  padding: var(--espaco-4) var(--espaco-5);
+}
+
+.conexoes-secao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  max-width: 980px;
+  min-width: 0;
+}
+
+.conexoes-secao-titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.conexoes-subtitulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: var(--espaco-2) 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.conexoes-texto {
+  margin: 0;
+  max-width: 78ch;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.conexoes-nota {
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.conexoes-vazio {
+  margin: 0;
+  font-size: 13px;
+}
+
+.conexoes-erro {
+  margin: 0;
+  font-size: 13px;
+  color: var(--perigo);
+}
+
+.conexoes code {
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+}
+
+/* campos e botões */
+.conexoes input {
+  height: 36px;
+  padding: 0 var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  background: var(--lateral-filtro);
+  color: var(--texto);
+  font: inherit;
+  font-size: 14px;
+  outline: 0;
+}
+
+.conexoes input::placeholder {
+  color: var(--texto-suave);
+}
+
+.conexoes input:focus {
+  border-color: var(--destaque);
+}
+
+.conexoes button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: 6px var(--espaco-3);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.conexoes button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.conexoes button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.conexoes button.primario {
+  height: 36px;
+  border-color: var(--destaque);
+  background: var(--destaque);
+  color: var(--texto-sobre-cor);
+  font-weight: 600;
+}
+
+.conexoes button.primario:hover:not(:disabled) {
+  background: var(--destaque-forte);
+}
+
+.conexoes button.perigo:hover:not(:disabled) {
+  color: var(--perigo);
+}
+
+/* gerar chave */
+.conexoes-gerar {
+  display: flex;
+  gap: var(--espaco-2);
+  max-width: 560px;
+}
+
+.conexoes-gerar input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* a chave recém-criada e o comando de ligar o MCP */
+.conexoes-nova {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  padding: var(--espaco-3);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel-alto);
+}
+
+.conexoes-config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  min-width: 0;
+}
+
+.conexoes-formatos {
+  display: flex;
+  gap: var(--espaco-1);
+}
+
+.conexoes .conexoes-formato {
+  border-color: transparent;
+  color: var(--texto-suave);
+  font-size: 12.5px;
+}
+
+.conexoes .conexoes-formato:hover {
+  color: var(--texto);
+}
+
+.conexoes .conexoes-formato.ativo {
+  color: var(--texto);
+  background: var(--hover);
+}
+
+.conexoes-comando {
+  margin: 0;
+  padding: var(--espaco-3);
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  background: var(--terminal-corpo);
+  color: var(--terminal-texto);
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+}
+
+.conexoes-acoes {
+  display: flex;
+  gap: var(--espaco-2);
+}
+
+/* listas: chaves e portais */
+.conexoes-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+}
+
+.conexoes-linha {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 1px solid var(--pilula-borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--pilula-fundo);
+}
+
+.conexoes-linha-dados {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.conexoes-linha-nome {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.conexoes-linha-detalhe {
+  font-size: 12.5px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.conexoes .conexoes-icone {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  justify-content: center;
+}
+
+/* ferramentas do MCP */
+.conexoes-ferramentas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conexoes-ferramentas li {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  align-items: baseline;
+  gap: var(--espaco-3);
+  padding: var(--espaco-1) var(--espaco-3);
+  border-bottom: 1px solid var(--borda-suave);
+  font-size: 13px;
+}
+
+.conexoes-ferramentas li:last-child {
+  border-bottom: 0;
+}

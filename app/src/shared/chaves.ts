@@ -51,6 +51,16 @@ export function redigir(segredo: string): string {
   return segredoBemFormado(segredo) ? `${segredo.slice(0, PREFIXO.length + 6)}…` : '(chave inválida)'
 }
 
+/**
+ * O começo da chave como a tela mostra: no máximo o prefixo e 6 caracteres, e sempre com reticências. O cofre já
+ * guarda só isso, mas a tela não confia: se um registro trouxesse mais (arquivo editado à mão, versão antiga), o
+ * resto não chega a aparecer. Uma chave inteira colada aqui sai cortada do mesmo jeito.
+ */
+export function comecoParaTela(comeco: string): string {
+  const tem = typeof comeco === 'string' ? comeco.replace(/…+$/, '') : ''
+  return `${tem.slice(0, PREFIXO.length + 6)}…`
+}
+
 export function cofreValido(cofre: unknown): cofre is CofreDeChaves {
   const c = cofre as CofreDeChaves
   return (
