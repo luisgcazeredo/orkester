@@ -1,4 +1,4 @@
-import { BookOpen, Bot, Clock, LayoutGrid, Plug } from 'lucide-react'
+import { BookOpen, Bot, Clock, LayoutGrid, Palette, Plug } from 'lucide-react'
 import { lazy, Suspense } from 'react'
 import * as loja from '../estado/loja'
 import {
@@ -19,6 +19,7 @@ import { BotaoLateral, CantoInferior, CantoSuperior } from '../ui/Controles'
 import { VistaAndares } from '../ui/Andares'
 import { atalhosDoLeitor } from '../paginas/leitor/atalhos'
 import { pegarPedido } from '../paginas/leitor/pedido'
+import { iniciarTemas } from '../paginas/temas/aplicar'
 import { DIALOGOS } from './dialogos'
 import { FronteiraDePagina } from './FronteiraDePagina'
 import { acharPagina, ligarPaginaAtiva, paginaAtiva, paginasMontadas, PAGINA_INICIAL, registrarPagina, temPagina } from './paginas'
@@ -119,6 +120,7 @@ const falhou = (nome: string) => () => ({ default: () => <p className="leitor-va
 const RotinasPreguicosa = lazy(() => import('../paginas/rotinas/Rotinas').then((m) => ({ default: m.Rotinas }), falhou('as Rotinas')))
 const ConexoesPreguicosa = lazy(() => import('../paginas/conexoes/Conexoes').then((m) => ({ default: m.Conexoes }), falhou('as Conexões')))
 const AgentesPreguicosa = lazy(() => import('../paginas/agentes/Agentes').then((m) => ({ default: m.Agentes }), falhou('os Agentes')))
+const TemasPreguicosa = lazy(() => import('../paginas/temas/Temas').then((m) => ({ default: m.Temas }), falhou('os Temas')))
 
 function PaginaRotinas() {
   return (
@@ -140,6 +142,14 @@ function PaginaAgentes() {
   return (
     <Suspense fallback={null}>
       <AgentesPreguicosa />
+    </Suspense>
+  )
+}
+
+function PaginaTemas() {
+  return (
+    <Suspense fallback={null}>
+      <TemasPreguicosa />
     </Suspense>
   )
 }
@@ -173,6 +183,10 @@ if (!temPagina('leitor')) registrarPagina({ id: 'leitor', titulo: 'Leitor de Mar
 if (!temPagina('rotinas')) registrarPagina({ id: 'rotinas', titulo: 'Rotinas', icone: Clock, nativa: true, Componente: PaginaRotinas })
 if (!temPagina('agentes')) registrarPagina({ id: 'agentes', titulo: 'Agentes', icone: Bot, nativa: true, Componente: PaginaAgentes })
 if (!temPagina('conexoes')) registrarPagina({ id: 'conexoes', titulo: 'Conexões', icone: Plug, nativa: true, Componente: PaginaConexoes })
+if (!temPagina('temas')) registrarPagina({ id: 'temas', titulo: 'Temas', icone: Palette, nativa: true, Componente: PaginaTemas })
+
+// os temas do usuário e os plugins de CSS valem desde a partida, mesmo sem abrir a página (ver paginas/temas/aplicar.ts)
+iniciarTemas()
 
 /**
  * As páginas montadas: a ativa e as que pedem `manterMontada` (o quadro, para os terminais não caírem ao trocar).

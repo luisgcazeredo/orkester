@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { usarLoja } from '../estado/loja'
 import { corrigirEscalaDoMouse } from './escalaDoMouse'
-import { TEMAS_XTERM } from './temaXterm'
+import { temaXtermComCores } from './temaXterm'
+import { usarCoresDoTerminal } from '../paginas/temas/aplicar'
 
 // O corpo de um cartão de terminal: um xterm ligado ao processo, que mora no processo principal. Montar liga
 // (o processo manda o retrato da tela e passa a mandar a saída); desmontar só desliga, o processo continua.
@@ -29,6 +30,9 @@ export function CorpoXterm({ id, ativo }: Props) {
   const areaRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<{ terminal: Terminal; ajuste: FitAddon; ajustar: (refazerColunas: boolean) => void } | null>(null)
   const tema = usarLoja((e) => e.preferencias.tema)
+  // as cores do tema do usuário (página Temas), se a base dele é o tema em tela; sem elas, o tema de fábrica
+  const cores = usarCoresDoTerminal(tema)
+  const temaXterm = useMemo(() => temaXtermComCores(tema, cores), [tema, cores])
   const [saiu, setSaiu] = useState<number | null>(null)
 
   useEffect(() => {
@@ -40,7 +44,7 @@ export function CorpoXterm({ id, ativo }: Props) {
       cursorBlink: true,
       allowProposedApi: true,
       scrollback: 5000,
-      theme: TEMAS_XTERM[tema]
+      theme: temaXterm
     })
     const ajuste = new FitAddon()
     terminal.loadAddon(ajuste)
@@ -131,8 +135,8 @@ export function CorpoXterm({ id, ativo }: Props) {
   }, [id])
 
   useEffect(() => {
-    if (termRef.current) termRef.current.terminal.options.theme = TEMAS_XTERM[tema]
-  }, [tema])
+    if (termRef.current) termRef.current.terminal.options.theme = temaXterm
+  }, [temaXterm])
 
   // Ativo, o cartão é dono do teclado. Focar uma só vez não basta: no mesmo clique que o selecionou, o
   // navegador ainda vai entregar um mousedown que mexe no foco, então foca de novo no quadro seguinte.

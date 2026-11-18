@@ -9,7 +9,7 @@ import { arquivoAcompanhado } from './codigo'
 import { AJUDA } from './manual'
 import { conferirModelo, lerModelos, modeloDasOpcoes, textoDoModelo, textoDosModelos } from './modelos'
 import { type NomeDeVerbo } from './verbos'
-import { encerrarAgora, escreverNoProcesso, esperarSessao, sessoesCriadasPor, telaDe, type Sessao } from './terminais'
+import { encerrarAgora, marcarFechamento, escreverNoProcesso, esperarSessao, sessoesCriadasPor, telaDe, type Sessao } from './terminais'
 import { esperar, janelaDoEspaco, abrirJanelaPronta, pedirAJanela } from './quadroDoAgente'
 import { situacao, contextoRestante, textoDoContexto, aguardarFim, aguardarPronto, recusarSeEmPergunta, digitarPedido, avisoDeEnvio, registrar, caixa, porNaCaixa, textoNaFila, quemRecebeDe, ligadosA, acharEntre, tempoDe, resultado, contaSessoes, descendentesDe, transferirSessoes } from './espera'
 
@@ -543,9 +543,20 @@ export const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
     const herdadas = sessoesCriadasPor(alvo.id)
     // Fechar não mata trabalho em andamento: os filhos passam para quem fechou, como numa passagem de bastão.
     await transferirSessoes(alvo, eu, herdadas)
-    await abrirJanelaPronta(alvo.espacoId)
-    const r = await pedirAJanela({ tipo: 'fechar', espacoId: alvo.espacoId, id: alvo.id })
-    if (!r.ok) throw new Error(r.erro)
+    // marca antes de pedir (a caixa não pode ver a saída antes da marca); recusado ou falhou, a marca sai
+    const desmarcar = marcarFechamento(alvo.id)
+    let r: Awaited<ReturnType<typeof pedirAJanela>>
+    try {
+      await abrirJanelaPronta(alvo.espacoId)
+      r = await pedirAJanela({ tipo: 'fechar', espacoId: alvo.espacoId, id: alvo.id })
+    } catch (erro) {
+      desmarcar()
+      throw erro
+    }
+    if (!r.ok) {
+      desmarcar()
+      throw new Error(r.erro)
+    }
     registrar(eu, alvo, 'fechar')
     encerrarAgora(alvo.id)
     return {

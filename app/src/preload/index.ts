@@ -28,7 +28,7 @@ import {
   type AvisoJanelas,
   type MudancaArquivo,
   type ApiOrkester,
-  type PedidoDoAgente, CANAIS_CHAVES, type ApiChaves, CANAIS_PORTAIS, type ApiPortais, type ResumoDaCaixa } from '../shared/api'
+  type PedidoDoAgente, CANAIS_CHAVES, type ApiChaves, CANAIS_PORTAIS, type ApiPortais, CANAIS_TEMAS, type ApiTemas, type ResumoDaCaixa } from '../shared/api'
 
 /** Cada canal vira uma função que chama o processo principal e devolve a resposta. */
 function chamadas<T>(canais: Record<string, string>): T {
@@ -151,6 +151,9 @@ const portais: ApiPortais = {
   limpar: (particao) => ipcRenderer.invoke(CANAIS_PORTAIS.limpar, particao)
 }
 
+// Temas do usuário e plugins de CSS: a página Temas lê e pede mudanças; o principal valida e grava.
+const temas = chamadas<ApiTemas>(CANAIS_TEMAS)
+
 // A janela não tem acesso ao Node: só a estas funções, nesta forma.
 const api: ApiOrkester = {
   terminal: {
@@ -192,6 +195,7 @@ const api: ApiOrkester = {
   leitor,
   chaves,
   portais,
+  temas,
   andares,
   area,
   janelas,

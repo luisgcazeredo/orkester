@@ -22,3 +22,20 @@ export const TEMAS_XTERM: Record<string, ITheme> = {
     brightYellow: '#8A5A00'
   }
 }
+
+/**
+ * O tema do xterm com as cores do tema do usuário (1.9.3). Só o corpo e o texto do terminal mexem nele: sem
+ * `--terminal-corpo` nem `--terminal-texto` trocados, volta o tema de fábrica sem mudança (os valores acima).
+ * As cores chegam já validadas (#rrggbb) de `shared/temasUsuario.ts`.
+ */
+export function temaXtermComCores(base: string, cores: Readonly<Record<string, string | undefined>> | null | undefined): ITheme | undefined {
+  const deFabrica = TEMAS_XTERM[base]
+  const corpo = cores?.['--terminal-corpo']
+  const texto = cores?.['--terminal-texto']
+  if (!corpo && !texto) return deFabrica
+  return {
+    ...deFabrica,
+    ...(corpo ? { background: corpo, cursorAccent: corpo } : {}),
+    ...(texto ? { foreground: texto, cursor: texto } : {})
+  }
+}

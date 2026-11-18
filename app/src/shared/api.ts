@@ -497,6 +497,8 @@ export type AvisoJanelas =
   | { tipo: 'renomear'; espacoId: string; nome: string }
   /** Tema ou outra preferência mudou em outra janela. */
   | { tipo: 'preferencias' }
+  /** Os temas do usuário ou os plugins de CSS mudaram (em outra janela). */
+  | { tipo: 'temas' }
 
 export interface ApiJanelas {
   /** Fica com o espaço nesta janela. false: ele já está aberto em outra janela, que vem para a frente. */
@@ -527,6 +529,14 @@ export interface ApiPortais {
   limpar(particao: string): Promise<boolean>
 }
 
+/** Temas do usuário e plugins de CSS (ver shared/temasUsuario.ts e shared/cssPlugin.ts). O principal valida tudo. */
+export interface ApiTemas {
+  ler(): Promise<import('./temasUsuario').ArquivoDeTemas>
+  aplicar(operacao: import('./temasUsuario').OperacaoDeTemas): Promise<import('./temasUsuario').ResultadoDeTemas>
+  /** Abre o diálogo do sistema para escolher um .css e devolve o texto (ainda não validado). null: cancelou. */
+  escolherCss(): Promise<{ nome: string; texto: string } | { erro: string } | null>
+}
+
 export interface ApiOrkester {
   terminal: ApiTerminal
   dados: ApiDados
@@ -541,6 +551,7 @@ export interface ApiOrkester {
   agentes: ApiAgentes
   chaves: ApiChaves
   portais: ApiPortais
+  temas: ApiTemas
   /** Chamado quando a janela vai fechar; `salvar` diz se gravou. Se não gravou, o app pergunta antes de fechar. */
   aoPedirFechar(salvar: () => Promise<boolean>): void
   autoteste: boolean
@@ -555,6 +566,13 @@ export const CANAIS_APP = {
 export const CANAIS_PORTAIS = {
   listar: 'portais:listar',
   limpar: 'portais:limpar'
+} as const
+
+/** Temas do usuário e plugins de CSS. */
+export const CANAIS_TEMAS = {
+  ler: 'temas:ler',
+  aplicar: 'temas:aplicar',
+  escolherCss: 'temas:escolher-css'
 } as const
 
 export const CANAIS = {

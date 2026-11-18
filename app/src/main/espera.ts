@@ -9,7 +9,7 @@ import { donoDe } from './janelas'
 import { extrairLeituraDeContexto, extrairLeituraDoRodape } from './contexto'
 import { agenteSaiuParaOShell, confirmarEnvio, DIALOGO, emSegundoPlano, lerProntidao, marcaNoCampo, retomarEnvio, registroDoEnvio, resultadoDaRotina, type ResultadoDoEnvio } from './envio'
 import { criarCaixa, janelaDeDialogo, motivoDeEspera, tirarCitacoes, TEXTO_DO_MOTIVO, type FimDoRecado, type MotivoDeEspera, type TipoDeRecado } from './caixa'
-import { aceitaColagem, cordasDoEspaco, encerrarAgora, escreverNoProcesso, sessaoPorId, sessoesCriadasPor, sessoesDoEspaco, telaDe, type Sessao } from './terminais'
+import { aceitaColagem, cordasDoEspaco, encerrarAgora, fechadoDeProposito, marcarFechamento, escreverNoProcesso, sessaoPorId, sessoesCriadasPor, sessoesDoEspaco, telaDe, type Sessao } from './terminais'
 import { esperar, abrirJanelaPronta, pedirAJanela } from './quadroDoAgente'
 
 const TEMPO_PADRAO = 100
@@ -282,6 +282,7 @@ export const caixa = criarCaixa({
     // o rodapé do Claude Code ("1 shell", "still running"): livre para digitar, mas só esperando o comando dele
     return !!s?.processo && s.espec.agente === 'claude' && emSegundoPlano(await telaDe(s, 6))
   },
+  fechadoDeProposito,
   shell: (id) => sessaoPorId(id)?.espec.agente === 'shell',
   tela: async (id, linhas) => {
     const s = sessaoPorId(id)
@@ -417,11 +418,14 @@ export async function resultado(s: Sessao, segundos: number, cancelado: () => bo
 /** Fecha cartões pelo mesmo pedido que o `ork fechar`; só roda depois de responder ao terminal que pediu saída. */
 export async function fecharCartoesDepoisDaResposta(sessoes: Sessao[]): Promise<void> {
   for (const s of sessoes) {
+    const desmarcar = marcarFechamento(s.id)
     try {
       await abrirJanelaPronta(s.espacoId)
       const r = await pedirAJanela({ tipo: 'fechar', espacoId: s.espacoId, id: s.id })
       if (r.ok) encerrarAgora(s.id)
+      else desmarcar() // recusado: o cartão segue vivo, a próxima saída dele avisa
     } catch {
+      desmarcar()
       // A resposta já saiu: não há cliente esperando este detalhe. O cartão continua visível para o usuário recuperar.
     }
   }

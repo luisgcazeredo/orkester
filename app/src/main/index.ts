@@ -8,6 +8,7 @@ import { registrarPanorama } from './panorama'
 import { registrarArea, registrarEsquemaImagem, servirImagens } from './area'
 import { registrarChaves } from './chaves'
 import { registrarPortais } from './portais'
+import { registrarTemas } from './temas'
 import { registrarCodigo } from './codigo'
 import { registrarLeitor } from './leitor'
 import { registrarComandos } from './comandos'
@@ -254,6 +255,7 @@ if (!autoteste && !medindo && !app.requestSingleInstanceLock()) {
     registrarDados()
     registrarChaves()
     registrarPortais()
+    registrarTemas()
     registrarAndares()
     registrarArea()
     registrarNavegador()

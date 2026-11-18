@@ -12,7 +12,7 @@ import { aplicarModelo, esforcoValido, modeloValido } from '../shared/modelos'
 import { ambienteDoComando } from './instalarOrk'
 import { ofertaDeAtualizacao, resolverOferta } from './codex-regras'
 import { AMBIENTE_DO_CLAUDE, juntarLinhasDaTela, tuiDoCodexPronta } from './envio'
-import { entradaVazia, lerEntradaDoUsuario, type EntradaDoUsuario } from './caixa'
+import { entradaVazia, FechamentosDeProposito, lerEntradaDoUsuario, type EntradaDoUsuario } from './caixa'
 import { donoDe, exigirDono } from './janelas'
 
 // Cada cartão de terminal é um processo de verdade (ConPTY no Windows). O processo é do app, não da janela:
@@ -55,6 +55,8 @@ export interface Sessao {
   chegando: Map<WebContents, string[]>
   ultimaSaida: number
   iniciadoEm: number
+  /** Número do processo atual (novo a cada `iniciarProcesso`): a marca de fechamento vale só para um processo. */
+  geracao: number
   /** Código de saída; null enquanto o processo vive. */
   saiu: number | null
   /** Identifica o terminal no `ork` (vai no ambiente do processo, nunca para a janela). */
@@ -157,6 +159,8 @@ function iniciarProcesso(s: Sessao): void {
   const { arquivo, argumentos } = shellPadrao()
   // crachá novo a cada processo; o de um processo que saiu deixa de valer
   s.cracha = randomBytes(24).toString('hex')
+  s.geracao = ++geracoes
+  fechamentos.nasceu(s.id)
   const processo = pty.spawn(arquivo, argumentos, {
     name: 'xterm-256color',
     cols: s.espelho.cols,
@@ -209,11 +213,13 @@ function criarSessao(espacoId: string, espec: EspecTerminal, aviso?: string): Se
     chegando: new Map(),
     ultimaSaida: 0,
     iniciadoEm: 0,
+    geracao: 0,
     saiu: null,
     cracha: '',
     fim: null,
     usuario: entradaVazia()
   }
+  fechamentos.nasceu(s.id)
   sessoes.set(s.id, s)
   if (aviso) escreverAviso(s, aviso)
   if (processosVivos() >= MAX_TERMINAIS) porNaFila(s)
@@ -251,9 +257,24 @@ function darVagaAosQueEsperam(): void {
   }
 }
 
+/**
+ * Processos fechados de propósito (todo `encerrar` é pedido: `ork fechar`, MCP, botão, espaço apagado); o processo
+ * que morre sozinho não passa por aqui. A marca é do processo (geração), não do id: ver `FechamentosDeProposito`.
+ */
+let geracoes = 0
+const fechamentos = new FechamentosDeProposito()
+/** Marca antes de pedir à janela; devolve o desfazer, para quando o fechamento for recusado ou falhar. */
+export function marcarFechamento(id: string): () => void {
+  const geracao = sessoes.get(id)?.geracao ?? 0
+  fechamentos.marcar(id, geracao)
+  return () => fechamentos.desmarcar(id, geracao)
+}
+export const fechadoDeProposito = (id: string): boolean => fechamentos.vale(id, sessoes.get(id)?.geracao)
+
 function encerrar(id: string): void {
   const s = sessoes.get(id)
   if (!s) return
+  fechamentos.marcar(id, s.geracao)
   sessoes.delete(id)
   if (s.fim) clearTimeout(s.fim)
   const processo = s.processo

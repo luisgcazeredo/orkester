@@ -190,9 +190,11 @@ export function decidirPendencia(
   situacao: Situacao,
   agora: number,
   /** o rodapé do agente diz que há comando em segundo plano: ele está esperando, não parado */
-  emSegundoPlano = false
-): { pendencia: Pendencia; avisar: 'parou' | 'pergunta' | 'encerrou' | 'segundo-plano' | null } {
-  if (situacao === 'encerrado') return { pendencia: p, avisar: 'encerrou' }
+  emSegundoPlano = false,
+  /** o cartão foi fechado pelo `ork fechar`, pelo MCP ou pelo botão: fechamento pedido não é saída inesperada */
+  fechadoDeProposito = false
+): { pendencia: Pendencia; avisar: 'parou' | 'pergunta' | 'encerrou' | 'segundo-plano' | null; descartar?: boolean } {
+  if (situacao === 'encerrado') return fechadoDeProposito ? { pendencia: p, avisar: null, descartar: true } : { pendencia: p, avisar: 'encerrou' }
   if (situacao === 'trabalhando') return { pendencia: { ...p, trabalhou: true, paradoDesde: 0, segundoPlanoDesde: 0, foraDoSegundoPlanoDesde: 0 }, avisar: null }
   const trabalhou = p.trabalhou || agora - p.desde >= SEM_VER_TRABALHAR
   if (!trabalhou) return { pendencia: p, avisar: null }
@@ -210,6 +212,33 @@ export function decidirPendencia(
   const limite = situacao === 'pergunta' ? PERGUNTA_PARA_AVISO : PARADO_PARA_AVISO
   if (agora - paradoDesde >= limite) return { pendencia: { ...p, trabalhou, paradoDesde }, avisar: situacao === 'pergunta' ? 'pergunta' : 'parou' }
   return { pendencia: { ...p, trabalhou, paradoDesde }, avisar: null }
+}
+
+/**
+ * "Fechado de propósito" vale para UM processo, não para o id do cartão (revisão 1.9.3). O id volta: Ctrl+Z
+ * restaura o cartão com o mesmo id, `ork modelo`/troca/reabrir sobem outro processo nele. Por isso a marca guarda
+ * a geração do processo que foi mandado fechar e cai quando nasce outro no mesmo id ou quando o fechamento é
+ * recusado; a saída real do processo seguinte volta a avisar.
+ */
+export class FechamentosDeProposito {
+  private readonly marcas = new Map<string, number>()
+  /** Pedido de fechar o processo `geracao` do cartão `id` (antes de pedir à janela, para a caixa não ver a saída antes). */
+  marcar(id: string, geracao: number): void {
+    this.marcas.set(id, geracao)
+  }
+  /** A janela recusou (ou o pedido falhou): o cartão segue vivo, e a próxima saída dele é de verdade. */
+  desmarcar(id: string, geracao: number): void {
+    if (this.marcas.get(id) === geracao) this.marcas.delete(id)
+  }
+  /** Nasceu sessão ou processo novo neste id: a marca era do anterior. */
+  nasceu(id: string): void {
+    this.marcas.delete(id)
+  }
+  /** `geracaoAtual` é a do processo que o cartão tem agora; sem sessão (já encerrada), vale a marca que ficou. */
+  vale(id: string, geracaoAtual: number | undefined): boolean {
+    const marcada = this.marcas.get(id)
+    return marcada !== undefined && (geracaoAtual === undefined || marcada === geracaoAtual)
+  }
 }
 
 export function textoDoAviso(nome: string, motivo: 'parou' | 'pergunta' | 'encerrou' | 'segundo-plano', tela: string): string {
@@ -292,6 +321,8 @@ interface DependenciasDaCaixa {
   nome(id: string): string | null
   /** O rodapé do agente diz que há comando em segundo plano (Claude: `1 shell`). Opcional. */
   segundoPlano?(id: string): Promise<boolean>
+  /** O cartão foi fechado de propósito (`ork fechar`, MCP, botão do cartão): a saída dele não é avisada. Opcional. */
+  fechadoDeProposito?(id: string): boolean
   /** o destino é um shell (entrega e aviso vão como comentário) */
   shell(id: string): boolean
   tela(id: string, linhas: number): Promise<string>
@@ -577,7 +608,12 @@ export function criarCaixa(d: DependenciasDaCaixa): Caixa {
       }
       const situacao = (await d.situacao(p.para)) ?? 'encerrado'
       const segundoPlano = situacao === 'livre' && d.segundoPlano ? await d.segundoPlano(p.para) : false
-      const { pendencia, avisar } = decidirPendencia(p, situacao, d.agora(), segundoPlano)
+      const { pendencia, avisar, descartar } = decidirPendencia(p, situacao, d.agora(), segundoPlano, d.fechadoDeProposito?.(p.para) ?? false)
+      if (descartar) {
+        pendencias.delete(p.para)
+        ultimaPendencia.delete(p.para)
+        continue
+      }
       if (!avisar) {
         if (pendencias.get(p.para) === p) pendencias.set(p.para, pendencia)
         continue
