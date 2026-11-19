@@ -1,11 +1,13 @@
-import { app, BrowserWindow, dialog, Menu, screen, session, shell, type Rectangle } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, screen, session, shell, type Rectangle } from 'electron'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { CANAIS_APP } from '../shared/api'
 import { registrarAndares } from './andares'
 import { pararRotinas, registrarRotinas } from './rotinas'
 import { registrarPanorama } from './panorama'
-import { registrarArea, registrarEsquemaImagem, servirImagens } from './area'
+import { registrarArea, registrarEsquemas, servirImagens } from './area'
+import { instalarIpcSeguro } from './ipcSeguro'
+import { anexarPagina, ehParticaoDePagina, guardarPagina, paginaAnexada, registrarPaginas } from './paginas'
 import { registrarChaves } from './chaves'
 import { registrarPortais } from './portais'
 import { registrarTemas } from './temas'
@@ -170,8 +172,13 @@ function criarJanela(espacoInicial: string | null = null, caixa?: Partial<Rectan
     abrirNoNavegador(url)
   })
 
+  // Página "+" (1.9.5): só a do registro, com a cópia conferida; o main força preload, sandbox e o resto.
   // Portal só abre site (http/https), sem preload e sem Node, isolado do app.
   janela.webContents.on('will-attach-webview', (evento, preferencias, parametros) => {
+    if (ehParticaoDePagina(parametros.partition)) {
+      if (!anexarPagina(preferencias, parametros)) evento.preventDefault()
+      return
+    }
     delete preferencias.preload
     preferencias.nodeIntegration = false
     preferencias.nodeIntegrationInSubFrames = false
@@ -179,6 +186,8 @@ function criarJanela(espacoInicial: string | null = null, caixa?: Partial<Rectan
     preferencias.sandbox = true
     if (!ehWeb(parametros.src) || parametros.partition !== 'persist:portal') evento.preventDefault()
   })
+  // a página anexada ganha o canal dela (guest.ipc), os eventos e a vigia de trava e memória
+  janela.webContents.on('did-attach-webview', (_evento, guest) => paginaAnexada(guest))
 
   // Fechar: a janela salva o que estiver pendente e só então fecha; se não conseguir salvar, pergunta.
   let podeFechar = autoteste
@@ -238,8 +247,10 @@ function abrirAsJanelasDaSessao(): void {
 }
 
 // Dentro do portal: janelas novas vão para o navegador do sistema; o site não sai de http/https.
+// Página "+" (achada pela sessão): nenhuma janela nova e navegação só dentro de ork-pagina://<id>/.
 app.on('web-contents-created', (_evento, conteudo) => {
   if (conteudo.getType() !== 'webview') return
+  if (guardarPagina(conteudo)) return
   conteudo.setWindowOpenHandler(({ url }) => {
     abrirNoNavegador(url)
     return { action: 'deny' }
@@ -249,8 +260,12 @@ app.on('web-contents-created', (_evento, conteudo) => {
   })
 })
 
-// antes de o app ficar pronto: o esquema das imagens do quadro precisa ser declarado cedo
-registrarEsquemaImagem()
+// Guarda central do IPC (1.9.5): antes de qualquer `registrar*`, todo canal do ipcMain passa a aceitar só a janela
+// do app. Portal e página "+" são webview: um renderer deles comprometido não chama terminal, dados nem git.
+instalarIpcSeguro(ipcMain)
+
+// antes de o app ficar pronto: os esquemas próprios (imagens do quadro e páginas "+") são declarados cedo, numa chamada
+registrarEsquemas()
 
 // Sem o menu padrão do Electron: os atalhos dele (zoom da página, recarregar) brigam com os do quadro.
 Menu.setApplicationMenu(null)
@@ -288,6 +303,7 @@ if (!autoteste && !medindo && !app.requestSingleInstanceLock()) {
     registrarLeitor()
     registrarRotinas()
     registrarPanorama()
+    registrarPaginas()
     quandoApagarEspaco(encerrarDoEspaco)
     if (medindo) void rodarMedicao()
     else abrirAsJanelasDaSessao()

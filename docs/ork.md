@@ -54,6 +54,7 @@ still the permission.
 | `ork abrir [claude\|codex\|shell]` | opens a new session beside you, already linked. With `--funcao`, the agent kind is optional |
 | `ork pedir <name> "text"` | sends a request and waits for it to finish; returns the screen |
 | `ork entregar "text"` | sends your result to whoever gave you the task (or opened you); no receipt. Also `responder`, `devolver` |
+| `ork pagina responder "<page>" "text"` | answers a "+" page linked to your card (open: arrives at once; closed: kept until it opens). Also `--arquivo answer.md`. See [`docs/paginas.md`](paginas.md) |
 | `ork esperar <name>` | waits for the other one to finish what it is doing |
 | `ork ver <name>` | reads its screen without sending anything |
 | `ork teclas <name> <key>…` | answers menus and prompts: `enter`, `esc`, `tab`, `shift-tab`, arrows, `ctrl-c`, `y`, `n`, numbers |

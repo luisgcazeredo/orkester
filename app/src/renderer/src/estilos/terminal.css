@@ -150,6 +150,19 @@
   cursor: pointer;
 }
 
+/* a tarefa do kanban em que o agente está (#N; o título vem no title) */
+.terminal-selo-tarefa {
+  border: 1px solid var(--borda);
+  background: transparent;
+  color: var(--texto-suave);
+  text-transform: none;
+  cursor: pointer;
+}
+
+.terminal-selo-tarefa:hover {
+  color: var(--texto);
+}
+
 .terminal-selo-caixa.terminal-selo-aviso {
   border-color: var(--perigo);
   color: var(--perigo);

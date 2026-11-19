@@ -52,6 +52,7 @@ Para mexer no quadro **de fora** do app — o seu Claude, o Codex, qualquer clie
 | `ork abrir [claude\|codex\|shell]` | abre uma sessão nova ao lado, já ligada a você. Com `--funcao`, o agente é opcional |
 | `ork pedir <nome> "texto"` | manda um pedido e espera terminar; devolve a tela |
 | `ork entregar "texto"` | manda o resultado a quem te deu a tarefa (ou a quem te abriu); sem recibo. Também `responder`, `devolver` |
+| `ork pagina responder "<página>" "texto"` | responde a uma página "+" ligada ao seu cartão (aberta: chega na hora; fechada: fica guardada até ela abrir). Também `--arquivo resposta.md`. Veja [`docs/paginas.pt-BR.md`](paginas.pt-BR.md) |
 | `ork esperar <nome>` | espera o outro terminar o que está fazendo |
 | `ork ver <nome>` | lê a tela dele sem mandar nada |
 | `ork teclas <nome> <tecla>…` | responde menus e perguntas: `enter`, `esc`, `tab`, `shift-tab`, setas, `ctrl-c`, `y`, `n`, números |

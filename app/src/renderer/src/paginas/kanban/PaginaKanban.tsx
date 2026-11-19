@@ -10,6 +10,7 @@ import { acoesDoKanban } from './atalhos'
 import { Coluna } from './Coluna'
 import { gravarEstadoDaPagina, lerEstadoDaPagina, painelQueVale } from './estadoDaPagina'
 import { FILTRO_INICIAL, colunaDoPapel, colunasNaTela, etiquetasEmUso, filtrando as estaFiltrando, posicaoDaSoltura, semCartao as quemSemCartao, soltouNoMesmoLugar, type FiltroDaPagina } from './filtros'
+import { OcupadosSemTarefa } from './OcupadosSemTarefa'
 import { PainelDaLixeira, PainelDaTarefa } from './PainelDaTarefa'
 import { TarefaNoKanban } from './TarefaNoKanban'
 import { usarKanban } from './usarKanban'
@@ -404,6 +405,16 @@ export function Kanban() {
         <p className="kanban-aviso" role="alert">
           Não consegui ler o kanban: {erroDeLeitura}
         </p>
+      )}
+
+      {arquivo && (
+        <OcupadosSemTarefa
+          arquivo={arquivo}
+          agentes={agentes}
+          podeEditar={podeEditar}
+          porNaTarefa={(numero, id) => void pedir({ tipo: 'pegar', numero, para: id }, 'Pôr numa tarefa')}
+          irAoCartao={irAoCartao}
+        />
       )}
 
       <div className={`kanban-corpo ${painel !== null ? 'com-painel' : ''}`}>

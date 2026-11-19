@@ -1,0 +1,684 @@
+/* Páginas extras ("+"): barra, moldura, diálogo de aceite, "Ligar a agente…" e a seção Páginas de Conexões.
+   Cores, espaços e raios só por tokens (tokens.css): segue qualquer tema. */
+
+/* ---------- barra ---------- */
+
+.barra-separador {
+  width: 60%;
+  height: 1px;
+  margin: var(--espaco-1) 0;
+  background: var(--lateral-borda);
+}
+
+.barra-mais {
+  color: var(--texto-suave);
+  border: 1px dashed var(--borda-suave);
+}
+
+/* chave desligada: o "+" continua (abre o painel com o botão de ligar), só mais apagado */
+.barra-mais.desligado {
+  opacity: 0.7;
+}
+
+.extra-icone-img {
+  display: block;
+  object-fit: contain;
+  border-radius: var(--raio-micro);
+}
+
+.extra-icone-inicial {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: var(--raio-micro);
+  background: var(--painel-alto);
+  color: var(--texto);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.barra-pagina.ativo .extra-icone-inicial {
+  background: var(--destaque);
+  color: var(--texto-sobre-destaque);
+}
+
+/* ---------- moldura ---------- */
+
+.extra-moldura {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--quadro-fundo);
+  color: var(--texto);
+}
+
+.extra-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: var(--espaco-2) var(--espaco-3);
+  border-bottom: 1px solid var(--borda);
+  background: var(--painel);
+}
+
+.extra-nome {
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.extra-versao,
+.extra-cordas {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.extra-espaco-flex {
+  flex: 1;
+}
+
+.extra-corpo {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.extra-visor {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--painel);
+}
+
+.extra-vazio {
+  margin: auto;
+  font-size: 13px;
+}
+
+.extra-aviso {
+  margin: auto;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-5);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-grande);
+  background: var(--painel);
+  text-align: center;
+}
+
+.extra-aviso p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.extra-aviso.perigo {
+  border-color: var(--perigo);
+}
+
+/* botões da moldura e do "Ligar a agente…" (fora de .conexoes, que tem os seus) */
+.extra-botao {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  padding: var(--espaco-1) var(--espaco-3);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--texto);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.extra-botao:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.extra-botao:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.extra-botao.primario {
+  border-color: var(--destaque);
+  background: var(--destaque);
+  color: var(--texto-sobre-destaque);
+  font-weight: 600;
+}
+
+.extra-botao.primario:hover:not(:disabled) {
+  background: var(--destaque-forte);
+}
+
+.extra-botao.ligado {
+  border-color: var(--destaque);
+  color: var(--destaque);
+}
+
+.extra-botao.extra-icone {
+  padding: var(--espaco-1);
+}
+
+.extra-erro {
+  margin: 0;
+  padding: var(--espaco-2) var(--espaco-3);
+  font-size: 13px;
+  color: var(--perigo);
+}
+
+/* ---------- Ligar a agente… ---------- */
+
+.extra-ligar {
+  position: relative;
+}
+
+.extra-ligar-lista {
+  position: absolute;
+  top: calc(100% + var(--espaco-1));
+  right: 0;
+  z-index: 20;
+  width: 320px;
+  max-height: 360px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  padding: var(--espaco-3);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--painel);
+  box-shadow: var(--sombra);
+}
+
+/* em Conexões a lista abre para baixo, alinhada à esquerda */
+.conexoes-pagina .extra-ligar-lista {
+  left: 0;
+  right: auto;
+}
+
+.extra-ligar-nota,
+.extra-ligar-vazio {
+  margin: 0 0 var(--espaco-1);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.extra-ligar-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-2);
+  padding: var(--espaco-1) 0;
+}
+
+.extra-ligar-nome {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- diálogo de aceite ---------- */
+
+.dialogo:has(.extra-aceite) {
+  width: 520px;
+}
+
+.extra-aceite {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  font-size: 13.5px;
+}
+
+.extra-aceite-topo {
+  display: flex;
+  gap: var(--espaco-3);
+  align-items: flex-start;
+}
+
+.extra-aceite-nome {
+  min-width: 0;
+}
+
+.extra-aceite-descricao {
+  margin: var(--espaco-1) 0 0;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.extra-aceite-origem {
+  margin: 0;
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+
+.extra-aceite-origem code {
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+}
+
+.extra-aceite-rotulo {
+  margin: var(--espaco-2) 0 0;
+  font-weight: 600;
+}
+
+.extra-aceite-lista,
+.extra-aceite-sempre {
+  margin: 0;
+  padding-left: var(--espaco-5);
+  line-height: 1.45;
+}
+
+.extra-aceite-lista li + li,
+.extra-aceite-sempre li + li {
+  margin-top: var(--espaco-1);
+}
+
+.extra-aceite-lista li.perigo {
+  color: var(--perigo);
+  font-weight: 600;
+}
+
+.extra-aceite-sempre {
+  font-size: 12.5px;
+}
+
+.extra-aceite-vazio {
+  margin: 0;
+}
+
+/* ---------- Conexões › Páginas (cartões da aba Páginas; o resto do visual de Conexões está em conexoes.css) ---------- */
+
+.conexoes-chave {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.conexoes .conexoes-chave input {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  accent-color: var(--destaque);
+}
+
+.conexoes-chave-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-3);
+}
+
+.conexoes-pagina-topo {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--espaco-3);
+}
+
+.conexoes-pagina-nome {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.conexoes-versao {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.conexoes-pagina-blocos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: var(--espaco-3);
+}
+
+.conexoes-pagina-bloco {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espaco-2);
+  min-width: 0;
+  padding: var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel-alto);
+}
+
+.conexoes-pagina-rotulo {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--texto-suave);
+}
+
+.conexoes-pagina-item {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.conexoes-pagina-item.perigo:not(.recusada) > span {
+  color: var(--perigo);
+}
+
+.conexoes-pagina-item.recusada > span {
+  color: var(--texto-suave);
+}
+
+.extra-aceite-aviso {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.extra-aceite-aviso.perigo {
+  color: var(--perigo);
+  font-weight: 600;
+}
+
+/* ---------- painel do "+" (1.9.5, S6): guia curto, exemplo, pasta e pedir a um agente ---------- */
+
+.dialogo:has(.extra-painel) {
+  display: flex;
+  flex-direction: column;
+  width: min(880px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+}
+
+.extra-painel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+  min-height: 0;
+  overflow: auto;
+  padding-right: var(--espaco-1);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.extra-painel p {
+  margin: 0;
+}
+
+.extra-painel h4 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.extra-painel code {
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+}
+
+/* modo "desligadas" */
+.extra-painel-desligadas {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-4);
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 1px solid color-mix(in srgb, var(--destaque) 45%, var(--borda));
+  border-radius: var(--raio);
+  background: color-mix(in srgb, var(--destaque) 8%, var(--painel));
+}
+
+.extra-painel-desligadas-texto {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+}
+
+.extra-painel-desligadas h4 {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.extra-painel-desligadas .extra-botao {
+  padding: var(--espaco-2) var(--espaco-4);
+  font-size: 13px;
+}
+
+/* guia curto */
+.extra-guia {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+.extra-guia-o-que {
+  max-width: 80ch;
+}
+
+.extra-passos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--espaco-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.extra-passo {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--espaco-3);
+  border: 1px solid var(--pilula-borda);
+  border-radius: var(--raio);
+  background: var(--pilula-fundo);
+}
+
+.extra-passo-numero {
+  position: absolute;
+  top: var(--espaco-2);
+  right: var(--espaco-3);
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--lateral-ativo);
+  color: var(--texto);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.extra-passo-icone {
+  margin-bottom: var(--espaco-1);
+  color: var(--destaque);
+}
+
+.extra-pode {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--espaco-2);
+}
+
+.extra-pode-coluna {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  padding: var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-left: 3px solid var(--vivo);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel-alto);
+}
+
+.extra-pode-coluna.nao {
+  border-left-color: var(--perigo);
+}
+
+.extra-pode-coluna h4 {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: 12.5px;
+}
+
+.extra-pode-coluna ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--texto-suave);
+}
+
+.extra-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--destaque);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.extra-link:hover {
+  color: var(--texto);
+}
+
+/* adicionar: exemplo, pasta, pedir a um agente */
+.extra-adicionar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+}
+
+.extra-opcoes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--espaco-2);
+}
+
+.extra-opcao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  min-width: 0;
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 1px solid var(--pilula-borda);
+  border-radius: var(--raio);
+  background: var(--pilula-fundo);
+}
+
+.extra-opcao-larga {
+  grid-column: 1 / -1;
+}
+
+.extra-opcao-topo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.extra-opcao-topo svg {
+  flex-shrink: 0;
+  color: var(--destaque);
+}
+
+.extra-opcao-pede {
+  font-size: 12px;
+  color: var(--texto-suave);
+}
+
+.extra-opcao-pe {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  margin-top: auto;
+}
+
+.extra-opcao-pe .extra-botao {
+  padding: 6px var(--espaco-3);
+  font-size: 13px;
+}
+
+.extra-opcao-pe .extra-erro,
+.extra-opcao-pe .extra-ok {
+  flex: 1;
+  padding: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.extra-ok {
+  margin: 0;
+  color: var(--texto);
+}
+
+.extra-selo {
+  margin-left: auto;
+  padding: 1px var(--espaco-2);
+  border: 1px solid color-mix(in srgb, var(--destaque) 45%, transparent);
+  border-radius: var(--raio-pilula);
+  background: color-mix(in srgb, var(--destaque) 14%, transparent);
+  color: var(--texto);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.extra-opcao textarea {
+  width: 100%;
+  min-height: 52px;
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  background: var(--lateral-filtro);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+  outline: 0;
+}
+
+.extra-opcao textarea::placeholder {
+  color: var(--texto-suave);
+}
+
+.extra-opcao textarea:focus {
+  border-color: var(--destaque);
+}
+
+.extra-opcao textarea:disabled {
+  opacity: 0.6;
+}
+
+/* guia completo (o docs/paginas embutido) */
+.extra-guia-completo {
+  padding-bottom: var(--espaco-2);
+}
+
+/* janela estreita: uma coluna */
+@media (max-width: 760px) {
+  .extra-passos,
+  .extra-pode,
+  .extra-opcoes {
+    grid-template-columns: 1fr;
+  }
+}

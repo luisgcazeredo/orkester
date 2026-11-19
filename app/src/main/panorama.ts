@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { CANAIS_PANORAMA, type AcaoNaRotina, type AgenteDoPanorama, type Panorama, type RotinaDoPanorama } from '../shared/api'
 import { idsDosEspacos, rotinasSalvas } from './dados'
 import { caixa, situacaoNaTela } from './espera'
+import { tarefasDosAgentesDo } from './kanban'
 import { donoDe } from './janelas'
 import { agirNaRotina, rotinasDoRelogio } from './rotinas'
 import { sessaoPorId, telaDe, todasAsSessoes } from './terminais'
@@ -14,6 +15,8 @@ const ACOES: readonly AcaoNaRotina[] = ['pausar', 'ligar', 'testar']
 
 async function agentes(): Promise<AgenteDoPanorama[]> {
   const vivas = todasAsSessoes().filter((s) => !s.fim)
+  // o kanban de cada espaço uma vez só (1.9.5, S5: "#N título" no card da página Agentes)
+  const tarefas = new Map([...new Set(vivas.map((s) => s.espacoId))].map((id) => [id, tarefasDosAgentesDo(id)]))
   return Promise.all(
     vivas.map(async (s) => ({
       id: s.id,
@@ -24,7 +27,8 @@ async function agentes(): Promise<AgenteDoPanorama[]> {
       modelo: s.espec.modelo,
       esforco: s.espec.esforco,
       situacao: situacaoNaTela(s, await telaDe(s, 80)),
-      fila: caixa.resumo(s.id).fila
+      fila: caixa.resumo(s.id).fila,
+      tarefas: tarefas.get(s.espacoId)?.[s.id] ?? []
     }))
   )
 }

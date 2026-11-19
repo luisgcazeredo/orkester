@@ -1,6 +1,8 @@
-/* ------------------------------------------------------------------ Página Conexões (1.9.2, C1)
+/* ------------------------------------------------------------------ Página Conexões (1.9.2, C1; em abas e cartões na 1.9.5, S6)
  * Só tokens (R7): nenhuma cor literal aqui. Carregado junto com a página (import dentro de Conexoes.tsx).
- * Tudo sob `.conexoes`, para não mexer em nada fora dela.
+ * Tudo sob `.conexoes`, para não mexer em nada fora dela. Os cartões seguem os da página Agentes (pilula-fundo,
+ * pilula-borda, raio) e o selo segue o `.agente-situacao` (texto na cor do texto; a cor vai no ponto, fundo e borda).
+ * Os cartões das páginas "+" (aba Páginas) têm o miolo em extra.css.
  */
 
 .conexoes {
@@ -40,22 +42,68 @@
   line-height: 1.5;
 }
 
+/* abas: Chaves · MCP · Páginas · Portais */
+.conexoes-abas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-1);
+  margin-top: var(--espaco-1);
+}
+
+.conexoes .conexoes-aba {
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--texto-suave);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.conexoes .conexoes-aba:hover {
+  background: var(--hover);
+  color: var(--texto);
+}
+
+.conexoes .conexoes-aba.ativo {
+  border-color: var(--borda);
+  background: var(--lateral-ativo);
+  color: var(--texto);
+}
+
+.conexoes-aba-contagem,
+.conexoes-contagem {
+  padding: 0 var(--espaco-2);
+  border-radius: var(--raio-pilula);
+  background: var(--painel-alto);
+  color: var(--texto-suave);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
 .conexoes-corpo {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-5);
-  padding: var(--espaco-4) var(--espaco-5);
+  padding: var(--espaco-4) var(--espaco-5) var(--espaco-5);
 }
 
 .conexoes-secao {
   display: flex;
   flex-direction: column;
   gap: var(--espaco-3);
-  max-width: 980px;
+  max-width: 1080px;
   min-width: 0;
+}
+
+.conexoes-secao-topo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  margin-bottom: var(--espaco-1);
 }
 
 .conexoes-secao-titulo {
@@ -63,13 +111,26 @@
   align-items: center;
   gap: var(--espaco-2);
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.conexoes-subtitulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin-top: var(--espaco-2);
+}
+
+.conexoes-subtitulo h4 {
+  margin: 0;
+  font-size: 13.5px;
   font-weight: 600;
 }
 
 .conexoes-texto {
   margin: 0;
-  max-width: 78ch;
+  max-width: 80ch;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -77,11 +138,32 @@
 .conexoes-nota {
   margin: 0;
   font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.conexoes-rodape {
+  max-width: 80ch;
+  margin-top: var(--espaco-2);
+}
+
+.conexoes-detalhe {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .conexoes-vazio {
   margin: 0;
   font-size: 13px;
+}
+
+/* vazio com instrução: caixa tracejada, para não parecer um erro nem sumir */
+.conexoes-vazio-caixa {
+  padding: var(--espaco-4);
+  border: 1px dashed var(--borda);
+  border-radius: var(--raio);
+  line-height: 1.5;
 }
 
 .conexoes-erro {
@@ -93,6 +175,111 @@
 .conexoes code {
   font-family: var(--fonte-mono);
   font-size: 12px;
+}
+
+/* cartões */
+.conexoes-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: var(--espaco-3);
+}
+
+.conexoes-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+.conexoes-cartao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  min-width: 0;
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 1px solid var(--pilula-borda);
+  border-radius: var(--raio);
+  background: var(--pilula-fundo);
+}
+
+/* o cartão da ação principal da aba (criar chave, chave das páginas): borda esquerda no destaque */
+.conexoes-cartao.destaque {
+  border-left: 3px solid var(--destaque);
+}
+
+.conexoes-cartao-topo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--espaco-2);
+}
+
+.conexoes-cartao-titulo {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+/* selo de estado */
+.conexoes-selo {
+  --cor-selo: var(--texto-suave);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--cor-selo) 45%, transparent);
+  border-radius: var(--raio-pilula);
+  background: color-mix(in srgb, var(--cor-selo) 16%, transparent);
+  color: var(--texto);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.conexoes-selo::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cor-selo);
+}
+
+.conexoes-selo.vivo {
+  --cor-selo: var(--vivo);
+}
+
+.conexoes-selo.atencao {
+  --cor-selo: var(--atencao);
+}
+
+.conexoes-selo.perigo {
+  --cor-selo: var(--perigo);
+}
+
+/* passos numerados (aba MCP) */
+.conexoes-passos {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.conexoes .conexoes-link {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--destaque);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.conexoes .conexoes-link:hover:not(:disabled) {
+  background: transparent;
+  color: var(--texto);
 }
 
 /* campos e botões */
@@ -138,7 +325,6 @@
 }
 
 .conexoes button.primario {
-  height: 36px;
   border-color: var(--destaque);
   background: var(--destaque);
   color: var(--texto-sobre-destaque);
@@ -151,6 +337,7 @@
 
 .conexoes button.perigo:hover:not(:disabled) {
   color: var(--perigo);
+  border-color: color-mix(in srgb, var(--perigo) 50%, var(--borda));
 }
 
 /* gerar chave */
@@ -165,17 +352,11 @@
   min-width: 0;
 }
 
-/* a chave recém-criada e o comando de ligar o MCP */
-.conexoes-nova {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-2);
-  padding: var(--espaco-3);
-  border: 1px solid var(--borda);
-  border-radius: var(--raio-pequeno);
-  background: var(--painel-alto);
+.conexoes-gerar button.primario {
+  height: 36px;
 }
 
+/* o comando de ligar o MCP (e a chave recém-criada) */
 .conexoes-config {
   display: flex;
   flex-direction: column;
@@ -185,6 +366,7 @@
 
 .conexoes-formatos {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--espaco-1);
 }
 
@@ -201,6 +383,7 @@
 .conexoes .conexoes-formato.ativo {
   color: var(--texto);
   background: var(--hover);
+  border-color: var(--borda);
 }
 
 .conexoes-comando {
@@ -224,59 +407,21 @@
   gap: var(--espaco-2);
 }
 
-/* listas: chaves e portais */
-.conexoes-lista {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-2);
-}
-
-.conexoes-linha {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: var(--espaco-3);
-  padding: var(--espaco-2) var(--espaco-3);
-  border: 1px solid var(--pilula-borda);
-  border-radius: var(--raio-pequeno);
-  background: var(--pilula-fundo);
-}
-
-.conexoes-linha-dados {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.conexoes-linha-nome {
-  font-size: 13.5px;
-  font-weight: 600;
-}
-
-.conexoes-linha-detalhe {
-  font-size: 12.5px;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-
-.conexoes .conexoes-icone {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  justify-content: center;
-}
-
-/* ferramentas do MCP: uma linha e o botão que baixa a lista */
-.conexoes-ferramentas {
-  display: flex;
+.conexoes-acoes-quebra {
   flex-wrap: wrap;
-  align-items: center;
-  gap: var(--espaco-3);
 }
 
-.conexoes-ferramentas .conexoes-texto svg {
-  margin-right: var(--espaco-2);
+/* ação no pé do cartão, à direita */
+.conexoes-acoes-pe {
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+.conexoes-texto svg {
+  margin-right: var(--espaco-1);
   vertical-align: -2px;
 }
 
+.conexoes .espaco-flex {
+  flex: 1;
+}

@@ -16,6 +16,7 @@ import type { PedidoNoQuadro } from './quadro/agente'
 import type { FichaDeCatalogo } from './catalogo'
 import type { PreferenciasParciais } from './preferencias'
 import type { Esforco } from './modelos'
+import type { TarefaDoAgente } from './kanban'
 
 /** O que o processo principal precisa para manter o processo de um cartão de terminal. */
 
@@ -242,6 +243,8 @@ export interface AgenteDoPanorama {
   situacao: ResumoContextoTerminal['situacao']
   /** Recados esperando na caixa de entrada dele. */
   fila: number
+  /** As tarefas abertas do kanban em que ele está (a que pegou por último primeiro); vazia = nenhuma. */
+  tarefas: TarefaDoAgente[]
 }
 
 /** Uma rotina de qualquer espaço, com o estado que o relógio do processo principal conhece. */
@@ -501,6 +504,10 @@ export type AvisoJanelas =
   | { tipo: 'temas' }
   /** O kanban de um espaço mudou (agente, MCP ou outra janela): a página relê. */
   | { tipo: 'kanban'; espacoId: string }
+  /** O registro das páginas "+" mudou (chave geral, aceite, revogação, cordas, quedas): `paginas.listar()` de novo. */
+  | { tipo: 'paginas' }
+  /** Uma página "+" aberta nesta janela travou, estourou memória ou caiu, e foi fechada: a moldura mostra o aviso. */
+  | { tipo: 'pagina-caiu'; id: string; motivo: import('./paginas').MotivoDeQueda }
 
 export interface ApiJanelas {
   /** Fica com o espaço nesta janela. false: ele já está aberto em outra janela, que vem para a frente. */
@@ -551,6 +558,143 @@ export interface ApiKanban {
   aplicar(espacoId: string, operacao: import('./kanban').OperacaoDoKanban): Promise<import('./kanban').ResultadoDoKanban>
 }
 
+// ---------------------------------------------------------------- páginas "+" (1.9.5)
+// Contrato S2↔S3. Permissões são fichas de texto: `quadro`, `recado`, `rede:<host>`, `local:<porta><caminho>`
+// (`lerPermissao` em shared/paginas.ts as lê). O webview: `src="ork-pagina://<id>/index.html"`, `partition="pagina-<id>"`,
+// sem `allowpopups`, `webpreferences` nem `preload` (o main põe tudo em will-attach-webview).
+
+/** O que o main achou numa pasta (ou na cópia, em `rever`). Nada é copiado antes do `aceitar(token)`. */
+export interface PropostaDePagina {
+  /** vale 10 minutos; o renderer nunca manda caminho nem permissões, só o token */
+  token: string
+  tipo: 'nova' | 'atualizacao' | 'rever'
+  manifesto: import('./paginas').ManifestoDePagina
+  icone: import('./paginas').IconeDePagina | null
+  /** pasta de onde vem (mostrada no diálogo) */
+  origem: string
+  arquivos: number
+  bytes: number
+  /** todas as fichas que o manifesto pede */
+  pedidas: string[]
+  /** as que o usuário ainda não decidiu: é o que o diálogo mostra (em `nova`, = pedidas) */
+  novas: string[]
+  /** `atualizacao`: a versão instalada; `rever` por mudança fora do app: true */
+  versaoAntes?: string
+  mudouFora?: boolean
+}
+
+export type RespostaDaProposta = { ok: true; proposta: PropostaDePagina } | { ok: false; erro: string; cancelado?: boolean }
+
+export type ResultadoDePaginas = { ok: true } | { ok: false; erro: string }
+
+export interface ResumoDePagina {
+  id: string
+  nome: string
+  versao: string
+  descricao: string
+  icone: import('./paginas').IconeDePagina | null
+  origem: string
+  pedidas: string[]
+  aceitas: string[]
+  recusadas: string[]
+  /** não carrega até o usuário rever: a cópia mudou fora do Orkester, ou o manifesto pede permissão nova */
+  pendente?: { motivo: 'mudou-fora' | 'permissao-nova'; novas: string[] }
+  desligada?: { motivo: 'usuario' | 'quedas'; em: number }
+  cordas: Array<{ espacoId: string; espacoNome: string; cartaoId: string; cartaoNome: string }>
+  ultimaQueda?: import('./paginas').QuedaDePagina
+}
+
+export interface ApiPaginas {
+  listar(): Promise<{ ligadas: boolean; paginas: ResumoDePagina[]; soLeitura?: string }>
+  /** Diálogo nativo de pasta → varredura → proposta. Cancelou: `{ ok: false, cancelado: true }`. */
+  escolherPasta(): Promise<RespostaDaProposta>
+  /** Um exemplo embutido no app, pelo nome (`resumo-do-espaco`): mesma varredura e proposta do `escolherPasta`. */
+  adicionarExemplo(nome: string): Promise<RespostaDaProposta>
+  /** Copia (nova/atualização) ou reconfirma a cópia (rever), e aceita todas as `novas`. */
+  aceitar(token: string): Promise<ResultadoDePaginas & { id?: string }>
+  recusar(token: string): Promise<void>
+  /** Proposta para reaceitar uma página pendente (mudou fora do app / pede permissão nova). */
+  rever(id: string): Promise<RespostaDaProposta>
+  revogar(id: string, permissao: string): Promise<ResultadoDePaginas>
+  permitirDeNovo(id: string, permissao: string): Promise<ResultadoDePaginas>
+  ligarCorda(id: string, espacoId: string, cartaoId: string): Promise<ResultadoDePaginas>
+  desligarCorda(id: string, espacoId: string, cartaoId: string): Promise<ResultadoDePaginas>
+  chaveGeral(ligar: boolean): Promise<ResultadoDePaginas>
+  /** Liga de novo (depois de desligar à mão ou por quedas). */
+  religar(id: string): Promise<ResultadoDePaginas>
+  /** Desliga só esta página (Conexões). */
+  desligar(id: string): Promise<ResultadoDePaginas>
+  remover(id: string): Promise<ResultadoDePaginas>
+  /** Relê a pasta de origem: proposta de atualização (aceite direto se `novas` vier vazio). */
+  atualizar(id: string): Promise<RespostaDaProposta>
+  /** As cores do tema atual desta janela (`--x: valor`), para o evento `tema` das páginas abertas nela. */
+  tema(tokens: Record<string, string>): void
+}
+
+/** Canais da janela para o main (passam pela guarda do ipcSeguro: só `window`). */
+export const CANAIS_PAGINAS = {
+  listar: 'paginas:listar',
+  escolherPasta: 'paginas:escolher-pasta',
+  adicionarExemplo: 'paginas:adicionar-exemplo',
+  aceitar: 'paginas:aceitar',
+  recusar: 'paginas:recusar',
+  rever: 'paginas:rever',
+  revogar: 'paginas:revogar',
+  permitirDeNovo: 'paginas:permitir-de-novo',
+  ligarCorda: 'paginas:ligar-corda',
+  desligarCorda: 'paginas:desligar-corda',
+  chaveGeral: 'paginas:chave-geral',
+  religar: 'paginas:religar',
+  desligar: 'paginas:desligar',
+  remover: 'paginas:remover',
+  atualizar: 'paginas:atualizar',
+  tema: 'paginas:tema'
+} as const
+
+/** O que a página "+" vê em `window.orkPagina` (preload/pagina.ts). Tudo é conferido no main a cada chamada. */
+export interface ApiOrkPagina {
+  eu(): Promise<{ id: string; nome: string; versao: string; permissoes: string[]; espaco: { id: string; nome: string } | null }>
+  quadro: { resumo(): Promise<ResumoDoQuadroParaPagina> }
+  agentes(): Promise<AgenteParaPagina[]>
+  recado(agenteId: string, texto: string): Promise<{ posicao: number }>
+  dados: {
+    ler(chave: string): Promise<unknown>
+    gravar(chave: string, valor: unknown): Promise<void>
+    apagar(chave: string): Promise<void>
+    chaves(): Promise<string[]>
+  }
+  local: { ler(caminho: string): Promise<{ status: number; tipo: string; texto: string }> }
+  ao<E extends keyof EventosDaPagina>(evento: E, fn: (dados: EventosDaPagina[E]) => void): () => void
+}
+
+export interface AgenteParaPagina {
+  id: string
+  nome: string
+  motor: Agente
+  funcao?: string
+  situacao: string
+  fila: number
+}
+
+export interface ResumoDoQuadroParaPagina {
+  espaco: { id: string; nome: string } | null
+  agentes: AgenteParaPagina[]
+  cordas: Array<[string, string]>
+}
+
+export interface EventosDaPagina {
+  recado: { de: { id: string; nome: string }; texto: string; em: number }
+  quadro: ResumoDoQuadroParaPagina
+  tema: { tokens: Record<string, string> }
+}
+
+/** Canais da página (preload/pagina.ts) — só existem no `guest.ipc` de cada página, nunca no ipcMain. */
+export const CANAIS_ORK_PAGINA = {
+  chamar: 'pagina:chamar',
+  ouvir: 'pagina:ouvir',
+  evento: 'pagina:evento'
+} as const
+
 export interface ApiOrkester {
   terminal: ApiTerminal
   dados: ApiDados
@@ -567,6 +711,7 @@ export interface ApiOrkester {
   portais: ApiPortais
   temas: ApiTemas
   kanban: ApiKanban
+  paginas: ApiPaginas
   /** Chamado quando a janela vai fechar; `salvar` diz se gravou. Se não gravou, o app pergunta antes de fechar. */
   aoPedirFechar(salvar: () => Promise<boolean>): void
   autoteste: boolean

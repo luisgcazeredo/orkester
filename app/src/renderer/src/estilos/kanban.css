@@ -404,6 +404,34 @@
   color: var(--perigo);
 }
 
+/* faixa "Ocupados sem tarefa" (1.9.5): agentes trabalhando fora do kanban; o chip vira botão (pôr numa tarefa) */
+.kanban-ocupados {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+  margin: var(--espaco-3) var(--espaco-5) 0;
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 1px dashed var(--borda);
+  border-radius: var(--raio-pequeno);
+}
+
+.kanban-ocupados-titulo {
+  color: var(--texto-suave);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kanban-chip-botao {
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.kanban-chip-botao:hover {
+  border-color: var(--destaque);
+}
+
 /* chips de "trabalhando" (e o do Maestro): a cor vai no ponto; o texto fica na cor do texto (lê nos 2 temas).
    Fechado: o chip apaga; cartão apagado: o nome fica riscado. */
 .kanban-chips {

@@ -10,6 +10,8 @@ import { anexarArquivosAoPrompt, anexarPastaAoPrompt } from '../ui/anexar'
 import { itensDoCodigoDoTerminal } from '../ui/menus'
 import { rotuloModelo } from '../../../shared/modelos'
 import { COR_AGENTE, ICONE_AGENTE } from './icones'
+import { abrirKanban } from '../paginas/abrir'
+import { ligarTarefasNoQuadro, usarTarefasDoCartao } from '../paginas/kanban/tarefasNoQuadro'
 
 const TEXTO_DO_AVISO = {
   ficou: 'O primeiro pedido foi escrito no campo do agente e NÃO foi enviado.',
@@ -71,6 +73,8 @@ export const PecaTerminal = memo(function PecaTerminal({ no, selecionado, pastaD
   const aviso = usarLoja((e) => e.avisosDoPrimeiroPedido[chaveDoAviso(e.espaco?.id, no.id)])
   const caixa = usarCaixa(no.id)
   useEffect(() => carregarCaixas(espacoId), [espacoId])
+  const tarefas = usarTarefasDoCartao(no.id)
+  useEffect(() => ligarTarefasNoQuadro(espacoId), [espacoId])
   return (
     <MolduraNo no={no} selecionado={selecionado}>
       <header className="terminal-cabecalho" data-arrasta>
@@ -83,6 +87,18 @@ export const PecaTerminal = memo(function PecaTerminal({ no, selecionado, pastaD
           </span>
         )}
         {no.criadoPor && <span className="terminal-selo" title="Aberto por um agente pelo ork">agente</span>}
+        {tarefas && tarefas.length > 0 && (
+          <button
+            className="terminal-selo terminal-selo-tarefa"
+            data-teste="tarefa-do-cartao"
+            title={`Trabalhando em ${tarefas.map((t) => `#${t.numero} ${t.titulo}`).join(' · ')}. Clique para abrir no Kanban.`}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => abrirKanban({ numero: tarefas[0].numero })}
+          >
+            #{tarefas[0].numero}
+            {tarefas.length > 1 ? ` +${tarefas.length - 1}` : ''}
+          </button>
+        )}
         {aviso && (
           <button
             className="terminal-selo terminal-selo-aviso"

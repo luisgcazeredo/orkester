@@ -44,9 +44,19 @@ function confere(dados: string, assinatura: string): boolean {
 
 const escaparHtml = (t: string): string => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
-/** `ork-imagem://<espaço>/<arquivo>.png`: a janela mostra as imagens do quadro sem acesso ao disco. */
-export function registrarEsquemaImagem(): void {
-  protocol.registerSchemesAsPrivileged([{ scheme: 'ork-imagem', privileges: { standard: true, secure: true, supportFetchAPI: true } }])
+/**
+ * Os esquemas próprios, declarados antes de o app ficar pronto. O Electron aceita **uma** chamada só a
+ * `registerSchemesAsPrivileged` (a segunda substitui a primeira), por isso os dois vão juntos:
+ *  - `ork-imagem://<espaço>/<arquivo>.png`: a janela mostra as imagens do quadro sem acesso ao disco;
+ *  - `ork-pagina://<id>/…` (1.9.5): as páginas "+", servidas só na sessão de cada página (main/paginas.ts). Sem
+ *    `bypassCSP` e sem `allowServiceWorkers`. Com `corsEnabled` (revisão 195): a página roda com origem opaca (CSP
+ *    `sandbox`), então fonte, módulo e fetch dos próprios arquivos são pedidos de outra origem e precisam de CORS.
+ */
+export function registrarEsquemas(): void {
+  protocol.registerSchemesAsPrivileged([
+    { scheme: 'ork-imagem', privileges: { standard: true, secure: true, supportFetchAPI: true } },
+    { scheme: 'ork-pagina', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }
+  ])
 }
 
 export function servirImagens(): void {

@@ -12,6 +12,10 @@ export interface Pagina {
   icone: LucideIcon
   /** Vem de fábrica (não é de um plugin). */
   nativa: boolean
+  /** Página extra: ícone já embutido (`data:image/…`) que a barra desenha no lugar de `icone`. */
+  imagem?: string
+  /** Página extra sem ícone: a letra que a barra desenha no lugar de `icone`. */
+  inicial?: string
   Componente: () => JSX.Element
   /** Fica montada (só escondida) quando outra página está em tela: o quadro precisa, ou os terminais cairiam junto. */
   manterMontada?: boolean
@@ -106,6 +110,37 @@ export function paginasMontadas(ativa: string): string[] {
   montadas = montadas.filter((id) => id === alvo || acharPagina(id)?.manterMontada)
   if (!montadas.includes(alvo)) montadas.push(alvo)
   return [...montadas]
+}
+
+/**
+ * Troca de uma vez as páginas extras (`nativa: false`, vindas do registro do main) pelas da lista: tira as que
+ * saíram, põe as novas no fim e substitui as que ficaram no mesmo lugar. As nativas não mudam. Se a página em tela
+ * saiu, volta ao quadro. Recusa (lança, sem mudar nada) página nativa na lista, id de nativa ou id repetido.
+ */
+export function trocarPaginasExtras(extras: Pagina[]): void {
+  const ids = new Set<string>()
+  for (const p of extras) {
+    if (p.nativa) throw new Error(`"${p.id}" não é uma página extra.`)
+    if (paginas.get(p.id)?.nativa) throw new Error(`Já existe uma página com o id "${p.id}".`)
+    if (ids.has(p.id)) throw new Error(`Página extra repetida: "${p.id}".`)
+    ids.add(p.id)
+  }
+  let mudou = false
+  for (const [id, p] of paginas) {
+    if (p.nativa || ids.has(id)) continue
+    paginas.delete(id)
+    montadas = montadas.filter((m) => m !== id)
+    mudou = true
+  }
+  for (const p of extras) {
+    if (paginas.get(p.id) === p) continue
+    paginas.set(p.id, p)
+    mudou = true
+  }
+  if (!mudou) return
+  if (!paginas.has(armazem.ler())) armazem.escrever(PAGINA_INICIAL)
+  versaoDoRegistro++
+  ouvintesDoRegistro.forEach((o) => o())
 }
 
 /** Só para a prova: esvazia o registro. */

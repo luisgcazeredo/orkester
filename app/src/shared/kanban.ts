@@ -461,8 +461,12 @@ export type OperacaoDoKanban =
   /** `etiquetas` troca a lista; `etiquetasMais`/`etiquetasMenos` põem e tiram (o `--etiqueta +a,-b`). */
   | { tipo: 'editar'; numero: number; titulo?: string; descricao?: string; etiquetas?: string[]; etiquetasMais?: string[]; etiquetasMenos?: string[] }
   | { tipo: 'atribuir'; numero: number; responsavel: string }
-  /** Quem pede entra na lista; vai para a coluna de trabalho só se estava em entrada ou delegar. Só agente. */
-  | { tipo: 'pegar'; numero: number }
+  /**
+   * Quem pede entra na lista; vai para a coluna de trabalho só se estava em entrada ou delegar. Sem `para`, só
+   * agente. Com `para` (id do cartão ou nome), entra esse agente, sem aviso na caixa: é o `ork abrir/pedir --tarefa N`
+   * (o pedido já cita a tarefa) e o "pôr numa tarefa" da página.
+   */
+  | { tipo: 'pegar'; numero: number; para?: string }
   /**
    * Sai da lista. Sem `quem`: quem pede (agente). Com `quem` (nome, começo do nome, id ou `eu`, achado na lista da
    * tarefa): tirar outro é só do usuário e do Maestro.
@@ -927,9 +931,14 @@ export function aplicarOperacao(arquivo: ArquivoDoKanban, op: unknown, ctx: Cont
     case 'pegar': {
       const t = achar(o.numero)
       if (typeof t === 'string') return erro(t)
-      if (!por.id) return erro('pegar é de agente; pela tela ou pelo MCP, use atribuir')
-      const eu = responsavelOuErro('eu', ctx)
+      const para = typeof o.para === 'string' ? o.para.trim() : ''
+      if (!para && !por.id) return erro('pegar é de agente; pela tela ou pelo MCP, use atribuir')
+      // coluna final: em Feito ninguém "está" (e a tarefa pode ter ido para lá depois de quem chamou conferir)
+      const daTarefa = a.colunas.find((c) => c.id === t.coluna)
+      if (daTarefa?.final) return erro(`a #${t.numero} está em ${daTarefa.nome}; volte-a para uma coluna de trabalho antes (ork kanban mover ${t.numero} …)`)
+      const eu = responsavelOuErro(para || 'eu', ctx)
       if (typeof eu === 'string' || !eu) return erro(typeof eu === 'string' ? eu : 'não sei quem é você')
+      const outro = eu.id !== por.id
       const ja = t.trabalhando.some((p) => p.id === eu.id)
       if (!ja && t.trabalhando.length >= LIMITES_DO_KANBAN.trabalhando) return erro(`a #${t.numero} já tem ${LIMITES_DO_KANBAN.trabalhando} agentes`)
       tocar(t.numero, ja ? {} : { trabalhando: [...t.trabalhando, { ...eu, desde: agora }] })
@@ -942,7 +951,8 @@ export function aplicarOperacao(arquivo: ArquivoDoKanban, op: unknown, ctx: Cont
         marcarConclusao(a, t.numero, agora)
       }
       const outros = t.trabalhando.filter((p) => p.id !== eu.id)
-      return ok(`#${t.numero}: você está nela${outros.length ? ` (com ${nomesDe(outros)})` : ''}, em ${coluna.nome}.`, t.numero)
+      const com = outros.length ? ` (com ${nomesDe(outros)})` : ''
+      return ok(outro ? `#${t.numero}: "${eu.nome}" está nela${com}, em ${coluna.nome}.` : `#${t.numero}: você está nela${com}, em ${coluna.nome}.`, t.numero)
     }
 
     case 'soltar': {
@@ -1189,6 +1199,76 @@ export function textoDaTarefa(arquivo: ArquivoDoKanban, numero: unknown, agentes
     linhas.push('', titulo, ...ultimos.map((c) => citar(`[${quando(c.em)}] "${linha(c.por.nome)}": ${c.texto}`)))
   }
   return linhas.join('\n')
+}
+
+// ---------- quem está em quê (1.9.5, S5) ----------
+
+/** Uma tarefa em que um agente está: o selo do cartão no quadro e o card da página Agentes. */
+export interface TarefaDoAgente {
+  numero: number
+  titulo: string
+}
+
+/**
+ * As tarefas de cada agente (id do cartão), da que ele pegou por último para a primeira: só a lista `trabalhando`
+ * e só fora da coluna final (em Feito ninguém "está"). A lixeira não conta.
+ */
+export function tarefasDosAgentes(arquivo: Pick<ArquivoDoKanban, 'colunas' | 'tarefas'>): Record<string, TarefaDoAgente[]> {
+  const final = arquivo.colunas.find((c) => c.final)?.id
+  const porAgente = new Map<string, Array<TarefaDoAgente & { desde: number }>>()
+  for (const t of arquivo.tarefas) {
+    if (t.coluna === final) continue
+    for (const p of t.trabalhando) {
+      const lista = porAgente.get(p.id) ?? []
+      lista.push({ numero: t.numero, titulo: linha(t.titulo), desde: p.desde })
+      porAgente.set(p.id, lista)
+    }
+  }
+  const saida: Record<string, TarefaDoAgente[]> = {}
+  for (const [id, lista] of porAgente) saida[id] = lista.sort((a, b) => b.desde - a.desde || b.numero - a.numero).map(({ numero, titulo }) => ({ numero, titulo }))
+  return saida
+}
+
+/**
+ * Os agentes Claude/Codex ocupados (trabalhando ou numa pergunta) que não estão em tarefa aberta nenhuma: nem na
+ * lista `trabalhando` fora da final, nem como Maestro de uma delegação fora da final. É a faixa "Ocupados sem tarefa".
+ */
+export function ocupadosSemTarefa(arquivo: Pick<ArquivoDoKanban, 'colunas' | 'tarefas'>, agentes: readonly AgenteDoKanban[]): AgenteDoKanban[] {
+  const final = arquivo.colunas.find((c) => c.final)?.id
+  const emTarefa = new Set<string>()
+  for (const t of arquivo.tarefas) {
+    if (t.coluna === final) continue
+    for (const p of t.trabalhando) emTarefa.add(p.id)
+    if (t.delegada) emTarefa.add(t.delegada.id)
+  }
+  return agentes.filter((a) => a.agente !== 'shell' && (a.situacao === 'trabalhando' || a.situacao === 'pergunta') && !emTarefa.has(a.id))
+}
+
+/**
+ * A tarefa de um `ork abrir/pedir --tarefa N`: existe, não está na lixeira nem na coluna final. Devolve a tarefa ou
+ * o erro (nada muda quando é erro).
+ */
+export function tarefaParaDelegar(arquivo: ArquivoDoKanban, valor: unknown): Tarefa | string {
+  const n = numeroDaTarefa(valor)
+  if (n === null) return `--tarefa precisa do número da tarefa (ex.: --tarefa 12); veio "${linha(String(valor))}"`
+  const t = arquivo.tarefas.find((x) => x.numero === n)
+  if (!t) {
+    if (arquivo.lixeira.some((x) => x.numero === n)) return `a #${n} está na lixeira (a página recupera); nada foi aberto nem pedido`
+    return `não há #${n} no kanban deste espaço (ork kanban ver); nada foi aberto nem pedido`
+  }
+  const coluna = arquivo.colunas.find((c) => c.id === t.coluna)
+  if (coluna?.final) return `a #${n} está em ${coluna.nome}; volte-a para uma coluna de trabalho antes (ork kanban mover ${n} …)`
+  return t
+}
+
+/**
+ * A linha que abre o pedido de um `ork abrir/pedir --tarefa N`: quem recebe sabe em que tarefa já está e como
+ * devolvê-la. O título vai numa linha só e entre aspas (é texto da tarefa, não ordem).
+ */
+export function linhaDaTarefaNoPedido(t: Pick<Tarefa, 'numero' | 'titulo'>, colunas: readonly Coluna[]): string {
+  const revisao = colunaDoPapel(colunas, 'revisao')
+  const fim = revisao ? ` e ork kanban mover ${t.numero} ${colunaNoComando(revisao.nome)}` : ''
+  return `Tarefa #${t.numero} do kanban: "${linha(t.titulo)}". Você já está nela; ao terminar: ork kanban comentar ${t.numero} "o que fez e onde"${fim}.`
 }
 
 // ---------- o `ork kanban <ação>` vira operação (o `ork`, a chave de usuário e o MCP passam por aqui) ----------

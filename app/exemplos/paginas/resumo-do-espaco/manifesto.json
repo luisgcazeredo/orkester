@@ -1,0 +1,9 @@
+{
+  "formato": 1,
+  "id": "resumo-do-espaco",
+  "nome": "Resumo do espaço",
+  "versao": "1.0.0",
+  "descricao": "Mostra ao vivo os agentes do espaço, manda um recado ao agente que você ligar a ela e guarda uma nota.",
+  "icone": "icone.svg",
+  "permissoes": { "quadro": true, "recado": true }
+}

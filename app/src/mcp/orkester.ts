@@ -174,11 +174,13 @@ servidor.registerTool(
       pasta: z.string().optional().describe('Pasta do agente, relativa à do espaço. Sem isto, vale a do espaço ou a do papel.'),
       modelo: z.string().optional().describe('Modelo (veja a ferramenta modelos), por exemplo "opus" ou "sonnet". Fora da lista abre com aviso.'),
       esforco: z.enum(['low', 'medium', 'high', 'xhigh', 'max', 'ultra']).optional().describe('Esforço de raciocínio. O Claude vai de low a max; ultra é só do Codex.'),
+      tarefa: z.number().int().min(1).optional().describe('Número de uma tarefa do kanban do espaço (o N de #N): o agente aberto entra trabalhando nela.'),
       espaco
     }
   },
-  ({ agente, funcao, preset, nome, pasta, modelo, esforco, espaco: ondeEspaco }) =>
+  ({ agente, funcao, preset, nome, pasta, modelo, esforco, tarefa, espaco: ondeEspaco }) =>
     rodar('abrir', agente ? [agente] : [], {
+      ...(tarefa ? { tarefa: String(tarefa) } : {}),
       ...(funcao ? { funcao } : {}),
       ...(preset ? { preset } : {}),
       ...(nome ? { nome } : {}),

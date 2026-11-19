@@ -116,6 +116,10 @@ team sheets, acting as you. Orkester has to be open.
 
 **Tools, configuration and what the key does and does not protect: [`docs/mcp.md`](docs/mcp.md).**
 
+## Your own pages
+
+Write a small page in plain HTML/JS and add it to the page bar with **+**, isolated from your PC: **[`docs/paginas.md`](docs/paginas.md)**.
+
 ## Under the hood
 
 Electron · React · TypeScript · xterm.js · node-pty.

@@ -1,0 +1,102 @@
+/*
+ * Resumo do espaço — só tokens do tema do Orkester. O app manda os valores do tema em uso (evento "tema"); o valor
+ * depois da vírgula é o do tema Escuro, para a página não aparecer sem cor antes de o evento chegar.
+ * Escuro, Claro e OLED trocam os mesmos tokens, então a página segue qualquer um dos três; os valores depois da
+ * vírgula só valem enquanto o evento não chegou.
+ */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 14px/1.45 var(--fonte-interface, system-ui, sans-serif);
+  background: var(--quadro-fundo, #141519);
+  color: var(--texto, #e7e9f0);
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 20px 18px 32px;
+  display: grid;
+  gap: 16px;
+}
+
+h1 { font-size: 20px; margin: 0; }
+h2 { font-size: 13px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--texto-suave, #878e9f); }
+p { margin: 0 0 8px; }
+.suave { color: var(--texto-suave, #878e9f); }
+
+section {
+  background: var(--painel, #1b1d23);
+  border: 1px solid var(--borda, #2a2e38);
+  border-radius: var(--raio, 10px);
+  padding: 14px;
+}
+
+/* agentes */
+.agentes { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.agente {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--painel-alto, #212531);
+  border: 1px solid var(--borda-suave, #23262f);
+  border-radius: var(--raio-pequeno, 7px);
+}
+.agente-texto { display: grid; flex: 1; min-width: 0; }
+.agente-texto strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ponto { width: 10px; height: 10px; border-radius: 50%; background: var(--texto-suave, #878e9f); flex: none; }
+.agente[data-situacao='livre'] .ponto { background: var(--vivo, #35c46b); }
+.agente[data-situacao='trabalhando'] .ponto { background: var(--atencao, #f0a33a); }
+.agente[data-situacao='pergunta'] .ponto { background: var(--destaque-claro, #98a8f8); }
+.selo {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--destaque, #4060e8);
+  color: var(--destaque-claro, #98a8f8);
+}
+
+/* formulário */
+form { display: grid; gap: 6px; }
+label { font-size: 12px; color: var(--texto-suave, #878e9f); }
+select, textarea {
+  width: 100%;
+  font: inherit;
+  color: var(--texto, #e7e9f0);
+  background: var(--painel-alto, #212531);
+  border: 1px solid var(--borda, #2a2e38);
+  border-radius: var(--raio-pequeno, 7px);
+  padding: 7px 9px;
+}
+textarea { resize: vertical; }
+button {
+  justify-self: start;
+  font: inherit;
+  cursor: pointer;
+  color: var(--texto-sobre-destaque, #ffffff);
+  background: var(--destaque, #4060e8);
+  border: 0;
+  border-radius: var(--raio-pequeno, 7px);
+  padding: 7px 14px;
+}
+button:hover:not(:disabled) { background: var(--destaque-forte, #3250d8); }
+button:disabled { opacity: 0.5; cursor: default; }
+:is(select, textarea, button):focus-visible { outline: 2px solid var(--destaque, #4060e8); outline-offset: 2px; }
+
+/* conversa */
+.conversa { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.conversa:empty { display: none; }
+.msg { padding: 8px 10px; border-radius: var(--raio-pequeno, 7px); border: 1px solid var(--borda-suave, #23262f); }
+.msg p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg.enviada { background: var(--painel-alto, #212531); }
+.msg.recebida { border-color: var(--destaque, #4060e8); }
+.msg strong { font-size: 12px; color: var(--texto-suave, #878e9f); }
+
+#situacao { min-height: 1.4em; }
+
+@media (max-width: 420px) {
+  main { padding: 14px 10px 24px; }
+  button { justify-self: stretch; }
+}

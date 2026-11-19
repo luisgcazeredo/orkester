@@ -18,9 +18,19 @@ export default defineConfig({
       }
     }
   },
-  preload: {},
+  preload: {
+    build: {
+      rolldownOptions: {
+        // index.js: o preload da janela (window.ork) · pagina.js: o das páginas "+" (window.orkPagina), posto pelo main
+        input: { index: resolve('src/preload/index.ts'), pagina: resolve('src/preload/pagina.ts') }
+      }
+    }
+  },
   renderer: {
     define: { __VERSAO__: JSON.stringify(version) },
-    plugins: [react()]
+    plugins: [react()],
+    // o guia das páginas próprias (`docs/paginas.pt-BR.md?raw`, PainelMais) mora fora de app/: o servidor de dev recusa (403) o que
+    // está fora da lista. Ao trocar a lista os padrões somem, então vão junto: app/ (inclui node_modules) e só a pasta docs.
+    server: { fs: { allow: [resolve('.'), resolve('../docs')] } }
   }
 })

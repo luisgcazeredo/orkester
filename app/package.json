@@ -1,7 +1,7 @@
 {
   "name": "orkester",
   "productName": "Orkester",
-  "version": "1.9.4",
+  "version": "1.9.5",
   "private": true,
   "description": "Quadro infinito para orquestrar agentes de código",
   "author": "Luís Azeredo",
@@ -61,6 +61,12 @@
       "out/**",
       "!out/autoteste*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "exemplos/paginas/resumo-do-espaco",
+        "to": "exemplos/paginas/resumo-do-espaco"
+      }
     ],
     "asarUnpack": [
       "**/node_modules/node-pty/**",

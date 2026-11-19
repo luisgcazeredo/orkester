@@ -12,8 +12,11 @@ import {
   aplicarOperacao,
   escolherMaestro,
   lerArquivoDoKanban,
+  linhaDaTarefaNoPedido,
   opcaoTexto,
   operacaoDoComando,
+  tarefaParaDelegar,
+  tarefasDosAgentes,
   textoDaTarefa,
   textoDoKanban,
   type AgenteDoKanban,
@@ -23,7 +26,9 @@ import {
   type Pessoa,
   type Quem,
   type RegrasDoKanban,
-  type ResultadoDoKanban
+  type ResultadoDoKanban,
+  type Tarefa,
+  type TarefaDoAgente
 } from '../shared/kanban'
 import { idsDosEspacos, PASTA_DADOS } from './dados'
 import { caixa, situacaoNaTela } from './espera'
@@ -223,6 +228,40 @@ export async function lerKanban(espacoId: string): Promise<LeituraDoKanban> {
   const visto = m ? agentes.find((a) => a.id === m.id) : undefined
   const maestro = m ? { id: m.id, nome: m.nome, situacao: visto?.situacao ?? ('livre' as const), fila: visto?.fila ?? 0 } : null
   return { arquivo: lido.arquivo, agentes, maestro, ...(lido.soLeitura ? { soLeitura: lido.soLeitura } : {}) }
+}
+
+// ---------- quem está em quê (1.9.5, S5) ----------
+
+/**
+ * `ork abrir/pedir --tarefa N` (e o `abrir_cartao` do MCP): confere a tarefa do kanban do espaço ANTES de abrir ou
+ * pedir. Inexistente, na lixeira, em Feito ou kanban só leitura = erro, e nada muda.
+ */
+export function conferirTarefa(espacoId: string, valor: unknown): Tarefa {
+  const lido = ler(espacoId)
+  if (lido.soLeitura) throw new Error(lido.soLeitura)
+  const t = tarefaParaDelegar(lido.arquivo, valor)
+  if (typeof t === 'string') throw new Error(t)
+  return t
+}
+
+/**
+ * Põe o agente na lista `trabalhando` da tarefa (um `pegar` por ele, sem aviso na caixa: o pedido já cita a tarefa)
+ * e devolve a linha que abre o pedido. Erro = lança, e o kanban não muda.
+ */
+export function porNaTarefa(espacoId: string, numero: number, agenteId: string, por: Quem): { texto: string; linha: string } {
+  const r = aplicarNoKanban(espacoId, { tipo: 'pegar', numero, para: agenteId }, por)
+  if (!r.ok) throw new Error(r.erro)
+  const t = r.arquivo.tarefas.find((x) => x.numero === numero)
+  return { texto: r.texto, linha: t ? linhaDaTarefaNoPedido(t, r.arquivo.colunas) : `Tarefa #${numero} do kanban.` }
+}
+
+/** As tarefas abertas de cada agente do espaço (id do cartão → da mais recente para a mais antiga), para a página Agentes. */
+export function tarefasDosAgentesDo(espacoId: string): Record<string, TarefaDoAgente[]> {
+  try {
+    return tarefasDosAgentes(ler(espacoId).arquivo)
+  } catch {
+    return {} // espaço que sumiu ou arquivo ilegível: só não mostra
+  }
 }
 
 export function registrarKanban(): void {

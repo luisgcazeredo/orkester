@@ -116,6 +116,10 @@ como se fosse você. O Orkester precisa estar aberto.
 
 **Ferramentas, configuração e o que a chave protege e o que não protege: [`docs/mcp.pt-BR.md`](docs/mcp.pt-BR.md).**
 
+## Suas próprias páginas
+
+Escreva uma páginazinha em HTML/JS simples e ponha na barra de páginas com o **+**, isolada do seu PC: **[`docs/paginas.pt-BR.md`](docs/paginas.pt-BR.md)**.
+
 ## Por dentro
 
 Electron · React · TypeScript · xterm.js · node-pty.

@@ -33,7 +33,7 @@ export const FERRAMENTAS_MCP = {
   abrir_cartao: {
     titulo: 'Abrir um agente no quadro',
     descricao:
-      'Abre uma sessão nova. Com `funcao`, o motor, o modelo e o esforço saem do papel; sem ela, diga o agente. `modelo`/`esforco` mandam sobre o papel. O cartão nasce solto: sem dono e sem corda, como os que o usuário cria pela tela.'
+      'Abre uma sessão nova. Com `funcao`, o motor, o modelo e o esforço saem do papel; sem ela, diga o agente. `modelo`/`esforco` mandam sobre o papel. Com `tarefa`, o agente entra trabalhando nessa tarefa do kanban do espaço (tarefa inexistente, na lixeira ou em Feito: erro, e nada abre). O cartão nasce solto: sem dono e sem corda, como os que o usuário cria pela tela.'
   },
   modelos: {
     titulo: 'Listar modelos',

@@ -3,7 +3,7 @@ import type { ResumoEspaco } from '../shared/modelo'
 import type { ChaveGuardada } from '../shared/chaves'
 import { resumosDosEspacos } from './dados'
 import { registroDoEnvio } from './envio'
-import { rodarKanban } from './kanban'
+import { conferirTarefa, porNaTarefa, rodarKanban } from './kanban'
 import { validarChamada, type NomeDeVerbo } from './verbos'
 import { esperarSessao, sessoesDoEspaco, telaDe } from './terminais'
 import { conferirModelo, lerModelos, modeloDasOpcoes, textoDoModelo, textoDosModelos } from './modelos'
@@ -92,12 +92,15 @@ const HANDLERS_DO_USUARIO: Partial<Record<NomeDeVerbo, (ctx: ContextoDoUsuario) 
     return { saida: [r.texto ?? '', ...sobras].join('\n').trim() }
   },
 
-  abrir: async ({ pos, opcoes }) => {
+  abrir: async ({ chave, pos, opcoes }) => {
     const espaco = espacoDoUsuario(opcoes)
     const agente = agenteDe(pos[0])
     if (pos[0] && !agente) throw new Error(`não existe o agente "${pos[0]}"; use claude, codex ou shell`)
     const funcao = typeof opcoes.funcao === 'string' ? opcoes.funcao.trim() : undefined
     if (!agente && !funcao && !opcoes.preset) throw new Error('diga o agente (claude, codex ou shell) ou use --funcao "Papel"')
+    // --tarefa (1.9.5, S5): conferida antes de abrir; erro = nada abre
+    if (opcoes.tarefa !== undefined && agente === 'shell') throw new Error('shell não entra em tarefa (só Claude ou Codex); nada foi aberto (tire a tarefa)')
+    const tarefa = opcoes.tarefa === undefined ? null : conferirTarefa(espaco.id, opcoes.tarefa)
     const { modelo, esforco } = modeloDasOpcoes(opcoes, agente ?? undefined)
     await abrirJanelaPronta(espaco.id)
     const r = await pedirAJanela({
@@ -113,12 +116,26 @@ const HANDLERS_DO_USUARIO: Partial<Record<NomeDeVerbo, (ctx: ContextoDoUsuario) 
       esforco
     })
     if (!r.ok) throw new Error(r.erro)
+    // --tarefa: o cartão já existe; se ele não puder entrar (ex.: a função abriu um shell), fica aberto e avisa
+    let linhaDaTarefa = ''
+    let naTarefa = ''
+    if (tarefa && r.id) {
+      try {
+        if (!(await esperarSessao(r.id, 5000))) throw new Error('o processo não abriu a tempo')
+        const t = porNaTarefa(espaco.id, tarefa.numero, r.id, { nome: `MCP · ${chave.nome}` })
+        linhaDaTarefa = t.linha
+        naTarefa = ` ${t.texto}`
+      } catch (e) {
+        naTarefa = ` Não entrou na #${tarefa.numero}: ${e instanceof Error ? e.message : String(e)}.`
+      }
+    }
     // A função traz o primeiro pedido (o papel). Até a 1.4.0 ele voltava da janela e era ignorado aqui: o
     // cartão aberto pelo MCP nascia com o agente certo e sem saber quem era. Quem digita é este processo,
     // como no `ork abrir`, mas sem segurar a resposta do cliente (o agente leva até um minuto para ficar pronto).
-    if (r.texto && r.id) void digitarPrimeiroPedidoDoUsuario(r.id, r.texto)
+    // Com tarefa, a linha dela vem depois do papel (sem papel, nada é digitado).
+    if (r.texto && r.id) void digitarPrimeiroPedidoDoUsuario(r.id, [r.texto, linhaDaTarefa].filter(Boolean).join('\n\n'))
     const aviso = [conferirModelo(r.agente ?? agente ?? undefined, r.modelo, r.esforco, lerModelos()).aviso, r.aviso].filter(Boolean).join('; ') || undefined
-    return { saida: `Abri "${r.nome}".${textoDoModelo(r.modelo, r.esforco, aviso)}${r.texto ? ' O papel da função vai ser digitado assim que o agente ficar pronto.' : ''}` }
+    return { saida: `Abri "${r.nome}".${textoDoModelo(r.modelo, r.esforco, aviso)}${naTarefa}${r.texto ? ' O papel da função vai ser digitado assim que o agente ficar pronto.' : ''}` }
   },
 
   /** O kanban de qualquer espaço (é o usuário). Quem fez fica como `MCP · <nome da chave>`. */

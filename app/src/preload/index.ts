@@ -28,7 +28,7 @@ import {
   type AvisoJanelas,
   type MudancaArquivo,
   type ApiOrkester,
-  type PedidoDoAgente, CANAIS_CHAVES, type ApiChaves, CANAIS_PORTAIS, type ApiPortais, CANAIS_TEMAS, type ApiTemas, CANAIS_KANBAN, type ApiKanban, type ResumoDaCaixa } from '../shared/api'
+  type PedidoDoAgente, CANAIS_CHAVES, type ApiChaves, CANAIS_PORTAIS, type ApiPortais, CANAIS_TEMAS, type ApiTemas, CANAIS_KANBAN, type ApiKanban, type ResumoDaCaixa, CANAIS_PAGINAS, type ApiPaginas } from '../shared/api'
 
 /** Cada canal vira uma função que chama o processo principal e devolve a resposta. */
 function chamadas<T>(canais: Record<string, string>): T {
@@ -158,6 +158,13 @@ const temas = chamadas<ApiTemas>(CANAIS_TEMAS)
 // Kanban do espaço: a página lê e pede mudanças; o principal é o dono do arquivo e avisa as janelas.
 const kanban = chamadas<ApiKanban>(CANAIS_KANBAN)
 
+// Páginas "+": a janela lista, propõe, aceita e revoga; o main é o dono do registro e confere tudo. `tema` só avisa.
+const { tema: canalDoTema, ...canaisDePaginas } = CANAIS_PAGINAS
+const paginas: ApiPaginas = {
+  ...chamadas<Omit<ApiPaginas, 'tema'>>(canaisDePaginas),
+  tema: (tokens) => ipcRenderer.send(canalDoTema, tokens)
+}
+
 // A janela não tem acesso ao Node: só a estas funções, nesta forma.
 const api: ApiOrkester = {
   terminal: {
@@ -201,6 +208,7 @@ const api: ApiOrkester = {
   portais,
   temas,
   kanban,
+  paginas,
   andares,
   area,
   janelas,

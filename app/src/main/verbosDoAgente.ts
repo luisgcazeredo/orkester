@@ -7,7 +7,9 @@ import type { PedidoNoQuadro } from '../shared/quadro/agente'
 import { criarEspacoDoAgente, resumosDosEspacos } from './dados'
 import { arquivoAcompanhado } from './codigo'
 import { AJUDA } from './manual'
-import { acaoDoKanban, PERMISSOES_DO_KANBAN, rodarKanban } from './kanban'
+import { acaoDoKanban, conferirTarefa, PERMISSOES_DO_KANBAN, porNaTarefa, rodarKanban } from './kanban'
+import type { Tarefa } from '../shared/kanban'
+import { responderAPagina } from './paginas'
 import { conferirModelo, lerModelos, modeloDasOpcoes, textoDoModelo, textoDosModelos } from './modelos'
 import { type NomeDeVerbo } from './verbos'
 import { encerrarAgora, marcarFechamento, escreverNoProcesso, esperarSessao, sessoesCriadasPor, telaDe, type Sessao } from './terminais'
@@ -28,6 +30,19 @@ function pastaPedida(eu: Sessao, pedida: unknown): string | undefined {
     throw new Error(`a pasta não existe: ${pedida} (procurei em ${caminho})`)
   }
   return caminho
+}
+
+/**
+ * O `--tarefa N` do `ork abrir`/`ork pedir` (1.9.5, S5), conferido ANTES de abrir ou pedir: a tarefa é do kanban do
+ * espaço de quem delega, e quem recebe precisa estar nesse espaço e não ser shell. Erro = nada abre, nada é pedido.
+ */
+function tarefaPedida(eu: Sessao, espacoDoAlvo: string, agente: Agente | null | undefined, valor: unknown): Tarefa | null {
+  if (valor === undefined) return null
+  if (espacoDoAlvo !== eu.espacoId) {
+    throw new Error('--tarefa é do kanban do seu espaço, e esse agente fica em outro espaço; nada foi aberto nem pedido (tire o --tarefa)')
+  }
+  if (agente === 'shell') throw new Error('shell não entra em tarefa (só Claude ou Codex); nada foi aberto nem pedido (tire o --tarefa)')
+  return conferirTarefa(eu.espacoId, valor)
 }
 
 const TECLAS: Record<string, string> = {
@@ -207,18 +222,34 @@ export const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
     // o primeiro pedido pode vir do --pedido, da função, ou dos dois
     let pedidoInicial = texto
     const espaco = typeof opcoes.espaco === 'string' ? espacoPorNome(opcoes.espaco) : { id: eu.espacoId, nome: '' }
+    const tarefa = tarefaPedida(eu, espaco.id, agente, opcoes.tarefa)
     let novo: Sessao | undefined
     let avisoDaJanela: string | undefined
+    let papel = ''
     {
       await abrirJanelaPronta(espaco.id)
       const r = await pedirAJanela({ tipo: 'abrir', espacoId: espaco.id, criador: eu.id, agente: agente ?? undefined, preset, nome, pasta, funcao, modelo, esforco })
       if (!r.ok) throw new Error(r.erro)
       avisoDaJanela = r.aviso
-      // o prompt da função é o primeiro pedido; com --pedido junto, a função vem antes e o pedido depois
-      if (r.texto) pedidoInicial = [r.texto, pedidoInicial].filter(Boolean).join('\n\n')
+      papel = r.texto ?? ''
       novo = r.id ? await esperarSessao(r.id, 5000) : undefined
     }
     if (!novo) throw new Error('o cartão foi criado, mas o processo não abriu')
+    // --tarefa: o cartão já existe; se ele não puder entrar (ex.: a função abriu um shell), abre assim mesmo e avisa
+    let linhaDaTarefa = ''
+    let naTarefa = ''
+    if (tarefa) {
+      try {
+        const r = porNaTarefa(eu.espacoId, tarefa.numero, novo.id, { id: eu.id, nome: eu.espec.nome })
+        linhaDaTarefa = r.linha
+        naTarefa = ` ${r.texto}`
+      } catch (e) {
+        naTarefa = ` Não entrou na #${tarefa.numero}: ${e instanceof Error ? e.message : String(e)}.`
+      }
+    }
+    // o prompt da função é o primeiro pedido; com --pedido junto, a função vem antes e o pedido depois; com
+    // --tarefa, a linha da tarefa entre os dois. Só a linha da tarefa, sem papel nem pedido, não vira pedido.
+    if (papel || pedidoInicial) pedidoInicial = [papel, linhaDaTarefa, pedidoInicial].filter(Boolean).join('\n\n')
     registrar(eu, novo, 'abrir', pedidoInicial)
     const avisoDoModelo =
       [conferirModelo(novo.espec.agente, novo.espec.modelo, novo.espec.esforco, lerModelos()).aviso, avisoDaJanela].filter(Boolean).join('; ') || undefined
@@ -226,7 +257,8 @@ export const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
       (novo.espacoId === eu.espacoId
         ? `Abri "${novo.espec.nome}" (${agente}), ligado a você.`
         : `Abri "${novo.espec.nome}" (${agente}) no espaço "${espaco.nome}"; você pode falar com ele porque o abriu.`) +
-      textoDoModelo(novo.espec.modelo, novo.espec.esforco, avisoDoModelo)
+      textoDoModelo(novo.espec.modelo, novo.espec.esforco, avisoDoModelo) +
+      naTarefa
     if (!pedidoInicial) return { saida: `${aberto} Mande o primeiro pedido com: ork pedir "${novo.espec.nome}" "…"` }
     const comecouEsperar = Date.now()
     const pronto = await aguardarPronto(novo, 90_000, cancelado)
@@ -258,6 +290,7 @@ export const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
   pedir: async ({ eu, pos, opcoes, texto, cancelado }) => {
     const alvo = acharEntre(ligadosA(eu), pos[0])
     if (!texto.trim()) throw new Error('falta o pedido: ork pedir <nome> "texto" (ou --arquivo pedido.md)')
+    const tarefa = tarefaPedida(eu, alvo.espacoId, alvo.espec.agente, opcoes.tarefa)
     if (!alvo.processo) throw new Error(`"${alvo.espec.nome}" está encerrado`)
     await recusarSeEmPergunta(alvo)
     // num agente, o pedido entra na fila dele; num shell rodando um comando, cairia no meio desse comando
@@ -270,12 +303,14 @@ export const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
     if (noShell === 'trabalhando' && !doUsuario) {
       throw new Error(`"${alvo.espec.nome}" está rodando um comando; espere terminar (\`ork esperar "${alvo.espec.nome}"\`) e mande de novo`)
     }
-    registrar(eu, alvo, 'pedir', texto)
+    // --tarefa: já conferida lá em cima; aqui ele entra na lista e o pedido abre com a linha da tarefa
+    const pedido = tarefa ? `${porNaTarefa(eu.espacoId, tarefa.numero, alvo.id, { id: eu.id, nome: eu.espec.nome }).linha}\n\n${texto}` : texto
+    registrar(eu, alvo, 'pedir', pedido)
     // o pedido entra na caixa de entrada dele: só é digitado com ele livre e sem o usuário escrevendo nele
     const comeco = Date.now()
     const segundos = tempoDe(opcoes)
     const espera = opcoes['sem-esperar'] ? 10_000 : segundos * 1000
-    const { fim, posicao, motivo } = await porNaCaixa(eu, alvo, 'pedido', texto, espera, cancelado)
+    const { fim, posicao, motivo } = await porNaCaixa(eu, alvo, 'pedido', pedido, espera, cancelado)
     if (fim === null) return { saida: textoNaFila(alvo, posicao, motivo, 'pedido') }
     if (fim === 'sem-destino') throw new Error(`"${alvo.espec.nome}" foi encerrado antes de o pedido entrar; nada foi digitado`)
     if (fim === 'ficou' || fim === 'incerto') throw new Error(await avisoDeEnvio(alvo, fim === 'ficou' ? 'ficou' : 'incerto', 25))
@@ -495,6 +530,15 @@ export const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
     if (!r.ok) throw new Error(r.erro)
     const sobras = pulados.length ? ['', 'Arquivos pulados (sem cabeçalho de ficha):', ...pulados.map((p) => `  ${p}`)] : []
     return { saida: [r.texto ?? '', ...sobras].join(String.fromCharCode(10)).trim() }
+  },
+
+  /**
+   * Resposta a uma página "+" (1.9.5). Só a página ligada a este cartão neste espaço; aberta, chega na hora;
+   * fechada, fica guardada em memória até ela abrir (main/paginas.ts).
+   */
+  pagina: async ({ eu, pos, texto }) => {
+    if (String(pos[0] ?? '').toLowerCase() !== 'responder') throw new Error('diga o que fazer: ork pagina responder "<página>" "texto" (ou --arquivo resposta.md)')
+    return { saida: responderAPagina(eu, pos[1], texto || pos.slice(2).join(' ')) }
   },
 
   modelos: async () => ({ saida: textoDosModelos(lerModelos()) }),

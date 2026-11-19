@@ -57,7 +57,8 @@ export function gravarSessaoAgora(): void {
   salvarSessao({ versao: 1, janelas: [...sessao.values()] })
 }
 
-const espacoDaJanela = (idConteudo: number): string | null =>
+/** O espaço que a janela (id do webContents) mostra; as páginas "+" abertas nela agem neste espaço. */
+export const espacoDaJanela = (idConteudo: number): string | null =>
   [...dono.entries()].find(([, janela]) => janela === idConteudo)?.[0] ?? null
 
 /** Guarda onde a janela está agora. Usa o tamanho "normal": maximizada, o que importa é para onde ela volta. */

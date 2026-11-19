@@ -45,15 +45,15 @@ export const VERBOS = [
     nome: 'abrir', aliases: [], posicionais: [{ nome: 'claude|codex|shell' }],
     // `--sem-esperar` é o normal aqui (o `abrir` só espera com `--esperar`), mas existe porque é assim que
     // se diz no `ork pedir`: o agente que aprendeu lá escreve igual aqui, e recusar por isso é pedantismo
-    opcoes: [texto('espaco'), texto('nome'), texto('pasta'), texto('funcao'), texto('preset'), texto('modelo'), texto('esforco'), texto('pedido'), texto('arquivo'), bandeira('esperar'), bandeira('sem-esperar'), numero('tempo', 1, 3600)],
+    opcoes: [texto('espaco'), texto('nome'), texto('pasta'), texto('funcao'), texto('preset'), texto('modelo'), texto('esforco'), texto('pedido'), texto('arquivo'), texto('tarefa'), bandeira('esperar'), bandeira('sem-esperar'), numero('tempo', 1, 3600)],
     descricao: 'abre uma sessão nova; em outro espaço, você continua sendo o dono',
-    ajuda: '  ork abrir [claude|codex|shell] [--espaco "Nome"] [--nome N] [--pasta P] [--funcao "Papel"] [--preset "Claude Code"] [--modelo opus] [--esforco high] [--pedido "texto" | --arquivo pedido.md] [--esperar] [--tempo S]\n                                       abre uma sessão nova; com --funcao, o motor, o modelo e o esforço saem da função;\n                                       --modelo/--esforco mandam sobre ela (veja `ork modelos`)'
+    ajuda: '  ork abrir [claude|codex|shell] [--espaco "Nome"] [--nome N] [--pasta P] [--funcao "Papel"] [--preset "Claude Code"] [--modelo opus] [--esforco high] [--pedido "texto" | --arquivo pedido.md] [--tarefa N] [--esperar] [--tempo S]\n                                       abre uma sessão nova; com --funcao, o motor, o modelo e o esforço saem da função;\n                                       --modelo/--esforco mandam sobre ela (veja `ork modelos`); --tarefa N põe o agente\n                                       trabalhando na tarefa #N do kanban do seu espaço e cita a tarefa no pedido'
   },
   {
     nome: 'pedir', aliases: [], posicionais: [obrigatorio('nome'), { nome: 'texto', resto: true }],
-    opcoes: [texto('arquivo'), bandeira('sem-esperar'), numero('tempo', 1, 3600)],
+    opcoes: [texto('arquivo'), texto('tarefa'), bandeira('sem-esperar'), numero('tempo', 1, 3600)],
     descricao: 'manda um pedido e espera ele terminar (devolve a tela)',
-    ajuda: '  ork pedir <nome> "texto" | --arquivo pedido.md [--sem-esperar] [--tempo S]\n                                      manda um pedido e espera ele terminar (devolve a tela); o pedido\n                                      entra na caixa de entrada dele e só é digitado com ele livre'
+    ajuda: '  ork pedir <nome> "texto" | --arquivo pedido.md [--tarefa N] [--sem-esperar] [--tempo S]\n                                      manda um pedido e espera ele terminar (devolve a tela); o pedido\n                                      entra na caixa de entrada dele e só é digitado com ele livre;\n                                      --tarefa N põe ele trabalhando na tarefa #N do kanban e cita a tarefa no pedido'
   },
   {
     nome: 'entregar', aliases: ['responder', 'devolver'], posicionais: [{ nome: 'texto', resto: true }],
@@ -134,6 +134,12 @@ export const VERBOS = [
       '  ork kanban comentar <n> "texto" | --arquivo f.md\n' +
       '  ork kanban apagar <n> --confirmar            vai para a lixeira (a página recupera)\n' +
       '  ork kanban coluna criar "Nome" | renomear "Velho" "Novo" | apagar "Nome"'
+  },
+  {
+    nome: 'pagina', aliases: ['página'], posicionais: [obrigatorio('responder'), obrigatorio('página'), { nome: 'texto', resto: true }],
+    opcoes: [texto('arquivo')],
+    descricao: 'responde a uma página "+" ligada ao seu cartão',
+    ajuda: '  ork pagina responder "<página>" "texto" | --arquivo resposta.md\n                                      responde a uma página "+" ligada ao seu cartão (aberta: chega na hora;\n                                      fechada: fica guardada até ela abrir)'
   },
   { nome: 'modelos', aliases: [], posicionais: [], opcoes: [texto('espaco')], descricao: 'lista os modelos de cada motor, com os esforços que aceitam', ajuda: '  ork modelos                        lista os modelos de Claude e Codex, os esforços de cada um e os padrões; use em `ork abrir --modelo X --esforco Y`' },
   {

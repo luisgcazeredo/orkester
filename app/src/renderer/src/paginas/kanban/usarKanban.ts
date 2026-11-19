@@ -10,7 +10,7 @@ const PASSO_MS = 3000
 // `aoAvisar` prende um ouvinte de IPC por chamada e não tem como soltar: liga UMA vez e reparte daqui.
 const ouvintes = new Set<(espacoId: string) => void>()
 let ligado = false
-function ouvirAvisos(ouvinte: (espacoId: string) => void): () => void {
+export function ouvirAvisos(ouvinte: (espacoId: string) => void): () => void {
   if (!ligado) {
     ligado = true
     window.ork.janelas.aoAvisar((aviso) => {

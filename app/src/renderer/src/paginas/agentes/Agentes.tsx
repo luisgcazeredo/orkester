@@ -1,16 +1,16 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ChevronDown, ChevronRight, Inbox, Pencil, Play, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, Inbox, Pencil, Play, SquareKanban, Trash2 } from 'lucide-react'
 import type { Agente, Partitura, ResumoEspaco } from '../../../../shared/modelo'
 import type { AgenteDoPanorama } from '../../../../shared/api'
 import { rotuloModelo } from '../../../../shared/modelos'
 import { resumoDaPartitura } from '../../../../shared/quadro/partituras'
-import { definirPartituras, usarLoja } from '../../estado/loja'
+import { abrirEspaco, definirPartituras, lerEstado, usarLoja } from '../../estado/loja'
 import { EditorDeFuncoes } from './Funcoes'
 import { EditorDePresets } from './Presets'
 import { confirmar, perguntarTexto } from '../../ui/Perguntas'
 import { subirPartituraNoCentro } from '../../ui/Partituras'
 import { irParaPagina } from '../../casca/paginas'
-import { aoChegarPedidoDePagina, pegarAbaPedida, type AbaAgentes } from '../abrir'
+import { abrirKanban, aoChegarPedidoDePagina, pegarAbaPedida, type AbaAgentes } from '../abrir'
 import { usarPanorama } from '../panorama'
 import { COR_AGENTE, ICONE_AGENTE } from '../../nos/icones'
 
@@ -42,6 +42,43 @@ function Campo({ rotulo, children, classe }: { rotulo: string; children: ReactNo
   )
 }
 
+/**
+ * Abre a tarefa no Kanban (1.9.5, S5). Agente de outro espaço: esta janela passa para o espaço dele (como o seletor
+ * do Kanban); se o espaço está aberto em outra janela, aquela vem para a frente e esta fica onde está.
+ */
+async function abrirTarefa(espacoId: string, numero: number): Promise<void> {
+  await abrirEspaco(espacoId)
+  if (lerEstado().espaco?.id === espacoId) abrirKanban({ numero })
+}
+
+/** "#N título" de cada tarefa aberta em que o agente está; clicar abre a tarefa no Kanban. */
+function TarefasDoAgente({ ag }: { ag: AgenteDoPanorama }) {
+  const tarefas = ag.tarefas ?? []
+  if (!tarefas.length) return null
+  return (
+    <div className="agente-campo agente-campo-largo">
+      <dt>{tarefas.length > 1 ? 'Tarefas' : 'Tarefa'}</dt>
+      <dd className="agente-tarefas">
+        {tarefas.map((t) => (
+          <button
+            key={t.numero}
+            type="button"
+            className="agente-tarefa"
+            data-tarefa={t.numero}
+            title={`#${t.numero} ${t.titulo} · abrir no Kanban`}
+            onClick={() => void abrirTarefa(ag.espacoId, t.numero)}
+          >
+            <SquareKanban size={13} aria-hidden />
+            <span>
+              #{t.numero} {t.titulo}
+            </span>
+          </button>
+        ))}
+      </dd>
+    </div>
+  )
+}
+
 function CartaoAgente({ ag, cor }: { ag: AgenteDoPanorama; cor: string }) {
   const modelo = rotuloModelo(ag)
   const Icone = ICONE_AGENTE[ag.agente]
@@ -66,6 +103,7 @@ function CartaoAgente({ ag, cor }: { ag: AgenteDoPanorama; cor: string }) {
           <Inbox size={13} aria-hidden />
           {recados(ag.fila)}
         </Campo>
+        <TarefasDoAgente ag={ag} />
       </dl>
     </article>
   )

@@ -344,6 +344,40 @@
   flex-shrink: 0;
 }
 
+/* a tarefa do kanban em que o agente está: a linha inteira do cartão, clicável */
+.agente-campo-largo {
+  grid-column: 1 / -1;
+}
+
+.agente-tarefas {
+  flex-wrap: wrap;
+}
+
+.agente-tarefa {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agente-tarefa span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agente-tarefa:hover {
+  border-color: var(--destaque);
+}
+
 .agente-caixa.com-recado {
   color: var(--destaque);
   font-weight: 600;

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resumo do espaço</title>
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1 id="titulo">Resumo do espaço</h1>
+      <p id="espaco" class="suave">Carregando…</p>
+    </header>
+
+    <section aria-labelledby="h-agentes">
+      <h2 id="h-agentes">Agentes</h2>
+      <ul id="agentes" class="agentes"></ul>
+      <p id="sem-agentes" class="suave" hidden>Nenhum agente neste espaço.</p>
+    </section>
+
+    <section aria-labelledby="h-recado">
+      <h2 id="h-recado">Recado</h2>
+      <p class="suave">Vai só para um agente que você ligou a esta página (botão “Ligar a agente…” no topo dela).</p>
+      <form id="form-recado">
+        <label for="destino">Para</label>
+        <select id="destino"></select>
+        <label for="texto">Recado</label>
+        <textarea id="texto" rows="3" maxlength="2000" placeholder="O que o agente deve fazer?"></textarea>
+        <button type="submit" id="mandar">Mandar recado</button>
+      </form>
+      <ol id="conversa" class="conversa" aria-live="polite"></ol>
+    </section>
+
+    <section aria-labelledby="h-nota">
+      <h2 id="h-nota">Nota</h2>
+      <label for="nota" class="suave">Fica guardada com a página, neste PC.</label>
+      <textarea id="nota" rows="4" maxlength="20000"></textarea>
+    </section>
+
+    <p id="situacao" class="suave" role="status"></p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
