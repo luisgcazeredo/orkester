@@ -117,7 +117,14 @@ export const TEXTO_DO_MOTIVO: Record<MotivoDeEspera, string> = {
 
 // ---------- recados ----------
 
-export type TipoDeRecado = 'pedido' | 'entrega' | 'aviso'
+/**
+ * `kanban` (1.9.4): "a tarefa #12 foi atribuída a você". Tratado como aviso (sem pendência, sem recibo, atrás de
+ * entregas e pedidos), mas com tipo e cabeçalho próprios: `aviso` significa "um filho parou" para o time.
+ */
+export type TipoDeRecado = 'pedido' | 'entrega' | 'aviso' | 'kanban'
+
+/** Avisos esperam a vez: entregas e pedidos passam na frente deles na mesma fila. */
+const ehAviso = (tipo: TipoDeRecado): boolean => tipo === 'aviso' || tipo === 'kanban'
 
 export interface Recado {
   id: string
@@ -144,7 +151,8 @@ export type FimDoRecado = 'entregue' | 'incerto' | 'ficou' | 'sem-destino' | 'ca
  */
 export function textoDoRecado(r: Pick<Recado, 'tipo' | 'deNome' | 'texto'>, shell = false): string {
   if (r.tipo === 'pedido') return r.texto
-  const texto = r.tipo === 'entrega' ? `[ork · entrega de "${r.deNome}"]\n${r.texto}` : `[ork · aviso do Orkester]\n${r.texto}`
+  const cabecalho = r.tipo === 'entrega' ? `[ork · entrega de "${r.deNome}"]` : r.tipo === 'kanban' ? '[ork · kanban]' : '[ork · aviso do Orkester]'
+  const texto = `${cabecalho}\n${r.texto}`
   if (!shell) return texto
   return texto
     .split('\n')
@@ -379,11 +387,18 @@ export interface Caixa {
   liberar(id: string): void
   /** a sessão saiu do app: os recados para ela não têm mais destino */
   esquecer(id: string): void
+  /**
+   * Tira da fila de `para` o recado `id` que ainda não foi digitado (fim `cancelado`). false = já saiu da fila,
+   * está sendo digitado agora ou ficou no campo à espera do Enter (retomada): para quem pediu, já chegou.
+   */
+  cancelar(para: string, id: string): boolean
 }
 
 export function criarCaixa(d: DependenciasDaCaixa): Caixa {
   const filas = new Map<string, NaFila[]>()
   const entregando = new Set<string>()
+  /** o recado que está sendo digitado agora, por destino (não se cancela no meio) */
+  const digitando = new Map<string, NaFila>()
   const pendencias = new Map<string, Pendencia>()
   /** a pendência que o último aviso apagou, por destino */
   const ultimaPendencia = new Map<string, Pendencia>()
@@ -533,7 +548,7 @@ export function criarCaixa(d: DependenciasDaCaixa): Caixa {
     const fila = filas.get(id) ?? []
     const ret = retomadas.get(id)
     if (ret && fila.includes(ret.item)) return ret.item
-    return fila.find((x) => x.recado.tipo !== 'aviso') ?? fila[0]
+    return fila.find((x) => !ehAviso(x.recado.tipo)) ?? fila[0]
   }
 
   const tentarEntregar = async (id: string): Promise<void> => {
@@ -565,7 +580,10 @@ export function criarCaixa(d: DependenciasDaCaixa): Caixa {
       return
     }
     if (motivo) return avisarSeMudou(id)
+    // cancelado enquanto se olhava o destino (`cancelar`): não digita
+    if (!filas.get(id)?.includes(primeiro)) return avisarSeMudou(id)
     entregando.add(id)
+    digitando.set(id, primeiro)
     try {
       const r = await d.digitar(id, textoDoRecado(primeiro.recado, d.shell(id)))
       ultimaEntrega.set(id, d.agora())
@@ -583,6 +601,7 @@ export function criarCaixa(d: DependenciasDaCaixa): Caixa {
       concluir(id, primeiro, fim, fim === 'entregue' ? undefined : await d.tela(id, 15))
     } finally {
       entregando.delete(id)
+      digitando.delete(id)
     }
   }
 
@@ -676,6 +695,12 @@ export function criarCaixa(d: DependenciasDaCaixa): Caixa {
     },
     liberar(id) {
       desistidos.delete(id)
+    },
+    cancelar(para, id) {
+      const item = filas.get(para)?.find((x) => x.recado.id === id)
+      if (!item || digitando.get(para) === item || retomadas.get(para)?.item === item) return false
+      terminar(para, item, 'cancelado')
+      return true
     },
     esquecer(id) {
       for (const item of [...(filas.get(id) ?? [])]) terminar(id, item, 'sem-destino')

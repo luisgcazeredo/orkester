@@ -28,7 +28,7 @@ import {
   type AvisoJanelas,
   type MudancaArquivo,
   type ApiOrkester,
-  type PedidoDoAgente, CANAIS_CHAVES, type ApiChaves, CANAIS_PORTAIS, type ApiPortais, CANAIS_TEMAS, type ApiTemas, type ResumoDaCaixa } from '../shared/api'
+  type PedidoDoAgente, CANAIS_CHAVES, type ApiChaves, CANAIS_PORTAIS, type ApiPortais, CANAIS_TEMAS, type ApiTemas, CANAIS_KANBAN, type ApiKanban, type ResumoDaCaixa } from '../shared/api'
 
 /** Cada canal vira uma função que chama o processo principal e devolve a resposta. */
 function chamadas<T>(canais: Record<string, string>): T {
@@ -142,7 +142,8 @@ const chaves: ApiChaves = {
   listar: () => ipcRenderer.invoke(CANAIS_CHAVES.listar),
   criar: (nome) => ipcRenderer.invoke(CANAIS_CHAVES.criar, nome),
   revogar: (id) => ipcRenderer.invoke(CANAIS_CHAVES.revogar, id),
-  comandoDoMcp: () => ipcRenderer.invoke(CANAIS_CHAVES.comando)
+  comandoDoMcp: () => ipcRenderer.invoke(CANAIS_CHAVES.comando),
+  salvarListaDeFerramentas: () => ipcRenderer.invoke(CANAIS_CHAVES.salvarLista)
 }
 
 // Os portais do navegador embutido: a página Conexões lista as partições e limpa o login de uma.
@@ -153,6 +154,9 @@ const portais: ApiPortais = {
 
 // Temas do usuário e plugins de CSS: a página Temas lê e pede mudanças; o principal valida e grava.
 const temas = chamadas<ApiTemas>(CANAIS_TEMAS)
+
+// Kanban do espaço: a página lê e pede mudanças; o principal é o dono do arquivo e avisa as janelas.
+const kanban = chamadas<ApiKanban>(CANAIS_KANBAN)
 
 // A janela não tem acesso ao Node: só a estas funções, nesta forma.
 const api: ApiOrkester = {
@@ -196,6 +200,7 @@ const api: ApiOrkester = {
   chaves,
   portais,
   temas,
+  kanban,
   andares,
   area,
   janelas,

@@ -113,7 +113,7 @@
   border: 0;
   border-radius: var(--raio-pequeno);
   background: var(--destaque);
-  color: var(--texto-sobre-cor);
+  color: var(--texto-sobre-destaque);
   font: inherit;
   cursor: pointer;
 }

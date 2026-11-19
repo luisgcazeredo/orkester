@@ -20,6 +20,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { metaDaFerramenta } from '../shared/ferramentasMcp'
+import { corpoDoPedido, opcoesDoKanban, pedidoDeEdicao, quemChama, type QuemChama } from './quemChama'
 
 const PASTA = process.env.ORK_DADOS || join(homedir(), '.orkester')
 const CANO = join(PASTA, 'cano.json')
@@ -49,12 +50,23 @@ function chave(): string {
   return k
 }
 
-/** Um pedido pelo cano, no mesmo formato do `ork`, com chave no lugar do crachá. */
-function pedir(comando: string, posicionais: string[] = [], opcoes: Record<string, string | number | true> = {}): Promise<string> {
+/**
+ * Um pedido pelo cano, no mesmo formato do `ork`: com a chave (o usuário) ou, nas ferramentas de kanban, com o
+ * crachá do agente em cujo terminal este servidor roda (ver quemChama.ts), pelo cano do app que abriu o agente.
+ */
+function pedir(
+  comando: string,
+  posicionais: string[] = [],
+  opcoes: Record<string, string | number | true> = {},
+  quem: QuemChama = { tipo: 'usuario' },
+  texto = ''
+): Promise<string> {
   return new Promise((resolver, recusar) => {
     let conexao: ReturnType<typeof connect>
+    let linha: string
     try {
-      conexao = connect(enderecoDoCano())
+      linha = `${JSON.stringify(corpoDoPedido(quem, chave, comando, posicionais, opcoes, texto))}\n`
+      conexao = connect(quem.tipo === 'agente' && quem.pipe ? quem.pipe : enderecoDoCano())
     } catch (erro) {
       return recusar(erro instanceof Error ? erro : new Error(String(erro)))
     }
@@ -64,7 +76,7 @@ function pedir(comando: string, posicionais: string[] = [], opcoes: Record<strin
       recusar(new Error('o Orkester não respondeu em 30 s'))
     }, PRAZO)
     conexao.setEncoding('utf8')
-    conexao.on('connect', () => conexao.write(`${JSON.stringify({ chave: chave(), comando, posicionais, opcoes })}\n`))
+    conexao.on('connect', () => conexao.write(linha))
     conexao.on('data', (parte: string) => {
       recebido += parte
       const fim = recebido.indexOf('\n')
@@ -226,6 +238,135 @@ servidor.registerTool(
     inputSchema: { pasta: z.string().describe('Pasta das fichas, relativa à do espaço.'), espaco }
   },
   ({ pasta, espaco: ondeEspaco }) => rodar('catalogo', ['importar', pasta], ondeEspaco ? { espaco: ondeEspaco } : {})
+)
+
+// ---------- kanban (1.9.4): o mesmo `ork kanban <ação>`; as colunas ficam na página e no `ork` ----------
+
+const numero = z.number().int().min(1).describe('Número da tarefa (o N de #N).')
+const comEspaco = opcoesDoKanban
+const espacoDoKanban = z
+  .string()
+  .optional()
+  .describe('Nome do espaço. Sem isto, vale o único aberto numa janela. Num terminal do Orkester você age como o seu agente e só alcança o próprio espaço (não mande isto).')
+
+/**
+ * O kanban age como quem chama (decisão 12.2 do Luís): num terminal do Orkester, como aquele agente, com o crachá
+ * dele (o app aplica as regras do `ork kanban`: só o espaço dele, o nome dele no histórico); fora, como o usuário.
+ * Quem é se decide a cada chamada, pelo ambiente que este servidor herdou (ver quemChama.ts).
+ */
+const rodarKanban = async (posicionais: string[], opcoes: Record<string, string | true>, textoDoPedido = '') => {
+  try {
+    return texto(await pedir('kanban', posicionais, opcoes, quemChama(process.env), textoDoPedido))
+  } catch (e) {
+    return falha(e)
+  }
+}
+
+servidor.registerTool(
+  'kanban',
+  {
+    ...metaDaFerramenta('kanban'),
+    inputSchema: {
+      numero: numero.optional(),
+      coluna: z.string().optional().describe('Só esta coluna (nome, sem caixa nem acento).'),
+      responsavel: z.string().optional().describe('Só as em que este agente trabalha; "ninguem" = sem ninguém trabalhando.'),
+      etiqueta: z.string().optional().describe('Só as com esta etiqueta.'),
+      espaco: espacoDoKanban
+    }
+  },
+  ({ numero: n, coluna, responsavel, etiqueta, espaco: ondeEspaco }) =>
+    rodarKanban(n ? ['ver', String(n)] : ['ver'], comEspaco({ coluna, para: responsavel, etiqueta }, ondeEspaco))
+)
+
+servidor.registerTool(
+  'kanban_criar',
+  {
+    ...metaDaFerramenta('kanban_criar'),
+    inputSchema: {
+      titulo: z.string().describe('Título curto (até 120 letras).'),
+      descricao: z.string().optional().describe('Markdown, até 8 KB.'),
+      coluna: z.string().optional().describe('Coluna onde nasce. Sem isto, a primeira.'),
+      responsavel: z.string().optional().describe('Nome do agente (Claude ou Codex) do espaço.'),
+      etiquetas: z.array(z.string()).optional().describe('Até 8, de até 24 letras.'),
+      espaco: espacoDoKanban
+    }
+  },
+  ({ titulo, descricao, coluna, responsavel, etiquetas, espaco: ondeEspaco }) =>
+    rodarKanban(['criar', titulo], comEspaco({ descricao, coluna, para: responsavel, etiqueta: etiquetas?.join(',') }, ondeEspaco))
+)
+
+servidor.registerTool(
+  'kanban_mover',
+  {
+    ...metaDaFerramenta('kanban_mover'),
+    inputSchema: {
+      numero,
+      coluna: z.string().describe('Coluna de destino.'),
+      posicao: z.union([z.enum(['topo', 'fim']), z.number().int().min(1)]).optional().describe('topo, fim (padrão) ou a posição (1 = topo).'),
+      espaco: espacoDoKanban
+    }
+  },
+  ({ numero: n, coluna, posicao, espaco: ondeEspaco }) =>
+    rodarKanban(['mover', String(n), coluna], comEspaco({ posicao: posicao === undefined ? undefined : String(posicao) }, ondeEspaco))
+)
+
+servidor.registerTool(
+  'kanban_editar',
+  {
+    ...metaDaFerramenta('kanban_editar'),
+    inputSchema: {
+      numero,
+      titulo: z.string().optional(),
+      descricao: z.string().optional().describe('Markdown, até 8 KB. "" apaga a descrição; sem isto, fica como está.'),
+      etiquetas: z.string().optional().describe('"+a,-b" põe a e tira b; "a,b" troca a lista; "" tira todas.'),
+      espaco: espacoDoKanban
+    }
+  },
+  ({ numero: n, titulo, descricao, etiquetas, espaco: ondeEspaco }) => {
+    // vazio limpa (descrição, etiquetas); ausente não mexe — ver pedidoDeEdicao
+    const { opcoes, texto: conteudo } = pedidoDeEdicao({ titulo, descricao, etiquetas }, ondeEspaco)
+    return rodarKanban(['editar', String(n)], opcoes, conteudo)
+  }
+)
+
+servidor.registerTool(
+  'kanban_atribuir',
+  {
+    ...metaDaFerramenta('kanban_atribuir'),
+    inputSchema: { numero, responsavel: z.string().describe('Nome do agente, ou "ninguem".'), espaco: espacoDoKanban }
+  },
+  ({ numero: n, responsavel, espaco: ondeEspaco }) => rodarKanban(['atribuir', String(n), responsavel], comEspaco({}, ondeEspaco))
+)
+
+servidor.registerTool(
+  'kanban_soltar',
+  {
+    ...metaDaFerramenta('kanban_soltar'),
+    inputSchema: {
+      numero,
+      quem: z.string().optional().describe('Nome do agente que sai da lista. Sem isto, sai você (só num terminal do Orkester).'),
+      espaco: espacoDoKanban
+    }
+  },
+  ({ numero: n, quem, espaco: ondeEspaco }) => rodarKanban(['soltar', String(n), ...(quem?.trim() ? [quem] : [])], comEspaco({}, ondeEspaco))
+)
+
+servidor.registerTool(
+  'kanban_comentar',
+  {
+    ...metaDaFerramenta('kanban_comentar'),
+    inputSchema: { numero, texto: z.string().describe('O comentário (até 2 KB).'), espaco: espacoDoKanban }
+  },
+  ({ numero: n, texto: comentario, espaco: ondeEspaco }) => rodarKanban(['comentar', String(n), comentario], comEspaco({}, ondeEspaco))
+)
+
+servidor.registerTool(
+  'kanban_apagar',
+  {
+    ...metaDaFerramenta('kanban_apagar'),
+    inputSchema: { numero, confirmar: z.literal(true).describe('Precisa ser true: a tarefa vai para a lixeira.'), espaco: espacoDoKanban }
+  },
+  ({ numero: n, espaco: ondeEspaco }) => rodarKanban(['apagar', String(n)], comEspaco({ confirmar: true }, ondeEspaco))
 )
 
 // sem `await` no topo: o bundler do principal pode gerar CommonJS, onde isso não existe

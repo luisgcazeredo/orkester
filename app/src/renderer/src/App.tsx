@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import * as loja from './estado/loja'
 import { iniciar, salvarParaFechar, usarLoja } from './estado/loja'
-import { classeDoTema } from '../../shared/temas'
+import { classeDoDestaque, classeDoTema } from '../../shared/temas'
 import { Casca, Dialogos } from './casca/Casca'
 import { BarraPaginas } from './casca/BarraPaginas'
 import { despacharAtalho, irParaPagina, paginaAtiva, registrarPagina } from './casca/paginas'
@@ -11,6 +11,7 @@ import { ListaDeEspacos } from './ui/ListaDeEspacos'
 export function App() {
   const temEspaco = usarLoja((e) => e.espaco !== null)
   const tema = usarLoja((e) => e.preferencias.tema)
+  const destaque = usarLoja((e) => e.preferencias.destaque)
   const lateralAberta = usarLoja((e) => e.lateralAberta)
   const ferramenta = usarLoja((e) => e.ferramenta)
   const pagina = usarLoja((e) => e.paginaAtiva)
@@ -33,7 +34,7 @@ export function App() {
   }, [])
 
   return (
-    <div className={`app ${classeDoTema(tema)} ${lateralAberta && pagina === 'quadro' ? '' : 'sem-lateral'} ferramenta-${ferramenta}`}>
+    <div className={`app ${classeDoTema(tema)} ${classeDoDestaque(destaque)} ${lateralAberta && pagina === 'quadro' ? '' : 'sem-lateral'} ferramenta-${ferramenta}`}>
       <BarraPaginas />
       {/* a lista de espaços só existe na página Quadro (decisão do Luís, 17/11); ao voltar, volta como estava */}
       {lateralAberta && pagina === 'quadro' && <ListaDeEspacos />}

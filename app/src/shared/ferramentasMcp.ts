@@ -59,6 +59,46 @@ export const FERRAMENTAS_MCP = {
     titulo: 'Importar fichas de time',
     descricao:
       'Lê as fichas .md de uma pasta (cabeçalho com nome, motor, nível, pasta) e as transforma em funções. Atualiza pelo nome em vez de duplicar, e não apaga nada.'
+  },
+  kanban: {
+    titulo: 'Ler o kanban',
+    descricao:
+      'As tarefas do espaço por coluna, com número, etiquetas e quem trabalha em cada uma (e se está livre ou ocupado). Com `numero`, a tarefa inteira: descrição, delegação e últimos comentários.'
+  },
+  kanban_criar: {
+    titulo: 'Criar uma tarefa no kanban',
+    descricao:
+      'Cria uma tarefa e devolve o número dela (#N). Sem `coluna`, o usuário cria em Demandas e um agente em Fazendo. Com `responsavel`, o agente entra na lista de quem trabalha nela e é avisado na caixa de entrada dele.'
+  },
+  kanban_mover: {
+    titulo: 'Mover uma tarefa',
+    descricao:
+      'Leva a tarefa para outra coluna (pelo nome, sem caixa nem acento), no fim ou na posição pedida. Para "Com o Maestro" é delegar: só o usuário, e a demanda vai como pedido ao Maestro do espaço. A coluna final é do usuário e do Maestro.'
+  },
+  kanban_editar: {
+    titulo: 'Editar uma tarefa',
+    descricao:
+      'Troca o título, a descrição ou as etiquetas de uma tarefa. Etiquetas com +a,-b põem e tiram; sem sinal, trocam a lista.'
+  },
+  kanban_atribuir: {
+    titulo: 'Atribuir uma tarefa',
+    descricao:
+      'Põe um agente Claude ou Codex do espaço na lista de quem trabalha na tarefa ("ninguem" esvazia a lista). Ele é avisado na caixa de entrada; não vira pedido de trabalho.'
+  },
+  kanban_soltar: {
+    titulo: 'Tirar alguém de uma tarefa',
+    descricao:
+      'Tira um agente da lista de quem trabalha na tarefa. Um agente sai sozinho sem `quem`; tirar outro é só do usuário e do Maestro.'
+  },
+  kanban_comentar: {
+    titulo: 'Comentar numa tarefa',
+    descricao:
+      'Acrescenta um comentário à tarefa (os mais antigos saem depois de 50).'
+  },
+  kanban_apagar: {
+    titulo: 'Apagar uma tarefa',
+    descricao:
+      'Manda a tarefa para a lixeira do kanban; a página Kanban recupera. Exige confirmar.'
   }
 } as const satisfies Record<string, FerramentaMcp>
 
@@ -75,6 +115,22 @@ export function descricaoCurta(descricao: string): string {
   const limpa = descricao.replace(/\s+/g, ' ').trim()
   const fim = limpa.search(/[.!?](\s|$)/)
   return fim < 0 ? limpa : limpa.slice(0, fim + 1)
+}
+
+/**
+ * A lista inteira em Markdown (nome, título e a descrição completa de cada ferramenta), para o botão "Baixar a lista"
+ * da página Conexões. Sai do mesmo registro que o servidor usa: não há segunda cópia para esquecer de atualizar.
+ */
+export function listaEmMarkdown(): string {
+  const itens = Object.entries(FERRAMENTAS_MCP as Record<string, FerramentaMcp>)
+  const corpo = itens.map(([nome, f]) => `## \`${nome}\` — ${f.titulo}\n\n${f.descricao.replace(/\s+/g, ' ').trim()}\n`)
+  return [
+    '# Ferramentas do MCP do Orkester',
+    '',
+    `O servidor MCP do Orkester tem ${itens.length} ferramentas. A lista sai do registro do próprio servidor, então é a da versão que gerou o arquivo.`,
+    '',
+    ...corpo
+  ].join('\n')
 }
 
 export interface ItemDeFerramenta {

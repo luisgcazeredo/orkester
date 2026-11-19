@@ -1,4 +1,5 @@
 import { type CorPostIt, type Funcao, type No, type PresetAgente } from '../../../shared/modelo'
+import { resolverModelo } from '../../../shared/modelos'
 import { proximoZ } from '../../../shared/quadro/geometria'
 import { TOM_DO_POSTIT } from './coresDeDados'
 import { entregarPrimeiroPedido } from './espacos'
@@ -48,6 +49,11 @@ export function adicionarNo(novo: NovoNo, x: number, y: number): string {
       const usados = new Set(plano.nos.flatMap((n) => (n.tipo === 'terminal' ? [n.nome.toLowerCase()] : [])))
       let comoNomear = comoChamar
       for (let i = 2; usados.has(comoNomear.toLowerCase()); i++) comoNomear = `${comoChamar} ${i}`
+      // modelo e esforço: a mesma regra do `ork abrir` (função, depois preset; cada campo sozinho). A função só vale
+      // no motor do preset dela: se o preset dela sumiu e o menu caiu em outro, o modelo dela fica de fora
+      const funcaoServe = !!novo.funcao && (!novo.funcao.preset || novo.funcao.preset === novo.preset.id)
+      const { modelo, esforco } =
+        novo.preset.agente === 'shell' ? {} : resolverModelo(undefined, funcaoServe ? novo.funcao : undefined, novo.preset)
       no = {
         ...base,
         ...centrado(800, 500),
@@ -57,6 +63,8 @@ export function adicionarNo(novo: NovoNo, x: number, y: number): string {
         comando: novo.preset.comando,
         funcao: novo.funcao?.nome,
         pasta: novo.funcao?.pasta || undefined,
+        ...(modelo !== undefined ? { modelo } : {}),
+        ...(esforco !== undefined ? { esforco } : {}),
         // o prompt da função é entregue pelo processo principal, que sabe quando o agente ficou pronto
         // o Claude aceita o id da conversa desde o começo: com ele, o cartão retoma a mesma conversa ao reabrir
         sessao: novo.preset.agente === 'claude' ? novoId() : undefined

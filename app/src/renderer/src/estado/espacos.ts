@@ -1,4 +1,5 @@
 import { type Funcao, type Partitura, type Tema } from '../../../shared/modelo'
+import type { Destaque } from '../../../shared/temas'
 import { type AvisoJanelas, type ResultadoDoPrimeiroPedido } from '../../../shared/api'
 import { aplicarPartitura, MAX_PARTITURAS, partituraDe } from '../../../shared/quadro/partituras'
 import { irParaAndar } from './andares'
@@ -201,6 +202,12 @@ export function alternarLateral(): void {
 export function definirTema(tema: Tema): void {
   definir({ preferencias: { ...estado.preferencias, tema } })
   void window.ork.dados.salvarPreferencias({ tema })
+}
+
+/** A cor de destaque (1.9.4): vale na janela na hora e fica nas preferências (todas as janelas). */
+export function definirDestaque(destaque: Destaque): void {
+  definir({ preferencias: { ...estado.preferencias, destaque } })
+  void window.ork.dados.salvarPreferencias({ destaque })
 }
 
 /** Presets de agente (o botão de terminal): ficam nas preferências, valem para todas as janelas. */

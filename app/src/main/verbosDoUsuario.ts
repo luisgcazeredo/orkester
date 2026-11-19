@@ -3,6 +3,7 @@ import type { ResumoEspaco } from '../shared/modelo'
 import type { ChaveGuardada } from '../shared/chaves'
 import { resumosDosEspacos } from './dados'
 import { registroDoEnvio } from './envio'
+import { rodarKanban } from './kanban'
 import { validarChamada, type NomeDeVerbo } from './verbos'
 import { esperarSessao, sessoesDoEspaco, telaDe } from './terminais'
 import { conferirModelo, lerModelos, modeloDasOpcoes, textoDoModelo, textoDosModelos } from './modelos'
@@ -118,6 +119,12 @@ const HANDLERS_DO_USUARIO: Partial<Record<NomeDeVerbo, (ctx: ContextoDoUsuario) 
     if (r.texto && r.id) void digitarPrimeiroPedidoDoUsuario(r.id, r.texto)
     const aviso = [conferirModelo(r.agente ?? agente ?? undefined, r.modelo, r.esforco, lerModelos()).aviso, r.aviso].filter(Boolean).join('; ') || undefined
     return { saida: `Abri "${r.nome}".${textoDoModelo(r.modelo, r.esforco, aviso)}${r.texto ? ' O papel da função vai ser digitado assim que o agente ficar pronto.' : ''}` }
+  },
+
+  /** O kanban de qualquer espaço (é o usuário). Quem fez fica como `MCP · <nome da chave>`. */
+  kanban: async ({ chave, pos, opcoes, texto }) => {
+    const espaco = espacoDoUsuario(opcoes)
+    return { saida: await rodarKanban(espaco.id, { nome: `MCP · ${chave.nome}` }, pos, opcoes, texto) }
   },
 
   ver: async ({ pos, opcoes }) => {

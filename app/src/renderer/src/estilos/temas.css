@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------------ Página Temas (1.9.3, T1+T2)
  * Só tokens (R7): nenhuma cor literal aqui. Carregado junto com a página (import dentro de Temas.tsx).
  * Tudo sob `.temas`, para não mexer em nada fora dela. A prévia de cada cartão leva a classe do tema dela
- * (`.tema-escuro`/`.tema-claro`), então os mesmos tokens desenham as cores daquele tema.
+ * (`.tema-<base>`) e a do destaque (`.destaque-<id>`), então os mesmos tokens desenham as cores daquele tema.
  */
 
 .temas {
@@ -159,7 +159,7 @@
 .temas button.primario {
   border-color: var(--destaque);
   background: var(--destaque);
-  color: var(--texto-sobre-cor);
+  color: var(--texto-sobre-destaque);
   font-weight: 600;
 }
 
@@ -473,4 +473,193 @@
 .temas-linha-detalhe {
   font-size: 12px;
   overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------ base × destaque (1.9.4) */
+.temas-passo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+}
+
+.temas-passo-titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.temas-passo-numero {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--raio-pilula);
+  background: var(--destaque);
+  color: var(--texto-sobre-destaque);
+  font-size: 11.5px;
+}
+
+/* as bolinhas: o círculo é desenhado com o --destaque da própria classe (.destaque-<id>) */
+.temas-bolinhas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+}
+
+.temas .temas-bolinha {
+  flex-direction: column;
+  gap: var(--espaco-1);
+  min-width: 72px;
+  padding: var(--espaco-2);
+  border-color: transparent;
+}
+
+.temas .temas-bolinha.escolhida {
+  border-color: var(--borda);
+  background: var(--painel);
+}
+
+.temas .temas-bolinha:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 2px;
+}
+
+.temas-bolinha-cor {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--raio-pilula);
+  background: var(--destaque);
+  color: var(--texto-sobre-destaque);
+  box-shadow: inset 0 0 0 1px var(--amostra-borda);
+}
+
+.temas-bolinha.escolhida .temas-bolinha-cor {
+  box-shadow: 0 0 0 2px var(--quadro-fundo), 0 0 0 4px var(--destaque);
+}
+
+.temas-bolinha-nome {
+  font-size: 12px;
+}
+
+/* o título da seção de plugins com o botão do guia ao lado */
+.temas-secao-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  max-width: 640px;
+}
+
+/* Guia de CSS: diálogo largo, que rola por dentro */
+.dialogo:has(.temas-guia) {
+  display: flex;
+  flex-direction: column;
+  width: min(860px, 92vw);
+  max-height: 86vh;
+}
+
+.temas-guia {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+  min-height: 0;
+  overflow: auto;
+  padding-right: var(--espaco-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.temas-guia section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+}
+
+.temas-guia h4 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.temas-guia p {
+  margin: 0;
+}
+
+.temas-guia code {
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+}
+
+.temas-guia-exemplo {
+  margin: 0;
+  padding: var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  background: var(--terminal-corpo);
+  color: var(--terminal-texto);
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+.temas-guia-nota {
+  align-self: center;
+  font-size: 12px;
+}
+
+.temas-guia-regras {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  margin: 0;
+  padding-left: var(--espaco-4);
+}
+
+.temas-guia-regras b {
+  font-weight: 600;
+}
+
+.temas-guia-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  padding-top: var(--espaco-2);
+}
+
+.temas-guia-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.temas-guia-tabela td {
+  padding: 3px var(--espaco-2) 3px 0;
+  border-top: 1px solid var(--borda-suave);
+  vertical-align: top;
+}
+
+.temas-guia-tabela td:first-child {
+  width: 30%;
+  white-space: nowrap;
+}
+
+.temas-guia-valor {
+  width: 30%;
+  overflow-wrap: anywhere;
+}
+
+.temas-guia-amostra {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: var(--espaco-1);
+  border: 1px solid var(--amostra-borda);
+  border-radius: var(--raio-micro);
+  vertical-align: -1px;
 }

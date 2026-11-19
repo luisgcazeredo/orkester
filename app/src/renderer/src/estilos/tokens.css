@@ -10,43 +10,54 @@
  * de baixo por uma borda fina, não por sombra forte — sombra aqui serve para dizer "isto flutua sobre o
  * quadro", e nada mais.
  *
+ * Desde a 1.9.4 o tema é BASE (escuro, claro, OLED: os blocos `.tema-<id>`) × COR DE DESTAQUE (os blocos
+ * `.destaque-<id>`, mais abaixo). O Guia de CSS da página Temas lê ESTE arquivo: o comentário numa linha só
+ * abre um grupo ("título: para que serve") e o comentário no fim da linha diz para que serve o token. Cada
+ * token é descrito uma vez, no primeiro bloco em que aparece.
+ *
  * Nada neste arquivo é medido de outro produto.
  */
 .tema-escuro {
-  --quadro-fundo: #141519;
-  --grade: #262a36;
-  --painel: #1b1d23;
-  --painel-alto: #212531;
-  --borda: #2a2e38;
-  --borda-suave: #23262f;
-  --lateral-fundo: #16181d;
-  --lateral-borda: #22252d;
-  --lateral-filtro: #1e212a;
-  --lateral-ativo: rgba(64, 96, 232, 0.18);
-  --hover: rgba(255, 255, 255, 0.055);
-  --texto: #e7e9f0;
-  --texto-suave: #878e9f;
-  --pilula-fundo: #1b1d23;
-  --pilula-borda: #2a2e38;
-  --terminal-cabecalho: #212531;
-  --terminal-corpo: #16181d;
-  --terminal-borda: #2a2e38;
-  --terminal-texto: #d6d9e3;
-  --corda: #3d4252;
-  --cartao: #1b1d23;
-  --sombra: 0 18px 46px rgba(0, 0, 0, 0.55);
-  --sombra-leve: 0 6px 18px rgba(0, 0, 0, 0.4);
+  /* camadas: o fundo de tudo e as superfícies por cima dele */
+  --quadro-fundo: #141519; /* o fundo do quadro e das páginas */
+  --grade: #262a36; /* os pontos da grade do quadro */
+  --painel: #1b1d23; /* menus, diálogos e painéis */
+  --painel-alto: #212531; /* cabeçalho de cartão e campo: a camada acima do painel */
+  --cartao: #1b1d23; /* o corpo dos cartões no quadro */
+  --pilula-fundo: #1b1d23; /* barras flutuantes (pílulas) e cartões das páginas */
+  --hover: rgba(255, 255, 255, 0.055); /* o véu sob o mouse */
+  /* bordas: a linha fina que separa uma camada da outra */
+  --borda: #2a2e38; /* borda de painel, campo e cartão */
+  --borda-suave: #23262f; /* borda discreta, dentro de um painel */
+  --pilula-borda: #2a2e38; /* a borda das pílulas */
+  --corda: #3d4252; /* a linha que liga dois agentes no quadro */
+  /* lateral: a lista de espaços, à esquerda */
+  --lateral-fundo: #16181d; /* o fundo da lateral */
+  --lateral-borda: #22252d; /* a borda da lateral */
+  --lateral-filtro: #1e212a; /* o campo de busca e os campos de texto */
+  --lateral-ativo: color-mix(in srgb, var(--destaque) 18%, transparent); /* o item escolhido (segue o destaque) */
+  /* texto: as letras do app */
+  --texto: #e7e9f0; /* o texto principal */
+  --texto-suave: #878e9f; /* texto secundário, legendas e dicas */
+  /* terminal: o cartão do agente (o corpo e o texto vão também para o xterm) */
+  --terminal-cabecalho: #212531; /* a barra de título do terminal */
+  --terminal-corpo: #16181d; /* o fundo do terminal */
+  --terminal-borda: #2a2e38; /* a borda do terminal */
+  --terminal-texto: #d6d9e3; /* o texto do terminal */
+  /* sombra: só para dizer "isto flutua sobre o quadro" */
+  --sombra: 0 18px 46px rgba(0, 0, 0, 0.55); /* menus e diálogos */
+  --sombra-leve: 0 6px 18px rgba(0, 0, 0, 0.4); /* cartões e pílulas */
   /* realce de sintaxe: cores do Dark+ e do Light+ do VS Code (nomes das classes do highlight.js) */
-  --cod-texto: #d4d4d4;
-  --cod-comentario: #6a9955;
-  --cod-palavra: #569cd6;
-  --cod-controle: #c586c0;
-  --cod-texto-literal: #ce9178;
-  --cod-numero: #b5cea8;
-  --cod-funcao: #dcdcaa;
-  --cod-tipo: #4ec9b0;
-  --cod-variavel: #9cdcfe;
-  --cod-regex: #d16969;
+  --cod-texto: #d4d4d4; /* o texto comum do código */
+  --cod-comentario: #6a9955; /* comentário */
+  --cod-palavra: #569cd6; /* palavra-chave */
+  --cod-controle: #c586c0; /* if, for, return */
+  --cod-texto-literal: #ce9178; /* texto entre aspas */
+  --cod-numero: #b5cea8; /* número */
+  --cod-funcao: #dcdcaa; /* nome de função */
+  --cod-tipo: #4ec9b0; /* tipo e classe */
+  --cod-variavel: #9cdcfe; /* variável e propriedade */
+  --cod-regex: #d16969; /* expressão regular */
   color-scheme: dark;
 }
 
@@ -55,26 +66,25 @@
   --grade: #dde0ea;
   --painel: #ffffff;
   --painel-alto: #f2f3f8;
+  --cartao: #ffffff;
+  --pilula-fundo: #ffffff;
+  --hover: rgba(18, 24, 44, 0.05);
   --borda: #e3e6ef;
   --borda-suave: #edeff5;
+  --pilula-borda: #e3e6ef;
+  --corda: #a9afc0;
   --lateral-fundo: #f1f2f7;
   --lateral-borda: #e3e6ef;
   --lateral-filtro: #ffffff;
-  --lateral-ativo: rgba(64, 96, 232, 0.12);
-  --hover: rgba(18, 24, 44, 0.05);
+  --lateral-ativo: color-mix(in srgb, var(--destaque) 12%, transparent);
   --texto: #171a21;
   --texto-suave: #6a7183;
-  --pilula-fundo: #ffffff;
-  --pilula-borda: #e3e6ef;
   --terminal-cabecalho: #f2f3f8;
   --terminal-corpo: #ffffff;
   --terminal-borda: #e3e6ef;
   --terminal-texto: #23262e;
-  --corda: #a9afc0;
-  --cartao: #ffffff;
   --sombra: 0 16px 40px rgba(20, 25, 45, 0.13);
   --sombra-leve: 0 4px 14px rgba(20, 25, 45, 0.08);
-  /* realce de sintaxe: cores do Dark+ e do Light+ do VS Code (nomes das classes do highlight.js) */
   --cod-texto: #000000;
   --cod-comentario: #008000;
   --cod-palavra: #0000ff;
@@ -88,71 +98,193 @@
   color-scheme: light;
 }
 
+/* OLED (1.9.4): preto puro no fundo e no terminal (o pixel apagado), superfícies quase pretas e bordas sutis. */
+.tema-oled {
+  --quadro-fundo: #000000;
+  --grade: #1c1d22;
+  --painel: #0b0b0d;
+  --painel-alto: #141418;
+  --cartao: #0b0b0d;
+  --pilula-fundo: #0b0b0d;
+  --hover: rgba(255, 255, 255, 0.06);
+  --borda: #222328;
+  --borda-suave: #18191d;
+  --pilula-borda: #222328;
+  --corda: #3a3d48;
+  --lateral-fundo: #000000;
+  --lateral-borda: #1a1b1f;
+  --lateral-filtro: #111114;
+  --lateral-ativo: color-mix(in srgb, var(--destaque) 22%, transparent);
+  --texto: #ececf0;
+  --texto-suave: #8b909e;
+  --terminal-cabecalho: #0e0e11;
+  --terminal-corpo: #000000;
+  --terminal-borda: #222328;
+  --terminal-texto: #d6d9e3;
+  --sombra: 0 18px 46px rgba(0, 0, 0, 0.8);
+  --sombra-leve: 0 6px 18px rgba(0, 0, 0, 0.6);
+  --cod-texto: #d4d4d4;
+  --cod-comentario: #6a9955;
+  --cod-palavra: #569cd6;
+  --cod-controle: #c586c0;
+  --cod-texto-literal: #ce9178;
+  --cod-numero: #b5cea8;
+  --cod-funcao: #dcdcaa;
+  --cod-tipo: #4ec9b0;
+  --cod-variavel: #9cdcfe;
+  --cod-regex: #d16969;
+  color-scheme: dark;
+}
+
+/* ------------------------------------------------------------------ cor de destaque (1.9.4)
+ *
+ * Como nos sistemas com cor de destaque: a base dá as camadas e o texto; o destaque dá a cor de ação (botão
+ * principal, seleção, foco, item ativo). Cada destaque tem quatro tons: o destaque, o claro (realce em texto:
+ * link, selo), o forte (o botão sob o mouse) e o texto sobre ele. O bloco `.destaque-<id>` vale nas bases
+ * escuras (Escuro e OLED); `.tema-claro.destaque-<id>` acerta o que muda no Claro (o "claro" vira um tom
+ * escuro, porque no fundo branco ele é texto). A prova `shared/temas.prova.mts` mede o contraste de cada
+ * base × destaque (AA) e a distância de cada destaque para Perigo, Atenção e Vivo.
+ *
+ * Azul é o de sempre (#4060e8); o `:root` também o leva, para valer fora da raiz do app. Vermelho é vermelho de
+ * verdade (matiz ~26°, o mesmo do Perigo; o carmim da 1.9.3 puxava ao rosa, matiz ~12°) e só se separa do Perigo
+ * (#ff453a) por ser bem mais escuro, então o Perigo também se distingue por forma (o triângulo de aviso nos
+ * diálogos, ui.css), não só por cor; Laranja é queimado, mais escuro que o
+ * Perigo e que a Atenção (#f0a33a); Verde é esmeralda, mais escuro que o Vivo (#35c46b).
+ */
+:root,
+.destaque-azul {
+  /* destaque: a cor de ação, que a página Temas troca (azul, vermelho, verde…) */
+  --destaque: #4060e8; /* botão principal, seleção, foco, borda e ícone ativos */
+  --destaque-claro: #98a8f8; /* realce em texto: link, selo da caixa de entrada */
+  --destaque-forte: #3250d8; /* o botão principal sob o mouse */
+  --texto-sobre-destaque: #ffffff; /* texto e ícone em cima do destaque */
+}
+
+.tema-claro.destaque-azul {
+  --destaque-claro: #3048c8;
+}
+
+.destaque-vermelho {
+  --destaque: #d1232a;
+  --destaque-claro: #ff9a92;
+  --destaque-forte: #b81c23;
+  --texto-sobre-destaque: #ffffff;
+}
+
+.tema-claro.destaque-vermelho {
+  --destaque-claro: #b81c23;
+}
+
+.destaque-verde {
+  --destaque: #16804f;
+  --destaque-claro: #7fdcaa;
+  --destaque-forte: #0f6e43;
+  --texto-sobre-destaque: #ffffff;
+}
+
+.tema-claro.destaque-verde {
+  --destaque-claro: #11683f;
+}
+
+.destaque-roxo {
+  --destaque: #8a4ee8;
+  --destaque-claro: #c9adfb;
+  --destaque-forte: #7a3dd8;
+  --texto-sobre-destaque: #ffffff;
+}
+
+.tema-claro.destaque-roxo {
+  --destaque-claro: #6a30c8;
+}
+
+.destaque-laranja {
+  --destaque: #b5560c;
+  --destaque-claro: #ffb27a;
+  --destaque-forte: #96470a;
+  --texto-sobre-destaque: #ffffff;
+}
+
+.tema-claro.destaque-laranja {
+  --destaque-claro: #96470a;
+}
+
+.destaque-rosa {
+  --destaque: #c2338f;
+  --destaque-claro: #f5a3d2;
+  --destaque-forte: #a62779;
+  --texto-sobre-destaque: #ffffff;
+}
+
+.tema-claro.destaque-rosa {
+  --destaque-claro: #a12472;
+}
+
+.destaque-ciano {
+  --destaque: #0b7a8f;
+  --destaque-claro: #7fd8e8;
+  --destaque-forte: #08687a;
+  --texto-sobre-destaque: #ffffff;
+}
+
+.tema-claro.destaque-ciano {
+  --destaque-claro: #086376;
+}
+
+/* ------------------------------------------------------------------ o que não muda com o tema */
 :root {
-  --destaque: #4060e8;
-  --destaque-claro: #98a8f8;
-  --destaque-forte: #3250d8;
-  /* o agente está vivo; é a única cor "de estado" que aparece o tempo todo, então é discreta */
-  --vivo: #35c46b;
-  --perigo: #ff453a;
-  --atencao: #f0a33a;
-  /* o post-it é papel: a cor dele não muda com o tema, e o texto nele é sempre escuro */
-  --postit-texto: #2a2a2a;
-  --postit-mini: #fff3a0;
-  /* pasta no explorador e nas árvores */
-  --pasta: #5ea0ff;
-  /* diff: entrou e saiu */
-  --entrou: #35c46b;
-  --saiu: #ff453a;
-
-  /* cores fixas que não mudam com o tema (o valor é o mesmo nos dois): texto sobre cor cheia, véus, o branco do portal */
-  --texto-sobre-cor: #fff;
-  --postit-vazio: rgba(0, 0, 0, 0.35);
-  --portal-fundo: #fff;
-  --portal-escudo-fundo: rgba(0, 0, 0, 0.55);
-  --mini-visivel-fundo: rgba(0, 122, 255, 0.08);
-  --borracha-cursor-fundo: rgba(255, 255, 255, 0.08);
-  --amostra-borda: rgba(128, 128, 128, 0.35);
-  --sombra-plano-3d: 0 30px 60px rgba(0, 0, 0, 0.25);
-  --dialogo-veu: rgba(8, 9, 12, 0.55);
-  --paleta-veu: rgba(0, 0, 0, 0.25);
-  --diff-saiu-fundo: rgba(255, 59, 48, 0.14);
-
-  /* o papel de cada tom de post-it: como o post-it, não muda com o tema */
-  --postit-amarelo: #FFF9C4;
-  --postit-rosa: #FFD9E2;
-  --postit-azul: #D8EAFF;
-  --postit-verde: #DAF5D7;
-  --postit-roxo: #E9DDFF;
-  /* a cor de marca de cada agente (ícone no cartão, na barra e nos presets) */
-  --agente-claude: #D97757;
-  --agente-codex: #7B9CFF;
-  --agente-shell: #A0A0A4;
-  /* o estado de um andar que não é o destaque, o atenção ou o vivo */
-  --estado-revisao: #a06ae8;
+  /* estados: o que está acontecendo (não mudam com o destaque) */
+  --vivo: #35c46b; /* o agente está vivo: a única cor de estado que aparece o tempo todo, então é discreta */
+  --perigo: #ff453a; /* erro, apagar, recusa */
+  --atencao: #f0a33a; /* aviso, espera */
+  --entrou: #35c46b; /* diff: linha que entrou */
+  --saiu: #ff453a; /* diff: linha que saiu */
+  --diff-saiu-fundo: rgba(255, 59, 48, 0.14); /* diff: o fundo da linha que saiu */
+  /* cores fixas: o mesmo valor em toda base */
+  --texto-sobre-cor: #fff; /* texto sobre cor cheia que não é o destaque (perigo, véu do portal) */
+  --pasta: #5ea0ff; /* pasta no explorador e nas árvores */
+  --postit-vazio: rgba(0, 0, 0, 0.35); /* o texto de exemplo num post-it vazio */
+  --portal-fundo: #fff; /* o fundo do portal (a página web) */
+  --portal-escudo-fundo: rgba(0, 0, 0, 0.55); /* o véu sobre o portal enquanto ele não está ativo */
+  --mini-visivel-fundo: rgba(0, 122, 255, 0.08); /* a área visível na miniatura dos andares */
+  --borracha-cursor-fundo: rgba(255, 255, 255, 0.08); /* o círculo da borracha */
+  --amostra-borda: rgba(128, 128, 128, 0.35); /* a borda das amostras de cor */
+  --sombra-plano-3d: 0 30px 60px rgba(0, 0, 0, 0.25); /* a sombra do quadro em perspectiva */
+  --dialogo-veu: rgba(8, 9, 12, 0.55); /* o véu atrás de um diálogo */
+  --paleta-veu: rgba(0, 0, 0, 0.25); /* o véu atrás da paleta de comandos */
+  /* post-it: é papel, a cor não muda com o tema e o texto nele é sempre escuro */
+  --postit-texto: #2a2a2a; /* o texto no post-it */
+  --postit-mini: #fff3a0; /* o post-it na miniatura */
+  --postit-amarelo: #FFF9C4; /* papel amarelo */
+  --postit-rosa: #FFD9E2; /* papel rosa */
+  --postit-azul: #D8EAFF; /* papel azul */
+  --postit-verde: #DAF5D7; /* papel verde */
+  --postit-roxo: #E9DDFF; /* papel roxo */
+  /* agentes: a cor de marca de cada um (ícone no cartão, na barra e nos presets) */
+  --agente-claude: #D97757; /* Claude */
+  --agente-codex: #7B9CFF; /* Codex */
+  --agente-shell: #A0A0A4; /* shell */
+  --estado-revisao: #a06ae8; /* andar em revisão (o estado que não é destaque, atenção nem vivo) */
   /* miniatura dos andares: a cor de cada tipo de cartão, em escala pequena */
-  --mini-terminal: #1a1a1e;
-  --mini-arquivo: #d8d8dc;
-  --mini-codigo: #2b2b32;
-  --mini-imagem: #8e8e93;
-  --mini-borda: rgba(128, 128, 128, 0.45);
-  --mini-cabecalho: #3a3a3e;
-  --mini-texto: #9a9aa0;
-
-  /* raios: quatro degraus e a pílula. Fora daqui, nenhum número solto. */
-  --raio-micro: 4px;
-  --raio-pequeno: 7px;
-  --raio: 10px;
-  --raio-grande: 14px;
-  --raio-pilula: 999px;
-
-  /* espaçamento em múltiplos de 4: o ritmo do app inteiro */
-  --espaco-1: 4px;
-  --espaco-2: 8px;
-  --espaco-3: 12px;
-  --espaco-4: 16px;
-  --espaco-5: 24px;
-
-  --fonte-interface: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
-  --fonte-mono: 'Cascadia Mono', Consolas, 'DejaVu Sans Mono', monospace;
+  --mini-terminal: #1a1a1e; /* terminal */
+  --mini-arquivo: #d8d8dc; /* arquivo */
+  --mini-codigo: #2b2b32; /* código */
+  --mini-imagem: #8e8e93; /* imagem */
+  --mini-borda: rgba(128, 128, 128, 0.45); /* borda */
+  --mini-cabecalho: #3a3a3e; /* cabeçalho */
+  --mini-texto: #9a9aa0; /* texto */
+  /* raios: quatro degraus e a pílula. Fora daqui, nenhum número solto */
+  --raio-micro: 4px; /* amostra, selo */
+  --raio-pequeno: 7px; /* botão e campo */
+  --raio: 10px; /* cartão e painel */
+  --raio-grande: 14px; /* diálogo */
+  --raio-pilula: 999px; /* pílula e bolinha */
+  /* espaçamento: múltiplos de 4, o ritmo do app inteiro */
+  --espaco-1: 4px; /* o menor respiro */
+  --espaco-2: 8px; /* entre ícone e texto */
+  --espaco-3: 12px; /* dentro de um painel */
+  --espaco-4: 16px; /* entre blocos */
+  --espaco-5: 24px; /* margem de página */
+  /* fontes: só fontes do sistema (plugin não traz fonte de fora) */
+  --fonte-interface: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif; /* a letra da interface */
+  --fonte-mono: 'Cascadia Mono', Consolas, 'DejaVu Sans Mono', monospace; /* terminal e código */
 }

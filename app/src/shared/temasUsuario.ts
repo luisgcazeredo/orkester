@@ -10,12 +10,12 @@ import { blocosValidos, validarCssDePlugin, type BlocoCss } from './cssPlugin.ts
 // @ts-expect-error idem.
 import { temaValido, type Tema } from './temas.ts'
 
-/** Os tokens que o editor mostra, agrupados. Todos são cor cheia (#rrggbb) nos dois temas de fábrica. */
+/** Os tokens que o editor mostra, agrupados. Todos são cor cheia (#rrggbb) em toda base e destaque de fábrica. */
 export const GRUPOS_DE_TOKENS = [
   { id: 'fundo', rotulo: 'Fundo', tokens: [['--quadro-fundo', 'Quadro'], ['--grade', 'Grade'], ['--painel', 'Painel'], ['--painel-alto', 'Painel alto'], ['--lateral-fundo', 'Lateral'], ['--cartao', 'Cartão']] },
   { id: 'bordas', rotulo: 'Bordas', tokens: [['--borda', 'Borda'], ['--borda-suave', 'Borda suave'], ['--corda', 'Corda']] },
   { id: 'texto', rotulo: 'Texto', tokens: [['--texto', 'Texto'], ['--texto-suave', 'Texto suave']] },
-  { id: 'destaque', rotulo: 'Destaque', tokens: [['--destaque', 'Destaque'], ['--destaque-claro', 'Destaque claro'], ['--destaque-forte', 'Destaque forte']] },
+  { id: 'destaque', rotulo: 'Destaque', tokens: [['--destaque', 'Destaque'], ['--destaque-claro', 'Destaque claro'], ['--destaque-forte', 'Destaque forte'], ['--texto-sobre-destaque', 'Texto sobre destaque']] },
   { id: 'estados', rotulo: 'Perigo e estados', tokens: [['--perigo', 'Perigo'], ['--atencao', 'Atenção'], ['--vivo', 'Vivo']] },
   { id: 'terminal', rotulo: 'Terminal', tokens: [['--terminal-cabecalho', 'Cabeçalho'], ['--terminal-corpo', 'Corpo'], ['--terminal-texto', 'Texto']] }
 ] as const satisfies ReadonlyArray<{ id: string; rotulo: string; tokens: ReadonlyArray<readonly [string, string]> }>

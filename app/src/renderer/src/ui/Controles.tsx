@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Gauge, Map as IconeMapa, Minus, Moon, PanelLeft, PanelRight, Plus, Scan, Sun } from 'lucide-react'
 import type { ResumoContextoTerminal } from '../../../shared/api'
+import { temaEscuro, temaOposto } from '../../../shared/temas'
 import {
   alternarExplorador,
   alternarLateral,
@@ -71,10 +72,10 @@ export function CantoSuperior() {
       </button>
       <button
         className="botao-redondo"
-        title={tema === 'escuro' ? 'Tema claro' : 'Tema escuro'}
-        onClick={() => definirTema(tema === 'escuro' ? 'claro' : 'escuro')}
+        title={temaEscuro(tema) ? 'Tema claro' : 'Tema escuro'}
+        onClick={() => definirTema(temaOposto(tema))}
       >
-        {tema === 'escuro' ? <Sun size={16} /> : <Moon size={16} />}
+        {temaEscuro(tema) ? <Sun size={16} /> : <Moon size={16} />}
       </button>
     </div>
   )

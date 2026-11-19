@@ -22,6 +22,7 @@ import {
   Users,
   type LucideIcon, Settings, Bot, Clock, Plug } from 'lucide-react'
 import type { No } from '../../../shared/modelo'
+import { temaEscuro } from '../../../shared/temas'
 import {
   abrirEspaco,
   abrirNovaJanela,
@@ -159,7 +160,7 @@ function montarItens(): Item[] {
     { rotulo: 'Ver tudo', grupo: 'Comando', icone: Scan, detalhe: 'Ctrl+1', acao: enquadrarTudo },
     { rotulo: 'Selecionar tudo', grupo: 'Comando', icone: Scan, detalhe: 'Ctrl+A', acao: selecionarTudo },
     { rotulo: miniMapa ? 'Esconder mini-mapa' : 'Mostrar mini-mapa', grupo: 'Comando', icone: IconeMapa, acao: alternarMiniMapa },
-    preferencias.tema === 'escuro'
+    temaEscuro(preferencias.tema)
       ? { rotulo: 'Tema claro', grupo: 'Comando', icone: Sun, acao: () => definirTema('claro') }
       : { rotulo: 'Tema escuro', grupo: 'Comando', icone: Moon, acao: () => definirTema('escuro') },
     { rotulo: 'Atalhos do teclado', grupo: 'Comando', icone: Keyboard, detalhe: '?', acao: abrirAtalhos },

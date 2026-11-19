@@ -6,7 +6,7 @@ import type { Preferencias } from './modelo.ts'
 export type PreferenciasParciais = Partial<Omit<Preferencias, 'versao'>>
 
 /** Os campos que uma janela pode gravar. Fora desta lista nada entra, nem por engano nem de propósito. */
-const CAMPOS = ['tema', 'presets', 'funcoes', 'partituras', 'corPostItPadrao', 'linhasDoCodigo', 'leitor'] as const
+const CAMPOS = ['tema', 'destaque', 'presets', 'funcoes', 'partituras', 'corPostItPadrao', 'linhasDoCodigo', 'leitor'] as const
 
 /**
  * Junta o que a janela mexeu com o que já está no disco — **campo por campo**.

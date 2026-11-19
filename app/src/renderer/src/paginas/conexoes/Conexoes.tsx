@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, Copy, Globe, KeyRound, Plug, Trash2, Wrench } from 'lucide-react'
+import { Check, Copy, Download, Globe, KeyRound, Plug, Trash2, Wrench } from 'lucide-react'
 import { comecoParaTela, configuracoesDoMcp, type ComandoDoMcp, type ConfiguracoesDoMcp } from '../../../../shared/chaves'
 import { listarFerramentas } from '../../../../shared/ferramentasMcp'
 import type { ResumoDePortal } from '../../../../shared/portais'
@@ -7,10 +7,10 @@ import { avisar, confirmar } from '../../ui/Perguntas'
 import '../../estilos/conexoes.css'
 
 // Conexões (página geral): tudo o que liga o Orkester ao que está fora dele, numa tela só — as chaves que deixam
-// um cliente de fora (o Claude do usuário, o Codex) mexer no quadro, o comando para ligar o MCP do Orkester com a
-// lista do que ele faz, e os portais do navegador embutido, onde os logins ficam guardados.
-// Só mostra e organiza o que já existe: o cofre de chaves é main/chaves.ts, as ferramentas são as do servidor
-// (shared/ferramentasMcp.ts) e os portais são a partição do Electron (main/portais.ts).
+// um cliente de fora (o Claude do usuário, o Codex) mexer no quadro, o comando para ligar o MCP do Orkester (e um botão que baixa,
+// em Markdown, a lista do que ele faz), e os portais do navegador embutido, onde os logins ficam guardados.
+// Só mostra e organiza o que já existe: o cofre de chaves é main/chaves.ts, a lista das ferramentas sai do registro do servidor
+// (shared/ferramentasMcp.ts) e é salva pelo principal e os portais são a partição do Electron (main/portais.ts).
 
 type ChaveNaTela = Awaited<ReturnType<typeof window.ork.chaves.listar>>[number]
 type Formato = keyof ConfiguracoesDoMcp
@@ -227,7 +227,16 @@ function Chaves({ mcp }: { mcp: EstadoMcp }) {
 }
 
 function ServidorMcp({ mcp }: { mcp: EstadoMcp }) {
-  const ferramentas = useMemo(() => listarFerramentas(), [])
+  const total = useMemo(() => listarFerramentas().length, [])
+  const [resultado, definirResultado] = useState<{ caminho: string; erro: string } | null>(null)
+  async function baixar(): Promise<void> {
+    try {
+      const r = await window.ork.chaves.salvarListaDeFerramentas()
+      if (r) definirResultado('erro' in r ? { caminho: '', erro: `Não consegui salvar a lista: ${r.erro}` } : { caminho: r.caminho, erro: '' })
+    } catch (e) {
+      definirResultado({ caminho: '', erro: `Não consegui salvar a lista: ${mensagemDe(e)}` })
+    }
+  }
   const { config, erro } = useMemo(() => (mcp.comando ? montarConfig(NO_LUGAR_DA_CHAVE, mcp.comando) : { config: null, erro: mcp.erro }), [mcp])
   return (
     <Secao id="mcp" icone={<Plug size={15} />} titulo="MCP do Orkester">
@@ -244,17 +253,21 @@ function ServidorMcp({ mcp }: { mcp: EstadoMcp }) {
       ) : (
         <p className="suave conexoes-vazio">Lendo…</p>
       )}
-      <h4 className="conexoes-subtitulo">
-        <Wrench size={13} /> O que ele faz ({ferramentas.length} ferramentas)
-      </h4>
-      <ul className="conexoes-ferramentas">
-        {ferramentas.map((f) => (
-          <li key={f.nome} data-ferramenta={f.nome}>
-            <code>{f.nome}</code>
-            <span className="suave">{f.resumo}</span>
-          </li>
-        ))}
-      </ul>
+      <div className="conexoes-ferramentas" data-ferramentas-mcp>
+        <p className="conexoes-texto">
+          <Wrench size={13} /> O MCP do Orkester tem <b>{total} ferramentas</b>.
+        </p>
+        <div className="conexoes-acoes">
+          <button type="button" data-baixar-ferramentas onClick={() => void baixar()}>
+            <Download size={13} /> Baixar a lista (.md)
+          </button>
+        </div>
+      </div>
+      {resultado && (
+        <p className={resultado.erro ? 'conexoes-erro' : 'suave conexoes-nota'} role={resultado.erro ? 'alert' : 'status'} data-ferramentas-resultado>
+          {resultado.erro || `Lista salva em ${resultado.caminho}`}
+        </p>
+      )}
     </Secao>
   )
 }

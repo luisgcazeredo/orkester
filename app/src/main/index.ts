@@ -9,6 +9,7 @@ import { registrarArea, registrarEsquemaImagem, servirImagens } from './area'
 import { registrarChaves } from './chaves'
 import { registrarPortais } from './portais'
 import { registrarTemas } from './temas'
+import { registrarKanban } from './kanban'
 import { registrarCodigo } from './codigo'
 import { registrarLeitor } from './leitor'
 import { registrarComandos } from './comandos'
@@ -33,6 +34,10 @@ import { rodarAutoteste, rodarMedicao } from './ferramentas-dev'
 const autoteste = process.argv.includes('--autoteste')
 // Medição de memória: sobe sem janela, abre muitos terminais, mede e sai (npm run medir).
 const medindo = process.argv.includes('--medir')
+// Prévia (scripts/previa.mjs): o app local aberto para o Luís mexer antes de instalar. Roda com ORK_DADOS próprio
+// (outra pasta de dados = outro perfil do Chromium = outra trava de instância e outro pipe), então convive com o
+// Orkester instalado. Só muda a janela: título "PRÉVIA" e abrir maximizada na tela que não é a principal.
+const previa = process.env.ORK_PREVIA === '1'
 // No autoteste a janela pode ficar atrás de outras; sem isto o Windows para de desenhá-la e o print sai velho.
 if (autoteste) app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
 // E o autoteste usa um perfil do Chromium só dele: com o app instalado aberto, os dois disputavam o mesmo
@@ -88,6 +93,13 @@ function posicaoAutoteste(largura: number, altura: number): { x?: number; y?: nu
   }
 }
 
+/** Prévia: a janela nasce na área útil da tela não principal (uma tela só → a principal) e depois maximiza. */
+function posicaoDaPrevia(): { x: number; y: number } {
+  const principal = screen.getPrimaryDisplay()
+  const area = (screen.getAllDisplays().find((tela) => tela.id !== principal.id) ?? principal).workArea
+  return { x: area.x + 40, y: area.y + 40 }
+}
+
 /**
  * Uma janela do app. `espacoInicial`: o espaço que ela mostra ao abrir (null = o último usado).
  * `caixa`: onde ela estava na sessão passada; sem ela, a janela nasce deslocada da que está na frente.
@@ -95,7 +107,9 @@ function posicaoAutoteste(largura: number, altura: number): { x?: number; y?: nu
 function criarJanela(espacoInicial: string | null = null, caixa?: Partial<Rectangle> & { maximizada?: boolean }): BrowserWindow {
   // janela nova aparece um pouco deslocada da que está na frente, para não esconder uma atrás da outra
   const frente = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
-  const posicao = caixa
+  const posicao = previa
+    ? posicaoDaPrevia()
+    : caixa
     ? { x: caixa.x, y: caixa.y }
     : frente && !frente.isDestroyed() && !frente.isMaximized()
       ? { x: frente.getBounds().x + 36, y: frente.getBounds().y + 36 }
@@ -108,7 +122,7 @@ function criarJanela(espacoInicial: string | null = null, caixa?: Partial<Rectan
     ...posicao,
     minWidth: 640,
     minHeight: 420,
-    title: 'Orkester',
+    title: previa ? 'PRÉVIA · Orkester' : 'Orkester',
     // instalado, o ícone vem do próprio .exe
     icon: app.isPackaged ? undefined : join(__dirname, '../../build/icon.png'),
     backgroundColor: '#1E1E1E',
@@ -127,9 +141,16 @@ function criarJanela(espacoInicial: string | null = null, caixa?: Partial<Rectan
   })
 
   janela.once('ready-to-show', () => {
-    if (caixa?.maximizada) janela.maximize()
+    if (caixa?.maximizada || previa) janela.maximize()
     janela.show()
   })
+  // a página troca o título (espaço aberto); na prévia ele sempre começa com PRÉVIA, para não confundir com o instalado
+  if (previa) {
+    janela.on('page-title-updated', (evento, titulo) => {
+      evento.preventDefault()
+      janela.setTitle(`PRÉVIA · ${titulo}`)
+    })
+  }
   const idConteudo = janela.webContents.id
   lembrarInicial(idConteudo, espacoInicial)
   acompanharJanela(janela)
@@ -256,6 +277,7 @@ if (!autoteste && !medindo && !app.requestSingleInstanceLock()) {
     registrarChaves()
     registrarPortais()
     registrarTemas()
+    registrarKanban()
     registrarAndares()
     registrarArea()
     registrarNavegador()

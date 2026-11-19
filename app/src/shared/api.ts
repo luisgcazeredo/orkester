@@ -499,6 +499,8 @@ export type AvisoJanelas =
   | { tipo: 'preferencias' }
   /** Os temas do usuário ou os plugins de CSS mudaram (em outra janela). */
   | { tipo: 'temas' }
+  /** O kanban de um espaço mudou (agente, MCP ou outra janela): a página relê. */
+  | { tipo: 'kanban'; espacoId: string }
 
 export interface ApiJanelas {
   /** Fica com o espaço nesta janela. false: ele já está aberto em outra janela, que vem para a frente. */
@@ -520,6 +522,8 @@ export interface ApiChaves {
   revogar(id: string): Promise<void>
   /** Como subir o servidor MCP nesta máquina: entra na configuração que o usuário cola no cliente. */
   comandoDoMcp(): Promise<import('./chaves').ComandoDoMcp>
+  /** Abre o diálogo de salvar do sistema e grava a lista das ferramentas do MCP em Markdown. null: cancelou. */
+  salvarListaDeFerramentas(): Promise<{ caminho: string } | { erro: string } | null>
 }
 
 /** Os portais do navegador embutido: onde ficam os logins, e como limpá-los. Nada de valor de cookie passa por aqui. */
@@ -537,6 +541,16 @@ export interface ApiTemas {
   escolherCss(): Promise<{ nome: string; texto: string } | { erro: string } | null>
 }
 
+/**
+ * Kanban do espaço (ver shared/kanban.ts). O principal é o dono do arquivo: lê, valida, aplica e grava. `aplicar`
+ * só vale no espaço da própria janela; a operação é a mesma que o `ork kanban` e o MCP usam.
+ */
+export interface ApiKanban {
+  /** O arquivo, os agentes do espaço com situação e fila, e `soLeitura` se o arquivo é de uma versão mais nova. */
+  ler(espacoId: string): Promise<import('./kanban').LeituraDoKanban>
+  aplicar(espacoId: string, operacao: import('./kanban').OperacaoDoKanban): Promise<import('./kanban').ResultadoDoKanban>
+}
+
 export interface ApiOrkester {
   terminal: ApiTerminal
   dados: ApiDados
@@ -552,6 +566,7 @@ export interface ApiOrkester {
   chaves: ApiChaves
   portais: ApiPortais
   temas: ApiTemas
+  kanban: ApiKanban
   /** Chamado quando a janela vai fechar; `salvar` diz se gravou. Se não gravou, o app pergunta antes de fechar. */
   aoPedirFechar(salvar: () => Promise<boolean>): void
   autoteste: boolean
@@ -573,6 +588,12 @@ export const CANAIS_TEMAS = {
   ler: 'temas:ler',
   aplicar: 'temas:aplicar',
   escolherCss: 'temas:escolher-css'
+} as const
+
+/** Kanban do espaço. */
+export const CANAIS_KANBAN = {
+  ler: 'kanban:ler',
+  aplicar: 'kanban:aplicar'
 } as const
 
 export const CANAIS = {
@@ -646,7 +667,8 @@ export const CANAIS_CHAVES = {
   listar: 'chaves:listar',
   criar: 'chaves:criar',
   revogar: 'chaves:revogar',
-  comando: 'chaves:comando'
+  comando: 'chaves:comando',
+  salvarLista: 'chaves:salvar-lista'
 } as const
 
 export const CANAIS_LEITOR = {

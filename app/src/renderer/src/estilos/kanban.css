@@ -1,0 +1,806 @@
+/* ------------------------------------------------------------------ página Kanban (1.9.4, K2-F)
+ * Só tokens: nenhuma cor literal aqui (vale para qualquer tema, inclusive os do usuário). Escopo `.kanban`
+ * (`[data-pagina-geral="kanban"]`). Colunas na largura toda; rolagem horizontal só quando não cabem.
+ */
+
+.kanban .espaco-flex {
+  flex: 1;
+}
+
+.kanban-sem-espaco {
+  padding: var(--espaco-5);
+}
+
+/* ---------- topo ---------- */
+.kanban-topo {
+  gap: var(--espaco-3);
+}
+
+.kanban-linha-titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.kanban-linha-titulo h2 .suave {
+  font-weight: 400;
+}
+
+.kanban .kanban-espaco {
+  min-width: 140px;
+  max-width: 320px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.kanban-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--espaco-3);
+}
+
+.kanban-filtros label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  color: var(--texto-suave);
+  font-size: 12px;
+}
+
+.kanban-filtros select {
+  min-width: 140px;
+  max-width: 260px;
+}
+
+.kanban-filtros .kanban-busca {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-width: 260px;
+  flex: 0 1 380px;
+  padding: 0 var(--espaco-2);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel);
+}
+
+.kanban-filtros .kanban-busca:focus-within {
+  border-color: var(--destaque);
+}
+
+.kanban-filtros .kanban-busca input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding-left: 0;
+}
+
+.kanban-filtros .kanban-marcar {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--espaco-2);
+  height: 32px;
+  color: var(--texto);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.kanban-filtros .kanban-marcar input {
+  accent-color: var(--destaque);
+  margin: 0;
+}
+
+.kanban-total {
+  align-self: center;
+  font-size: 13px;
+}
+
+.kanban-aviso {
+  margin: var(--espaco-3) var(--espaco-5) 0;
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 1px solid color-mix(in srgb, var(--atencao) 50%, transparent);
+  border-radius: var(--raio-pequeno);
+  background: color-mix(in srgb, var(--atencao) 14%, transparent);
+  color: var(--texto);
+  font-size: 13px;
+}
+
+/* ---------- botões ---------- */
+.kanban-botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 var(--espaco-3);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.kanban-botao:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.kanban-botao.primario {
+  border-color: var(--destaque);
+  background: var(--destaque);
+  color: var(--texto-sobre-destaque);
+}
+
+.kanban-botao.primario:hover:not(:disabled) {
+  background: var(--destaque-forte);
+}
+
+.kanban-botao.perigo {
+  border-color: color-mix(in srgb, var(--perigo) 55%, transparent);
+  color: var(--perigo);
+}
+
+.kanban-botao.perigo:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--perigo) 12%, transparent);
+}
+
+.kanban-botao:disabled,
+.kanban-icone:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.kanban-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--texto-suave);
+  cursor: pointer;
+}
+
+.kanban-icone:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--texto);
+}
+
+.kanban-mais {
+  border-color: var(--borda);
+  background: var(--painel);
+}
+
+.kanban-botao:focus-visible,
+.kanban-icone:focus-visible,
+.kanban-tarefa:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 1px;
+}
+
+/* ---------- corpo: colunas + painel ---------- */
+.kanban-corpo {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.kanban-colunas {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--kanban-n, 5), minmax(200px, 1fr));
+  gap: var(--espaco-3);
+  padding: var(--espaco-4) var(--espaco-5);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* com o painel aberto, as colunas encolhem até 180 px: as 4 padrão cabem numa janela de ~1260 px sem rolar
+ * (rolagem horizontal só com mais colunas ou janela menor); o título da tarefa quebra linha */
+.kanban-corpo.com-painel .kanban-colunas {
+  grid-template-columns: repeat(var(--kanban-n, 5), minmax(150px, 1fr));
+  gap: var(--espaco-2);
+  padding: var(--espaco-4);
+}
+
+.kanban-coluna {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio);
+  background: var(--painel);
+}
+
+.kanban-coluna.alvo {
+  border-color: var(--destaque);
+}
+
+.kanban-coluna-topo {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-height: 40px;
+  padding: var(--espaco-2) var(--espaco-3);
+  border-bottom: 1px solid var(--borda-suave);
+  user-select: none;
+}
+
+.kanban-coluna-nome {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kanban .kanban-coluna-renomear {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+}
+
+.kanban-coluna-contagem {
+  flex-shrink: 0;
+  min-width: 22px;
+  padding: 1px 8px;
+  border-radius: var(--raio-pilula);
+  background: var(--painel-alto);
+  color: var(--texto-suave);
+  font-size: 12px;
+  text-align: center;
+}
+
+.kanban-coluna-lista {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  padding: var(--espaco-2);
+  overflow-y: auto;
+}
+
+.kanban-coluna-vazia {
+  margin: var(--espaco-2) var(--espaco-1);
+  font-size: 12px;
+}
+
+/* ---------- tarefa ---------- */
+.kanban-tarefa {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 1px solid var(--pilula-borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--pilula-fundo);
+  color: var(--texto);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.kanban-tarefa:hover {
+  border-color: var(--borda);
+  box-shadow: var(--sombra-leve);
+}
+
+.kanban-tarefa.aberta {
+  border-color: var(--destaque);
+  background: color-mix(in srgb, var(--destaque) 8%, var(--pilula-fundo));
+}
+
+.kanban-tarefa.arrastando {
+  opacity: 0.35;
+}
+
+.kanban-arrastando,
+.kanban-arrastando .kanban-tarefa {
+  cursor: grabbing;
+}
+
+.kanban-fantasma {
+  position: fixed;
+  z-index: 50;
+  pointer-events: none;
+  transform: rotate(1.5deg);
+}
+
+.kanban-fantasma .kanban-tarefa {
+  border-color: var(--destaque);
+  box-shadow: var(--sombra);
+}
+
+.kanban-vaga {
+  flex-shrink: 0;
+  height: 4px;
+  margin: -3px 0;
+  border-radius: var(--raio-pilula);
+  background: var(--destaque);
+}
+
+.kanban-tarefa-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-2);
+}
+
+.kanban-numero {
+  color: var(--texto-suave);
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+}
+
+.kanban-tarefa-comentarios {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--texto-suave);
+  font-size: 12px;
+}
+
+.kanban-tarefa-titulo {
+  display: -webkit-box;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.kanban-etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kanban-etiqueta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 1px 8px;
+  border: 1px solid color-mix(in srgb, var(--destaque) 35%, transparent);
+  border-radius: var(--raio-pilula);
+  background: color-mix(in srgb, var(--destaque) 12%, transparent);
+  color: var(--texto);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.kanban-etiqueta-tirar {
+  display: inline-flex;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--texto-suave);
+  cursor: pointer;
+}
+
+.kanban-etiqueta-tirar:hover {
+  color: var(--perigo);
+}
+
+/* chips de "trabalhando" (e o do Maestro): a cor vai no ponto; o texto fica na cor do texto (lê nos 2 temas).
+   Fechado: o chip apaga; cartão apagado: o nome fica riscado. */
+.kanban-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-1);
+  min-width: 0;
+}
+
+.kanban-chip {
+  --cor-situacao: var(--texto-suave);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 1px 8px 1px 6px;
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pilula);
+  background: var(--painel-alto);
+  color: var(--texto);
+  font-size: 12px;
+}
+
+.kanban-chip-nome {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kanban-chip-extra {
+  flex-shrink: 0;
+  color: var(--texto-suave);
+  white-space: nowrap;
+}
+
+.kanban-ponto {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cor-situacao);
+}
+
+.kanban .situacao-livre {
+  --cor-situacao: var(--vivo);
+}
+
+.kanban .situacao-trabalhando {
+  --cor-situacao: var(--atencao);
+}
+
+.kanban .situacao-pergunta {
+  --cor-situacao: var(--destaque);
+}
+
+.kanban-chip.situacao-encerrado {
+  opacity: 0.6;
+}
+
+.kanban-chip.situacao-sem-cartao {
+  opacity: 0.6;
+}
+
+.kanban-chip.situacao-sem-cartao .kanban-chip-nome {
+  text-decoration: line-through;
+}
+
+.kanban-chip.situacao-sem-cartao .kanban-ponto {
+  border: 1px dashed var(--texto-suave);
+  background: transparent;
+}
+
+/* cabeçalho da coluna de delegar: há Maestro (e como ele está) ou não */
+.kanban-coluna-maestro {
+  --cor-situacao: var(--texto-suave);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: var(--espaco-1) var(--espaco-3);
+  border-bottom: 1px solid var(--borda-suave);
+  color: var(--texto);
+  font-size: 12px;
+}
+
+.kanban-coluna-maestro.sem-maestro {
+  color: var(--texto-suave);
+  font-style: italic;
+}
+
+/* "+ Demanda" no topo da coluna de entrada: o botão, ou o campo aberto */
+.kanban-demanda {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  padding: var(--espaco-2) var(--espaco-2) 0;
+}
+
+.kanban .kanban-demanda-campo {
+  width: 100%;
+}
+
+.kanban-demanda-abrir {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  margin: var(--espaco-2) var(--espaco-2) 0;
+  padding: var(--espaco-1) var(--espaco-2);
+  border: 1px dashed var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--texto-suave);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.kanban-demanda-abrir:hover {
+  border-color: var(--destaque);
+  color: var(--texto);
+}
+
+.kanban-demanda-abrir:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 1px;
+}
+
+/* ---------- painel da tarefa / lixeira ---------- */
+.kanban-painel {
+  flex: 0 0 380px;
+  max-width: 45%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--borda);
+  background: var(--painel);
+}
+
+.kanban-painel-topo {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: var(--espaco-2) var(--espaco-3) var(--espaco-2) var(--espaco-4);
+  border-bottom: 1px solid var(--borda-suave);
+}
+
+.kanban-painel-nome {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.kanban-painel-corpo {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  padding: var(--espaco-3) var(--espaco-4) var(--espaco-4);
+  overflow-y: auto;
+}
+
+/* o texto do título alinha com os outros campos: a borda (1) e o respiro (8) ficam para fora da coluna do painel */
+.kanban .kanban-painel-titulo {
+  width: calc(100% + 18px);
+  margin: 0 -9px;
+  padding: 6px 8px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.kanban .kanban-painel-titulo:hover:not(:disabled) {
+  border-color: var(--borda);
+}
+
+.kanban-painel-campos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--espaco-3);
+}
+
+.kanban-painel-campos label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  min-width: 0;
+  color: var(--texto-suave);
+  font-size: 12px;
+}
+
+.kanban-delegar {
+  align-self: end;
+  height: 30px;
+}
+
+.kanban-delegada {
+  margin: 0;
+  font-size: 12px;
+}
+
+.kanban-trabalhando {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kanban-trabalhando-item {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-width: 0;
+}
+
+.kanban-trabalhando-item .kanban-icone {
+  width: 24px;
+  height: 24px;
+}
+
+.kanban .kanban-por-agente {
+  width: 100%;
+}
+
+.kanban-ir {
+  height: 26px;
+  margin-left: auto;
+  font-size: 12px;
+}
+
+.kanban-painel-secao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+}
+
+.kanban-painel-secao h4 {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  margin: 0;
+  color: var(--texto-suave);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kanban-painel-secao h4 .kanban-icone {
+  width: 24px;
+  height: 24px;
+}
+
+.kanban-dica {
+  margin: 0;
+  font-size: 12px;
+}
+
+.kanban .kanban-etiqueta-nova {
+  width: 100%;
+}
+
+.kanban .kanban-descricao-campo,
+.kanban .kanban-comentario-campo {
+  width: 100%;
+  resize: vertical;
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.kanban .kanban-comentario-campo {
+  font-family: var(--fonte-interface);
+  font-size: 13px;
+}
+
+.kanban-descricao.md-corpo {
+  max-width: none;
+  margin: 0;
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  background: var(--quadro-fundo);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.kanban-descricao.md-corpo > :first-child {
+  margin-top: 0;
+}
+
+.kanban-descricao.md-corpo > :last-child {
+  margin-bottom: 0;
+}
+
+.kanban-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+}
+
+.kanban-comentarios {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kanban-comentario {
+  padding: var(--espaco-2) var(--espaco-3);
+  border-left: 2px solid var(--borda);
+  background: var(--painel-alto);
+  border-radius: 0 var(--raio-micro) var(--raio-micro) 0;
+}
+
+.kanban-comentario-quem {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kanban-comentario p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.kanban-erro {
+  margin: 0;
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 1px solid color-mix(in srgb, var(--perigo) 50%, transparent);
+  border-radius: var(--raio-pequeno);
+  background: color-mix(in srgb, var(--perigo) 12%, transparent);
+  color: var(--texto);
+  font-size: 13px;
+}
+
+.kanban-meta {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.kanban-lixeira {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kanban-lixeira-item {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  background: var(--pilula-fundo);
+}
+
+.kanban-lixeira-dados {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.kanban-lixeira-dados .suave {
+  font-size: 12px;
+}
+
+/* janela estreita: o painel passa por cima das colunas em vez de espremê-las */
+@media (max-width: 900px) {
+  .kanban-corpo {
+    position: relative;
+  }
+
+  .kanban-painel {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: min(420px, 100%);
+    max-width: none;
+    box-shadow: var(--sombra);
+  }
+}

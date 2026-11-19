@@ -4,11 +4,12 @@
 // O arquivo guarda **impressão digital, nunca o segredo**: perder o arquivo não entrega acesso a ninguém,
 // e nem o app consegue mostrar uma chave de novo depois de criada. Quem perder a sua gera outra e revoga a
 // velha — que é como funciona em qualquer lugar que leve chave a sério.
-import { ipcMain } from 'electron'
+import { BrowserWindow, app, dialog, ipcMain } from 'electron'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { CANAIS_CHAVES } from '../shared/api'
+import { listaEmMarkdown } from '../shared/ferramentasMcp'
 import {
   COFRE_VAZIO,
   chavePorSegredo,
@@ -80,7 +81,26 @@ export function usuarioPorChave(segredo: unknown): ChaveGuardada | undefined {
   return chave
 }
 
+/** O diálogo de salvar do sistema; o texto é gerado aqui, do registro, e a tela não manda conteúdo nenhum. */
+async function salvarListaDeFerramentas(evento: Electron.IpcMainInvokeEvent): Promise<{ caminho: string } | { erro: string } | null> {
+  const janela = BrowserWindow.fromWebContents(evento.sender)
+  const opcoes = {
+    title: 'Salvar a lista de ferramentas do MCP',
+    defaultPath: join(app.getPath('documents'), 'ferramentas-mcp-orkester.md'),
+    filters: [{ name: 'Markdown', extensions: ['md'] }]
+  }
+  const r = await (janela ? dialog.showSaveDialog(janela, opcoes) : dialog.showSaveDialog(opcoes))
+  if (r.canceled || !r.filePath) return null
+  try {
+    writeFileSync(r.filePath, listaEmMarkdown(), 'utf8')
+    return { caminho: r.filePath }
+  } catch (e) {
+    return { erro: `não consegui gravar: ${e instanceof Error ? e.message : String(e)}` }
+  }
+}
+
 export function registrarChaves(): void {
+  ipcMain.handle(CANAIS_CHAVES.salvarLista, (evento) => salvarListaDeFerramentas(evento))
   ipcMain.handle(CANAIS_CHAVES.listar, () => listar())
   ipcMain.handle(CANAIS_CHAVES.criar, (_e, nome: string) => criar(nome))
   ipcMain.handle(CANAIS_CHAVES.revogar, (_e, id: string) => revogar(id))

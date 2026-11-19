@@ -7,6 +7,7 @@ import type { PedidoNoQuadro } from '../shared/quadro/agente'
 import { criarEspacoDoAgente, resumosDosEspacos } from './dados'
 import { arquivoAcompanhado } from './codigo'
 import { AJUDA } from './manual'
+import { acaoDoKanban, PERMISSOES_DO_KANBAN, rodarKanban } from './kanban'
 import { conferirModelo, lerModelos, modeloDasOpcoes, textoDoModelo, textoDosModelos } from './modelos'
 import { type NomeDeVerbo } from './verbos'
 import { encerrarAgora, marcarFechamento, escreverNoProcesso, esperarSessao, sessoesCriadasPor, telaDe, type Sessao } from './terminais'
@@ -457,6 +458,23 @@ export const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
     })
     if (!r.ok) throw new Error(r.erro)
     return { saida: r.texto ?? 'Pronto.' }
+  },
+
+  /**
+   * O kanban do espaço. O dono do arquivo é o processo principal (não a janela): funciona com o espaço fechado, e
+   * dois agentes gravando juntos não se atropelam. O agente só alcança o kanban do próprio espaço
+   * (`PERMISSOES_DO_KANBAN`, em main/kanban.ts).
+   */
+  kanban: async ({ eu, pos, opcoes, texto }) => {
+    const acao = acaoDoKanban(pos)
+    let espacoId = eu.espacoId
+    if (typeof opcoes.espaco === 'string') {
+      if (PERMISSOES_DO_KANBAN.agenteEmOutroEspaco !== 'ler' || acao !== 'ver') {
+        throw new Error('você só mexe no kanban do seu espaço: tire o --espaco (o kanban de outro espaço é do usuário, pela página)')
+      }
+      espacoId = espacoPorNome(opcoes.espaco).id
+    }
+    return { saida: await rodarKanban(espacoId, { id: eu.id, nome: eu.espec.nome }, pos, opcoes, texto) }
   },
 
   /** As funções (papéis) que o usuário guardou. Quem sabe quais existem é a janela, dona das preferências. */

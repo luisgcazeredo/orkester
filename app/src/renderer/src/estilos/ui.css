@@ -556,7 +556,7 @@ body.em-gesto webview {
 /* a ferramenta em uso é a única coisa preenchida com a cor da marca: não há dúvida de onde você está */
 .ferramenta.ativa {
   background: var(--destaque);
-  color: var(--texto-sobre-cor);
+  color: var(--texto-sobre-destaque);
 }
 
 .ferramenta:hover:not(:disabled):not(.ativa) {
@@ -1085,7 +1085,7 @@ body.em-gesto webview {
 .menu-item:hover:not(:disabled),
 .menu-item.aberto {
   background: var(--destaque);
-  color: var(--texto-sobre-cor);
+  color: var(--texto-sobre-destaque);
 }
 
 .menu-item:disabled {
@@ -1177,7 +1177,7 @@ body.em-gesto webview {
   place-items: center;
   border-radius: var(--raio-pilula);
   background: var(--destaque);
-  color: var(--texto-sobre-cor);
+  color: var(--texto-sobre-destaque);
   font-size: 11px;
 }
 
@@ -1221,7 +1221,7 @@ body.em-gesto webview {
 .pilula-andar.ativa {
   border-color: var(--destaque);
   background: var(--destaque);
-  color: var(--texto-sobre-cor);
+  color: var(--texto-sobre-destaque);
 }
 
 .pilula-andar.novo {
@@ -1385,6 +1385,19 @@ body.em-gesto webview {
   color: var(--texto-sobre-cor);
 }
 
+/* o botão de perigo também se distingue pela forma (o triângulo de aviso), não só pela cor: com o destaque Vermelho
+   o botão principal fica vermelho também, e o par "Cancelar" × "Apagar" não pode depender do tom */
+.dialogo-acoes .perigo::before {
+  content: '';
+  display: inline-block;
+  width: 0.95em;
+  height: 0.95em;
+  margin-right: 0.45em;
+  vertical-align: -0.12em;
+  background: currentColor;
+  clip-path: polygon(50% 6%, 98% 92%, 2% 92%);
+}
+
 .aviso-erro {
   position: absolute;
   left: 14px;
@@ -1481,7 +1494,7 @@ body.em-gesto webview {
 .dialogo-acoes .primario {
   border-color: var(--destaque);
   background: var(--destaque);
-  color: var(--texto-sobre-cor);
+  color: var(--texto-sobre-destaque);
   font-weight: 600;
 }
 
@@ -1561,7 +1574,7 @@ body.em-gesto .barra-selecao {
   place-items: center;
   border-radius: var(--raio-pilula);
   background: var(--destaque);
-  color: var(--texto-sobre-cor);
+  color: var(--texto-sobre-destaque);
   font-size: 11px;
 }
 
@@ -1695,7 +1708,7 @@ kbd {
 
 .paleta-item.ativo {
   background: var(--destaque);
-  color: var(--texto-sobre-cor);
+  color: var(--texto-sobre-destaque);
 }
 
 .paleta-rotulo {
@@ -1782,7 +1795,7 @@ kbd {
   border: 1px solid var(--destaque);
   border-radius: var(--raio-pequeno);
   background: var(--destaque);
-  color: var(--texto-sobre-cor);
+  color: var(--texto-sobre-destaque);
 }
 
 .botao-mini.ativo {

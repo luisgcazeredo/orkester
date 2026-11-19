@@ -34,6 +34,7 @@ import {
   Plus,
   Scan,
   Scissors,
+  SquareKanban,
   SquareTerminal,
   StickyNote,
   Sun,
@@ -108,9 +109,10 @@ import {
   trazerParaFrente
 } from '../estado/loja'
 import { ehVisor } from '../../../shared/quadro/visor'
+import { temaEscuro } from '../../../shared/temas'
 import { anexarAoPrompt, anexarArquivosAoPrompt, anexarPastaAoPrompt } from './anexar'
 import { abrirAtalhos } from './Atalhos'
-import { abrirRotinas } from '../paginas/abrir'
+import { abrirKanban, abrirRotinas } from '../paginas/abrir'
 import { colar, copiarSelecao } from './area'
 import { alternarRecolhido } from '../nos/Codigo'
 import { CORES_DE_CARTAO } from '../estado/coresDeDados'
@@ -364,7 +366,7 @@ export function itensDoFundo(x: number, y: number): ItemMenu[] {
     { rotulo: 'Selecionar tudo', atalho: 'Ctrl+A', acao: selecionarTudo },
     { rotulo: 'Ver tudo', icone: Scan, atalho: 'Ctrl+1', acao: enquadrarTudo },
     { rotulo: 'Mini-mapa', icone: IconeMapa, marcado: miniMapa, acao: alternarMiniMapa },
-    preferencias.tema === 'escuro'
+    temaEscuro(preferencias.tema)
       ? { rotulo: 'Tema claro', icone: Sun, acao: () => definirTema('claro') }
       : { rotulo: 'Tema escuro', icone: Moon, acao: () => definirTema('escuro') },
     separador,
@@ -540,6 +542,8 @@ export function itensDoNo(no: No): ItemMenu[] {
         { rotulo: 'Código que ele escreve', icone: FileCode, submenu: itensDoCodigoDoTerminal(no) },
         itemTrocarAgente(no),
         { rotulo: 'Rotinas…', icone: Clock, acao: () => abrirRotinas(no.id) },
+        // shell não pega tarefa do kanban (só Claude e Codex são responsáveis): o item só aparece para eles
+        ...(no.agente !== 'shell' ? [{ rotulo: 'Ver tarefas dele', icone: SquareKanban, acao: () => abrirKanban({ responsavel: no.id }) }] : []),
         itemSalvarPartitura([no.id]),
         {
           rotulo: 'Anexar ao prompt',

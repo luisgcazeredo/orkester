@@ -120,7 +120,8 @@ export function instalarComando(): void {
   // o app se chamava Maestri Próprio até 06/11/2026: o comando velho sai do PATH para ninguém chamar os dois
   for (const antigo of ['mpro.cmd', 'mpro']) rmSync(join(PASTA_BIN, antigo), { force: true })
   // o manual vira skill do Claude Code e do Codex (decisão do Luís, 28/10/2026); fora do app ela manda não usar
-  if (AUTOTESTE) return
+  // a prévia (ORK_PREVIA) também não mexe em ~/.claude e ~/.codex: ali mora a skill do app instalado
+  if (AUTOTESTE || process.env.ORK_PREVIA === '1') return
   for (const pasta of [process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), process.env.CODEX_HOME || join(homedir(), '.codex')]) {
     if (!existsSync(pasta)) continue
     const destino = join(pasta, 'skills', 'orkester')

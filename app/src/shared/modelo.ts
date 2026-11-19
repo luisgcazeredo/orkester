@@ -1,4 +1,4 @@
-import type { Tema } from './temas.ts'
+import type { Destaque, Tema } from './temas.ts'
 import type { Esforco } from './modelos.ts'
 // O que fica salvo em disco. Toda mudança de formato sobe a `versao` e ganha uma migração.
 
@@ -414,6 +414,8 @@ export type { Tema } from './temas.ts'
 export interface Preferencias {
   versao: 1
   tema: Tema
+  /** A cor de destaque (1.9.4). Campo novo: sem ele (arquivo antigo), vale o azul de sempre. */
+  destaque?: Destaque
   presets: PresetAgente[]
   /** Campo novo: sem ele, não há nenhuma função guardada. */
   funcoes?: Funcao[]

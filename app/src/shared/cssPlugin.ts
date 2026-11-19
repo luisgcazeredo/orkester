@@ -37,15 +37,37 @@ const FUNCOES_ACEITAS = new Set([
  * que adivinhar o que o navegador leria). A barra invertida é recusada antes (ver `validarCssDePlugin`), então
  * nenhum escape consegue montar estas palavras.
  */
-const PROIBIDAS: Array<[RegExp, string]> = [
-  [/@import/i, '"@import" não é aceito: plugin não carrega outro arquivo'],
-  [/@font-face/i, '"@font-face" não é aceito: plugin não traz fonte de fora'],
-  [/url\s*\(/i, '"url(" não é aceito: plugin só muda cores e medidas, não carrega nada de fora'],
-  [/image-set/i, '"image-set" não é aceito: plugin não carrega imagem'],
-  [/expression/i, '"expression" não é aceito: plugin não roda código'],
-  [/@/, 'regra com "@" não é aceita: só blocos de tokens (--nome: valor)'],
-  [/</, 'o caractere "<" não é aceito']
+const PROIBIDAS_COM_PORQUE: Array<[RegExp, string, string]> = [
+  [/@import/i, '"@import" não é aceito', 'plugin não carrega outro arquivo'],
+  [/@font-face/i, '"@font-face" não é aceito', 'plugin não traz fonte de fora'],
+  [/url\s*\(/i, '"url(" não é aceito', 'plugin só muda cores e medidas, não carrega nada de fora'],
+  [/image-set/i, '"image-set" não é aceito', 'plugin não carrega imagem'],
+  [/expression/i, '"expression" não é aceito', 'plugin não roda código'],
+  [/@/, 'regra com "@" não é aceita', 'só blocos de tokens (--nome: valor)'],
+  [/</, 'o caractere "<" não é aceito', 'ele fecharia o estilo e abriria HTML']
 ]
+const PROIBIDAS: Array<[RegExp, string]> = PROIBIDAS_COM_PORQUE.map(([p, oque, porque]) => [p, `${oque}: ${porque}`])
+
+/**
+ * O que um plugin recusa e por quê, para o Guia de CSS da página Temas. Sai das MESMAS listas e tetos que a
+ * validação usa, então o guia não fica velho quando a regra muda.
+ */
+export function regrasDoPlugin(): Array<{ regra: string; porque: string }> {
+  return [
+    { regra: `seletor fora da lista (só ${SELETORES_CONHECIDOS.join(', ')})`, porque: 'plugin troca tokens de um tema, não estiliza partes do app' },
+    { regra: 'propriedade de estilo (color:, background:…): só nomes que começam com --', porque: 'só tokens; o app decide onde cada token entra' },
+    ...PROIBIDAS_COM_PORQUE.map(([, oque, porque]) => ({ regra: oque, porque })),
+    { regra: 'barra invertida ("\\")', porque: 'escapes podem esconder palavras proibidas' },
+    { regra: '";", "{", "}" e "!" dentro de um valor (e "!important")', porque: 'fechariam a declaração ou o bloco e abririam regra nova' },
+    { regra: `função fora da lista (aceitas: ${[...FUNCOES_ACEITAS].join(', ')})`, porque: 'só cor, conta e var(); nenhuma delas carrega nada' },
+    { regra: 'aspas com pontuação (só nome de fonte entre aspas)', porque: 'texto livre entre aspas viraria conteúdo, não cor ou medida' },
+    { regra: '"/*" e "*/" dentro de um valor; comentário sem fechar', porque: 'o comentário aberto engoliria o resto do CSS' },
+    {
+      regra: `texto acima de ${TAMANHO_MAXIMO_DO_CSS / 1024} KB, mais de ${DECLARACOES_MAXIMAS} declarações ou valor com mais de ${VALOR_MAXIMO} caracteres`,
+      porque: 'um tema inteiro cabe com folga; acima disso é engano ou abuso'
+    }
+  ]
+}
 
 const NOME_DE_TOKEN = /^--[a-z0-9][a-z0-9_-]{0,63}$/i
 /** Caracteres de um valor (fora de aspas): letras, dígitos, espaço e a pontuação de cor e conta. */

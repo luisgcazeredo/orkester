@@ -13,7 +13,7 @@ ${tabelaDeComandos()}
 
 export const SKILL = `---
 name: orkester
-description: Use dentro de um terminal do Orkester (a variável de ambiente ORK_PIPE existe) para fazer engenharia de contexto — abrir uma sessão nova de agente (Claude, Codex ou shell) com um contexto limpo e focado, delegar uma parte do trabalho, conversar com os agentes ligados a você pela corda, ler a tela deles, zerar o contexto de uma sessão ou fechar as sessões que você abriu — e para organizar o quadro: ler o que há nele, ler um cartão inteiro, mover, arrumar em grade, renomear, ligar dois agentes, anotar, apagar o que não tem processo e agrupar cartões — para juntar agentes numa banda (grupo em que todos se falam), trocar o agente de um cartão que você abriu, e subir um time salvo (partitura) com as funções e as cordas dele, ou guardar o time que está no quadro. Comando: ork. Fora do app não funciona.
+description: Use dentro de um terminal do Orkester (a variável de ambiente ORK_PIPE existe) para fazer engenharia de contexto — abrir uma sessão nova de agente (Claude, Codex ou shell) com um contexto limpo e focado, delegar uma parte do trabalho, conversar com os agentes ligados a você pela corda, ler a tela deles, zerar o contexto de uma sessão ou fechar as sessões que você abriu — e para organizar o quadro: ler o que há nele, ler um cartão inteiro, mover, arrumar em grade, renomear, ligar dois agentes, anotar, apagar o que não tem processo e agrupar cartões — para juntar agentes numa banda (grupo em que todos se falam), trocar o agente de um cartão que você abriu, e subir um time salvo (partitura) com as funções e as cordas dele, ou guardar o time que está no quadro — e para ler e mexer no kanban do espaço (criar, pegar, mover, atribuir e comentar tarefas). Comando: ork. Fora do app não funciona.
 ---
 
 # Orkester: o comando \`ork\`
@@ -230,6 +230,40 @@ ork abrir --funcao "Revisor"   # e o cartão nasce no motor e no nível da ficha
 - **Importar de novo atualiza**, achando a função pelo nome; nada é apagado, porque a pasta pode ser um pedaço do
   time e não o time inteiro. Arquivo sem cabeçalho é pulado e aparece no relatório.
 - Ficha de \`shell\` não leva prompt: shell não é agente, e o que fosse digitado viraria comando.
+
+## Kanban do espaço: as tarefas
+
+Cada espaço tem um kanban (a página Kanban no app). O item dele é **tarefa**, com número curto (\`#12\`): é por
+ele que você fala dela. Cartão continua sendo o do agente no quadro.
+
+\`\`\`
+ork kanban                               # as tarefas por coluna, com quem trabalha em cada uma e se está livre
+ork kanban ver 12                        # uma tarefa inteira: descrição, delegação e últimos comentários
+ork kanban ver --para eu                 # só as em que você está (ou --para "Nome", --para ninguem, --etiqueta e)
+ork kanban criar "Revisar o login" --para "Revisor" --etiqueta back --arquivo tarefa.md
+ork kanban pegar 12                      # você entra na lista (cabem vários); de Demandas vai para Fazendo
+ork kanban soltar 12                     # você sai da lista
+ork kanban mover 12 "Revisão"            # coluna pelo nome, sem caixa nem acento
+ork kanban comentar 12 "Feito o teste; falta o caso X"
+ork kanban atribuir 12 "Testador"        # põe na lista e avisa (ninguem esvazia)
+ork kanban apagar 12 --confirmar         # vai para a lixeira; a página recupera
+\`\`\`
+
+- **Colunas:** Demandas (do usuário: sem \`--coluna\`, a sua tarefa nasce em Fazendo), Com o Maestro (só o usuário
+  põe ali: é delegar), Fazendo, Revisão, Feito. **Feito** é do usuário e do agente de função Maestro; os outros
+  levam a Revisão e comentam o que fizeram.
+- **Atribuir só avisa:** o agente recebe \`[ork · kanban] Tarefa #12 ... atribuída a você\` na caixa de entrada
+  (quando estiver livre). Não é pedido de trabalho: quem pede trabalho continua sendo o \`ork pedir\`.
+- Só o kanban do **seu** espaço; quem trabalha é agente Claude ou Codex (shell não pega tarefa).
+- Descrição e comentário longos: \`--arquivo\`. Detalhe grande vai num arquivo do projeto, e a tarefa cita o caminho.
+
+### Demandas do usuário (para o Maestro)
+
+- A demanda chega como \`[ork · demanda #N do kanban]\`: o usuário a arrastou para Com o Maestro.
+- Distribua com \`ork pedir\`/\`ork abrir\` pondo \`#N\` no pedido, e mande quem for trabalhar rodar \`ork kanban pegar N\` ao começar.
+- Quem termina faz \`ork kanban comentar N "o que foi feito e onde"\` e depois \`ork kanban mover N Revisão\`.
+- A resposta ao usuário é o kanban, não \`ork entregar\`.
+- Feito: o app deixa você mover, mas quando pode é regra do seu time (a sua função); na dúvida, deixe em Revisão.
 
 ## Regras de convívio
 

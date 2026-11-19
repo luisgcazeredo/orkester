@@ -32,7 +32,7 @@ import {
 import { CANAIS_DADOS } from '../shared/api'
 import { leitorValido, pastaFixavelReal, raizesDeLeitura } from '../shared/leitor'
 import { juntarPreferencias, type PreferenciasParciais } from '../shared/preferencias'
-import { TEMA_PADRAO, temaValido } from '../shared/temas'
+import { TEMA_PADRAO, destaqueValido, temaValido } from '../shared/temas'
 import { SESSAO_VAZIA, sessaoValida, type Sessao } from '../shared/janelas'
 import { migrarEspaco } from '../shared/quadro/visor'
 import { MAX_NOME_DA_PARTITURA, MAX_PARTITURAS, MAX_PECAS, MAX_TEXTO_DA_PECA } from '../shared/quadro/partituras'
@@ -524,6 +524,7 @@ function preferenciasValidas(p: Preferencias): boolean {
   return (
     p?.versao === 1 &&
     temaValido(p.tema) &&
+    (p.destaque === undefined || destaqueValido(p.destaque)) &&
     typeof p.corPostItPadrao === 'string' &&
     partiturasValidas(p.partituras) &&
     leitorValido(p.leitor, homedir()) &&

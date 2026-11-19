@@ -67,15 +67,6 @@
   font-weight: 600;
 }
 
-.conexoes-subtitulo {
-  display: flex;
-  align-items: center;
-  gap: var(--espaco-2);
-  margin: var(--espaco-2) 0 0;
-  font-size: 13px;
-  font-weight: 600;
-}
-
 .conexoes-texto {
   margin: 0;
   max-width: 78ch;
@@ -150,7 +141,7 @@
   height: 36px;
   border-color: var(--destaque);
   background: var(--destaque);
-  color: var(--texto-sobre-cor);
+  color: var(--texto-sobre-destaque);
   font-weight: 600;
 }
 
@@ -276,26 +267,16 @@
   justify-content: center;
 }
 
-/* ferramentas do MCP */
+/* ferramentas do MCP: uma linha e o botão que baixa a lista */
 .conexoes-ferramentas {
   display: flex;
-  flex-direction: column;
-  gap: var(--espaco-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.conexoes-ferramentas li {
-  display: grid;
-  grid-template-columns: 170px 1fr;
-  align-items: baseline;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--espaco-3);
-  padding: var(--espaco-1) var(--espaco-3);
-  border-bottom: 1px solid var(--borda-suave);
-  font-size: 13px;
 }
 
-.conexoes-ferramentas li:last-child {
-  border-bottom: 0;
+.conexoes-ferramentas .conexoes-texto svg {
+  margin-right: var(--espaco-2);
+  vertical-align: -2px;
 }
+

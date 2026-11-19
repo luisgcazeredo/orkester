@@ -1,17 +1,21 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { ArrowDown, ArrowUp, Check, Copy, FileUp, Palette, Pencil, Plus, RotateCcw, Trash2, Puzzle } from 'lucide-react'
-import { TEMAS, type Tema } from '../../../../shared/temas'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import { ArrowDown, ArrowUp, BookOpen, Check, Copy, FileUp, Palette, Pencil, Plus, RotateCcw, Trash2, Puzzle } from 'lucide-react'
+import { SELETORES_CONHECIDOS } from '../../../../shared/cssPlugin'
+import { DESTAQUES, TEMAS, classeDoDestaque, destaqueValido, DESTAQUE_PADRAO, type Destaque, type Tema } from '../../../../shared/temas'
 import { GRUPOS_DE_TOKENS, TOKENS_EDITAVEIS, normalizarHex, type TemaDoUsuario, type TokenEditavel } from '../../../../shared/temasUsuario'
-import { definirTema, usarLoja } from '../../estado/loja'
+import { definirDestaque, definirTema, usarLoja } from '../../estado/loja'
 import { confirmar } from '../../ui/Perguntas'
 import { definirRascunho, lerEstadoDosTemas, pedir, usarTemas } from './aplicar'
+import { GuiaCss } from './GuiaCss'
 import '../../estilos/temas.css'
 
-// Temas (página geral, 1.9.3): os temas de fábrica e os do usuário em cartões com prévia; duplicar um tema e mudar as
-// cores com efeito na hora (o rascunho é aplicado na janela antes de salvar); e os plugins de CSS, que só redefinem
-// tokens. Tudo o que grava passa pelo processo principal (main/temas.ts), que valida de novo.
+// Temas (página geral, 1.9.3; base × destaque na 1.9.4): em dois passos, a BASE (Escuro, Claro, OLED, em cartões com
+// prévia) e a COR DE DESTAQUE (bolinhas), as duas com efeito na hora e guardadas nas preferências. Para ir além,
+// duplicar um tema e mudar as cores uma a uma (o rascunho é aplicado na janela antes de salvar); e os plugins de CSS,
+// que só redefinem tokens, com o Guia de CSS. Tudo o que grava temas passa pelo processo principal (main/temas.ts).
 
-const NOME_DE_FABRICA: Record<string, string> = { escuro: 'Escuro', claro: 'Claro' }
+const NOME_DE_FABRICA: Record<string, string> = Object.fromEntries(TEMAS.map((t) => [t.id, t.rotulo]))
+const DESCRICAO_DA_BASE: Record<string, string> = Object.fromEntries(TEMAS.map((t) => [t.id, t.descricao]))
 /** As amostras de cada cartão: as cores que mais aparecem. */
 const AMOSTRAS: TokenEditavel[] = ['--quadro-fundo', '--painel', '--texto', '--destaque', '--perigo']
 
@@ -55,10 +59,10 @@ interface Cartao {
   doUsuario: boolean
 }
 
-function Previa({ base, cores }: { base: Tema; cores: TemaDoUsuario['cores'] }) {
-  // a prévia é desenhada com a classe do tema e as cores trocadas por cima: os tokens resolvem para aquele tema
+function Previa({ base, destaque, cores }: { base: Tema; destaque: Destaque; cores: TemaDoUsuario['cores'] }) {
+  // a prévia é desenhada com a classe da base e do destaque e as cores trocadas por cima: os tokens resolvem para eles
   return (
-    <div className={`temas-previa tema-${base}`} style={cores as CSSProperties} aria-hidden>
+    <div className={`temas-previa tema-${base} ${classeDoDestaque(destaque)}`} style={cores as CSSProperties} aria-hidden>
       <span className="temas-previa-lateral" />
       <span className="temas-previa-painel">
         <span className="temas-previa-linha" />
@@ -74,13 +78,27 @@ function Previa({ base, cores }: { base: Tema; cores: TemaDoUsuario['cores'] }) 
   )
 }
 
-function CartaoDeTema({ c, emUso, aoUsar, aoDuplicar, aoEditar }: { c: Cartao; emUso: boolean; aoUsar: () => void; aoDuplicar: () => void; aoEditar?: () => void }) {
+function CartaoDeTema({
+  c,
+  destaque,
+  emUso,
+  aoUsar,
+  aoDuplicar,
+  aoEditar
+}: {
+  c: Cartao
+  destaque: Destaque
+  emUso: boolean
+  aoUsar: () => void
+  aoDuplicar: () => void
+  aoEditar?: () => void
+}) {
   return (
     <article className={`temas-cartao ${emUso ? 'em-uso' : ''}`} data-tema-cartao={c.id} aria-current={emUso ? 'true' : undefined}>
-      <Previa base={c.base} cores={c.cores} />
+      <Previa base={c.base} destaque={destaque} cores={c.cores} />
       <div className="temas-cartao-nome">
         <b>{c.nome}</b>
-        <span className="suave">{c.doUsuario ? `seu · base ${NOME_DE_FABRICA[c.base] ?? c.base}` : 'de fábrica'}</span>
+        <span className="suave">{c.doUsuario ? `seu · base ${NOME_DE_FABRICA[c.base] ?? c.base}` : DESCRICAO_DA_BASE[c.id]}</span>
       </div>
       <div className="temas-cartao-acoes">
         <button type="button" data-acao="usar" className={emUso ? 'em-uso' : 'primario'} disabled={emUso} onClick={aoUsar}>
@@ -243,7 +261,7 @@ function Editor({ rascunho, salvo, temaEmTela }: { rascunho: TemaDoUsuario; salv
 
 // ---------------------------------------------------------------- plugins
 
-function Plugins() {
+function Plugins({ aoAbrirGuia }: { aoAbrirGuia: () => void }) {
   const plugins = usarTemas((e) => e.arquivo.plugins)
   const [nome, definirNome] = useState('')
   const [texto, definirTexto] = useState('')
@@ -294,13 +312,23 @@ function Plugins() {
 
   return (
     <section className="temas-secao" data-temas-secao="plugins">
-      <h3 className="temas-secao-titulo">
-        <Puzzle size={15} /> Plugins de CSS
-      </h3>
+      <div className="temas-secao-topo">
+        <h3 className="temas-secao-titulo">
+          <Puzzle size={15} /> Plugins de CSS
+        </h3>
+        <button type="button" data-acao="guia-css" title="O que é um token, a lista deles, um exemplo e o que é recusado" onClick={aoAbrirGuia}>
+          <BookOpen size={13} /> Guia de CSS
+        </button>
+      </div>
       <p className="suave temas-texto">
-        Um plugin só troca tokens (as variáveis de cor e medida do app), dentro de <code>:root</code>, <code>.tema-escuro</code> ou <code>.tema-claro</code>. Nada de
-        regra de estilo, <code>url(</code>, <code>@import</code> ou fonte de fora: o Orkester confere e recusa com o motivo. O que é aplicado é refeito a partir dos
-        tokens aceitos, não o texto colado. Na lista, o de baixo vence.
+        Um plugin só troca tokens (as variáveis de cor e medida do app), dentro de {SELETORES_CONHECIDOS.map((s, i) => (
+          <span key={s}>
+            {i ? ', ' : ''}
+            <code>{s}</code>
+          </span>
+        ))}
+        . Nada de regra de estilo, <code>url(</code>, <code>@import</code> ou fonte de fora: o Orkester confere e recusa com o motivo. O que é aplicado é refeito
+        a partir dos tokens aceitos, não o texto colado. Na lista, o de baixo vence.
       </p>
       <form
         className="temas-plugin-novo"
@@ -366,6 +394,8 @@ function Plugins() {
 
 export function Temas() {
   const temaEmTela = usarLoja((e) => e.preferencias.tema)
+  const destaque = usarLoja((e) => (destaqueValido(e.preferencias.destaque) ? e.preferencias.destaque : DESTAQUE_PADRAO))
+  const [guiaAberto, definirGuiaAberto] = useState(false)
   const arquivo = usarTemas((e) => e.arquivo)
   const rascunho = usarTemas((e) => e.rascunho)
   const [erro, definirErro] = useState('')
@@ -374,10 +404,21 @@ export function Temas() {
   // em uso: o tema do usuário ativo, se a base dele é o tema em tela; senão o de fábrica das preferências
   const emUso = rascunho && rascunho.base === temaEmTela ? rascunho.id : ativo && ativo.base === temaEmTela ? ativo.id : temaEmTela
 
-  const cartoes: Cartao[] = [
-    ...TEMAS.map((t) => ({ id: t.id, nome: NOME_DE_FABRICA[t.id] ?? t.rotulo, base: t.id, cores: {}, doUsuario: false })),
-    ...arquivo.temas.map((t) => ({ ...(rascunho?.id === t.id ? rascunho : t), doUsuario: true }))
-  ]
+  const bases: Cartao[] = TEMAS.map((t) => ({ id: t.id, nome: t.rotulo, base: t.id, cores: {}, doUsuario: false }))
+  const seus: Cartao[] = arquivo.temas.map((t) => ({ ...(rascunho?.id === t.id ? rascunho : t), doUsuario: true }))
+  // o tema do usuário em uso que troca o destaque vale por cima das bolinhas: a página avisa
+  const temaQueTrocaDestaque = [rascunho, ativo].find((t) => t && t.base === temaEmTela && t.cores['--destaque'])
+
+  /** As setas andam entre as bolinhas (grupo de rádio), como nos sistemas. */
+  function teclaNasBolinhas(e: KeyboardEvent<HTMLDivElement>): void {
+    const passo = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0
+    if (!passo) return
+    e.preventDefault()
+    const i = DESTAQUES.findIndex((d) => d.id === destaque)
+    const proximo = DESTAQUES[(i + passo + DESTAQUES.length) % DESTAQUES.length]
+    definirDestaque(proximo.id)
+    e.currentTarget.querySelector<HTMLButtonElement>(`[data-destaque="${proximo.id}"]`)?.focus()
+  }
 
   /** Antes de trocar de tema, o rascunho com mudança não salva pede confirmação. */
   async function largarRascunho(): Promise<boolean> {
@@ -432,24 +473,76 @@ export function Temas() {
     <div className="temas" data-pagina-geral="temas">
       <header className="temas-cabecalho">
         <h2>Temas</h2>
-        <p className="suave">As cores do app. Duplique um tema para mudar as cores: a mudança aparece na hora, e o terminal acompanha.</p>
+        <p className="suave">
+          As cores do app em dois passos: a base e a cor de destaque. A mudança aparece na hora, fica guardada e o terminal acompanha. Para mexer em cada cor,
+          duplique um tema.
+        </p>
       </header>
       <div className="temas-corpo">
         <section className="temas-secao" data-temas-secao="temas">
           <h3 className="temas-secao-titulo">
-            <Palette size={15} /> Temas
+            <Palette size={15} /> Tema
           </h3>
-          <div className="temas-grade">
-            {cartoes.map((c) => (
-              <CartaoDeTema
-                key={c.id}
-                c={c}
-                emUso={emUso === c.id}
-                aoUsar={() => void usar(c)}
-                aoDuplicar={() => void duplicar(c)}
-                aoEditar={c.doUsuario ? () => void editar(c) : undefined}
-              />
-            ))}
+          <div className="temas-passo" data-temas-passo="base">
+            <h4 className="temas-passo-titulo">
+              <span className="temas-passo-numero">1</span> Base
+            </h4>
+            <div className="temas-grade">
+              {bases.map((c) => (
+                <CartaoDeTema key={c.id} c={c} destaque={destaque} emUso={emUso === c.id} aoUsar={() => void usar(c)} aoDuplicar={() => void duplicar(c)} />
+              ))}
+            </div>
+          </div>
+          <div className="temas-passo" data-temas-passo="destaque">
+            <h4 className="temas-passo-titulo">
+              <span className="temas-passo-numero">2</span> Cor de destaque
+            </h4>
+            <div className="temas-bolinhas" role="radiogroup" aria-label="Cor de destaque" onKeyDown={teclaNasBolinhas}>
+              {DESTAQUES.map((d) => {
+                const escolhida = destaque === d.id
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={escolhida}
+                    tabIndex={escolhida ? 0 : -1}
+                    data-destaque={d.id}
+                    className={`temas-bolinha ${classeDoDestaque(d.id)} ${escolhida ? 'escolhida' : ''}`}
+                    title={d.id === DESTAQUE_PADRAO ? `${d.rotulo} (o padrão)` : d.rotulo}
+                    onClick={() => definirDestaque(d.id)}
+                  >
+                    <span className="temas-bolinha-cor">{escolhida && <Check size={15} />}</span>
+                    <span className="temas-bolinha-nome">{d.rotulo}</span>
+                  </button>
+                )
+              })}
+            </div>
+            {temaQueTrocaDestaque && (
+              <p className="suave temas-texto" data-aviso-destaque>
+                O tema "{temaQueTrocaDestaque.nome}" em uso tem um destaque próprio, que vale por cima desta escolha. Use uma base acima para ver a cor escolhida.
+              </p>
+            )}
+          </div>
+          <div className="temas-passo" data-temas-passo="seus">
+            <h4 className="temas-passo-titulo">Seus temas</h4>
+            {seus.length ? (
+              <div className="temas-grade">
+                {seus.map((c) => (
+                  <CartaoDeTema
+                    key={c.id}
+                    c={c}
+                    destaque={destaque}
+                    emUso={emUso === c.id}
+                    aoUsar={() => void usar(c)}
+                    aoDuplicar={() => void duplicar(c)}
+                    aoEditar={() => void editar(c)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="suave temas-vazio">Nenhum ainda. "Duplicar" numa base cria uma cópia para mudar as cores uma a uma.</p>
+            )}
           </div>
           {erro && (
             <p className="temas-erro" role="alert">
@@ -458,8 +551,9 @@ export function Temas() {
           )}
           {rascunho && <Editor rascunho={rascunho} salvo={arquivo.temas.find((t) => t.id === rascunho.id)} temaEmTela={temaEmTela} />}
         </section>
-        <Plugins />
+        <Plugins aoAbrirGuia={() => definirGuiaAberto(true)} />
       </div>
+      {guiaAberto && <GuiaCss base={temaEmTela} aoFechar={() => definirGuiaAberto(false)} />}
     </div>
   )
 }
