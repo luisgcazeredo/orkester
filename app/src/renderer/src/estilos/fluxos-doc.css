@@ -1,0 +1,33 @@
+/* documentação de um nó (T6): janela larga com o trecho do guia */
+.dialogo:has(.doc-no-corpo) {
+  display: flex;
+  flex-direction: column;
+  width: min(820px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+}
+
+.doc-no-corpo {
+  min-height: 0;
+  overflow: auto;
+  padding-right: var(--espaco-1);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.doc-no-md > :first-child {
+  margin-top: 0;
+}
+
+/* o .md-corpo quebra em qualquer letra (overflow-wrap: anywhere), o que encolhe as colunas das tabelas até partir
+   "recurso" em "recur/so"; nas células, quebra só o que não cabe */
+.doc-no-md :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.doc-no-aviso {
+  margin: 0 0 var(--espaco-3);
+}
+
+.dialogo-doc-no .dialogo-acoes .espaco-flex {
+  flex: 1;
+}

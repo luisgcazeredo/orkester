@@ -3,6 +3,8 @@ import type { ResumoEspaco } from '../shared/modelo'
 import type { ChaveGuardada } from '../shared/chaves'
 import { resumosDosEspacos } from './dados'
 import { registroDoEnvio } from './envio'
+import { servicoDeFluxos } from './fluxos'
+import { rodarFluxo } from './fluxos/verbos'
 import { conferirTarefa, porNaTarefa, rodarKanban } from './kanban'
 import { validarChamada, type NomeDeVerbo } from './verbos'
 import { esperarSessao, sessoesDoEspaco, telaDe } from './terminais'
@@ -142,6 +144,12 @@ const HANDLERS_DO_USUARIO: Partial<Record<NomeDeVerbo, (ctx: ContextoDoUsuario) 
   kanban: async ({ chave, pos, opcoes, texto }) => {
     const espaco = espacoDoUsuario(opcoes)
     return { saida: await rodarKanban(espaco.id, { nome: `MCP · ${chave.nome}` }, pos, opcoes, texto) }
+  },
+
+  /** Os fluxos de qualquer espaço, como cliente MCP: o fluxo sensível fica desligado e só a página o liga. */
+  fluxo: async ({ chave, pos, opcoes, texto }) => {
+    const espaco = espacoDoUsuario(opcoes)
+    return { saida: await rodarFluxo(servicoDeFluxos, espaco.id, { tipo: 'mcp', nome: `MCP · ${chave.nome}` }, pos, opcoes, texto) }
   },
 
   ver: async ({ pos, opcoes }) => {

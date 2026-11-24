@@ -129,6 +129,11 @@
   letter-spacing: 0.03em;
 }
 
+.terminal-selo-padrao {
+  opacity: 0.6;
+  font-weight: 500;
+}
+
 .terminal-selo-aviso {
   display: inline-flex;
   align-items: center;

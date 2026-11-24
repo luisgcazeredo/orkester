@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { RotateCw, Settings2 } from 'lucide-react'
-import { irParaPagina } from '../../casca/paginas'
+import { abrirConfiguracoes } from '../configuracoes/abrir'
 import { usarLoja } from '../../estado/loja'
 import type { PaginaInstalada } from './contrato'
 import { IconeDaPagina } from './Icone'
@@ -29,7 +29,7 @@ export function Moldura({ pagina, aoRecarregar, children }: { pagina: PaginaInst
             <RotateCw size={13} />
           </button>
         )}
-        <button type="button" className="extra-botao extra-icone" title="Permissões e ligações (Conexões)" aria-label="Permissões e ligações desta página em Conexões" onClick={() => irParaPagina('conexoes')}>
+        <button type="button" className="extra-botao extra-icone" title="Permissões e ligações (Configurações › Conexões › Páginas)" aria-label="Permissões e ligações desta página em Configurações, Conexões, Páginas" onClick={() => abrirConfiguracoes('conexoes', 'paginas')}>
           <Settings2 size={13} />
         </button>
       </header>

@@ -1,0 +1,427 @@
+/* ------------------------------------------------------------------ página Fluxos (1.9.6, F1: a lista com pastas)
+ * Só tokens (R7): nenhuma cor literal. Escopo `[data-pagina-geral="fluxos"]`. Carregado com a página (preguiçosa).
+ */
+
+[data-pagina-geral='fluxos'] .fluxo-flex {
+  flex: 1;
+}
+
+/* sem nenhum fluxo: o "como começar" e o botão do guia */
+.fluxo-vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espaco-2);
+  max-width: 64ch;
+  color: var(--texto-suave);
+  line-height: 1.5;
+}
+
+.fluxo-vazio p {
+  margin: 0;
+}
+
+.fluxo-comecar {
+  margin: 0;
+  padding-left: 1.4em;
+}
+
+.fluxo-comecar b {
+  color: var(--texto);
+}
+
+/* barra do alto: espaço, busca e "abrir aqui" */
+.fluxo-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin-top: var(--espaco-2);
+  font-size: 13px;
+}
+
+.fluxo-busca {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 var(--espaco-2);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel);
+  color: var(--texto-suave);
+}
+
+.fluxo-busca:focus-within {
+  border-color: var(--destaque);
+}
+
+[data-pagina-geral='fluxos'] .fluxo-busca input {
+  width: 220px;
+  padding-left: 0;
+  border: 0;
+  background: transparent;
+}
+
+[data-pagina-geral='fluxos'] .fluxo-botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+[data-pagina-geral='fluxos'] .fluxo-botao:hover:not(:disabled) {
+  border-color: var(--destaque);
+}
+
+[data-pagina-geral='fluxos'] .fluxo-botao:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* faixas de aviso (dados de exemplo, só leitura, erro de leitura) */
+.fluxo-faixa {
+  margin: 0;
+  max-width: 1100px;
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 1px solid color-mix(in srgb, var(--atencao) 50%, var(--borda));
+  border-radius: var(--raio-pequeno);
+  color: var(--texto);
+  font-size: 13px;
+}
+
+.fluxo-faixa.perigo {
+  border-color: color-mix(in srgb, var(--perigo) 50%, var(--borda));
+}
+
+.fluxo-faixa ul {
+  margin: var(--espaco-1) 0 0;
+  padding-left: 18px;
+}
+
+/* pastas à esquerda, fluxos à direita */
+.fluxo-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--espaco-4);
+  max-width: 1200px;
+}
+
+.fluxo-pastas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  padding: var(--espaco-2);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio);
+  background: var(--pilula-fundo);
+}
+
+.fluxo-pastas-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--espaco-1);
+}
+
+.fluxo-pastas-titulo {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--texto-suave);
+}
+
+.fluxo-pastas-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fluxo-pasta {
+  display: flex;
+  align-items: center;
+  padding-left: var(--espaco-2); /* as pastas aninhadas trazem o recuo no `style` */
+  padding-right: var(--espaco-1);
+  border: 1px dashed transparent;
+  border-radius: var(--raio-pequeno);
+}
+
+.fluxo-pasta:hover {
+  background: var(--hover);
+}
+
+.fluxo-pasta.ativa {
+  background: color-mix(in srgb, var(--destaque) 16%, transparent);
+}
+
+/* com um fluxo no ar, cada pasta mostra que aceita o soltar */
+.fluxo-pasta.alvo {
+  border-color: var(--borda);
+}
+
+.fluxo-pasta.alvo:hover {
+  border-color: var(--destaque);
+  background: color-mix(in srgb, var(--destaque) 22%, transparent);
+}
+
+.fluxo-pasta-nome {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fluxo-pasta-nome:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 1px;
+  border-radius: var(--raio-pequeno);
+}
+
+.fluxo-pasta-texto {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fluxo-pasta-contagem {
+  color: var(--texto-suave);
+  font-size: 11px;
+}
+
+/* renomear e apagar só aparecem sob o mouse ou com o foco na pasta */
+.fluxo-pasta-acoes {
+  display: none;
+  align-items: center;
+}
+
+.fluxo-pasta:hover .fluxo-pasta-acoes,
+.fluxo-pasta:focus-within .fluxo-pasta-acoes,
+.fluxo-pasta.ativa .fluxo-pasta-acoes {
+  display: inline-flex;
+}
+
+.fluxo-pasta-acoes .preset-apagar {
+  width: 24px;
+  height: 24px;
+}
+
+.fluxo-pastas-dica {
+  margin: 0;
+  padding: 0 var(--espaco-1);
+  font-size: 12px;
+}
+
+/* lista */
+.fluxo-conteudo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  min-width: 0;
+}
+
+.fluxo-linhas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fluxo-linha {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 1px solid var(--pilula-borda);
+  border-radius: var(--raio);
+  background: var(--pilula-fundo);
+}
+
+.fluxo-linha[draggable='true'] {
+  cursor: grab;
+}
+
+.fluxo-linha.desligado .fluxo-dados {
+  opacity: 0.7;
+}
+
+.fluxo-dados {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fluxo-nome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.fluxo-detalhe {
+  font-size: 12px;
+}
+
+.fluxo-selo {
+  --cor-selo: var(--texto-suave);
+  padding: 1px 8px;
+  border: 1px solid color-mix(in srgb, var(--cor-selo) 55%, var(--borda));
+  border-radius: var(--raio-pilula);
+  color: var(--cor-selo);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.fluxo-selo.atencao {
+  --cor-selo: var(--atencao);
+}
+
+.fluxo-selo.perigo {
+  --cor-selo: var(--perigo);
+}
+
+/* último disparo e resultado */
+.fluxo-ultimo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 110px;
+}
+
+.fluxo-resultado {
+  --cor-res: var(--texto-suave);
+  color: var(--cor-res);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fluxo-resultado.ok {
+  --cor-res: var(--vivo);
+}
+
+.fluxo-resultado.atencao {
+  --cor-res: var(--atencao);
+}
+
+.fluxo-resultado.perigo {
+  --cor-res: var(--perigo);
+}
+
+.fluxo-acoes {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-1);
+}
+
+[data-pagina-geral='fluxos'] .fluxo-mover {
+  max-width: 150px;
+  font-size: 12px;
+}
+
+.fluxo-alca {
+  color: var(--texto-suave);
+}
+
+/* interruptor liga/desliga */
+.fluxo-interruptor {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pilula);
+  background: var(--painel);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.fluxo-interruptor.ligado {
+  background: var(--destaque);
+  border-color: var(--destaque);
+}
+
+.fluxo-interruptor:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.fluxo-interruptor:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 2px;
+}
+
+.fluxo-interruptor-bola {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--texto-suave);
+  transition: transform 0.12s ease;
+}
+
+.fluxo-interruptor.ligado .fluxo-interruptor-bola {
+  background: var(--texto-sobre-destaque);
+  transform: translateX(14px);
+}
+
+/* janela estreita: a barra de pastas vai para cima e a linha empilha o último disparo */
+@media (max-width: 860px) {
+  .fluxo-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fluxo-linha {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .fluxo-ultimo {
+    grid-column: 2 / 3;
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--espaco-2);
+  }
+}
+
+/* notas sob o campo do Relógio (mínimo do intervalo e aviso do teto por hora) */
+.ed-campo-nota .ed-nota-linha {
+  display: block;
+  margin-top: 2px;
+}
+
+.ed-campo-nota .ed-falta.ed-nota-linha {
+  display: flex;
+  align-items: flex-start;
+}

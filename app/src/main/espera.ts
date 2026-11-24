@@ -11,6 +11,8 @@ import { agenteSaiuParaOShell, confirmarEnvio, DIALOGO, emSegundoPlano, lerPront
 import { criarCaixa, janelaDeDialogo, motivoDeEspera, tirarCitacoes, TEXTO_DO_MOTIVO, type FimDoRecado, type MotivoDeEspera, type TipoDeRecado } from './caixa'
 import { aceitaColagem, cordasDoEspaco, encerrarAgora, fechadoDeProposito, marcarFechamento, escreverNoProcesso, sessaoPorId, sessoesCriadasPor, sessoesDoEspaco, telaDe, type Sessao } from './terminais'
 import { esperar, abrirJanelaPronta, pedirAJanela } from './quadroDoAgente'
+import { emitir } from './eventosDeAutomacao'
+import { escolherMaestro } from '../shared/kanban'
 
 const TEMPO_PADRAO = 100
 const TEMPO_MAX = 3600
@@ -186,7 +188,8 @@ export async function recusarSeEmPergunta(s: Sessao): Promise<void> {
  * outro lado ninguém tinha ouvido. `saiu`: confirmado. `ficou`: escrito no compositor (ou nem chegou), NÃO
  * enviado. `incerto`: pode ter saído; não reenvie sem ver a tela.
  */
-export async function digitarPedido(s: Sessao, texto: string): Promise<ResultadoDoEnvio> {
+/** `sinal` (opcional): abortado, nenhuma tecla a mais sai e a promessa rejeita com `EnvioCancelado` (ver envio.ts). */
+export async function digitarPedido(s: Sessao, texto: string, sinal?: AbortSignal): Promise<ResultadoDoEnvio> {
   const limpo = texto.replace(/\r\n?/g, '\n').trimEnd()
   const escreverColagem = (): void => {
     if (s.espec.agente !== 'shell' && aceitaColagem(s)) {
@@ -208,7 +211,8 @@ export async function digitarPedido(s: Sessao, texto: string): Promise<Resultado
     esperar,
     ocupado: (tela) => OCUPADO.test(tela),
     // o usuário começou a escrever no campo durante as esperas: nenhum Enter (mandaria o rascunho dele)
-    interromper: () => motivoDeEspera('livre', s.usuario, Date.now()) !== null
+    interromper: () => motivoDeEspera('livre', s.usuario, Date.now()) !== null,
+    sinal
   })
 }
 
@@ -233,7 +237,7 @@ export async function avisoDeEnvio(s: Sessao, r: 'ficou' | 'incerto', linhas: nu
  * ocupado, parado numa pergunta ou com o processo encerrado, pula a vez e diz por quê. Escrever no meio do
  * trabalho de um agente — ou em cima de uma pergunta — é exatamente o que uma tarefa do Windows faria.
  */
-export async function dispararNoTerminal(id: string, texto: string): Promise<ResultadoDaRotina> {
+export async function dispararNoTerminal(id: string, texto: string, sinal?: AbortSignal): Promise<ResultadoDaRotina> {
   const s = sessaoPorId(id)
   if (!s || s.fim) return 'sem-cartao'
   const agora = await situacao(s)
@@ -241,7 +245,8 @@ export async function dispararNoTerminal(id: string, texto: string): Promise<Res
   // o usuário escrevendo nesse cartão (ou com texto no campo) também é "ocupado": a rotina não cola por cima
   if (motivoDeEspera(agora, s.usuario, Date.now())) return 'ocupado'
   // `incerto` não vira `nao-enviou`: a rotina repetiria e duplicaria o pedido. Fica anotado no registro.
-  const envio = await digitarPedido(s, texto)
+  if (sinal?.aborted) return 'nao-enviou'
+  const envio = await digitarPedido(s, texto, sinal)
   registrar(s, null, registroDoEnvio('rotina', envio).comando, texto)
   return resultadoDaRotina(envio)
 }
@@ -283,6 +288,19 @@ export const caixa = criarCaixa({
     return !!s?.processo && s.espec.agente === 'claude' && emSegundoPlano(await telaDe(s, 6))
   },
   fechadoDeProposito,
+  espacoDe: (id) => sessaoPorId(id)?.espacoId ?? null,
+  // a mesma regra do kanban (`maestroDo`), sem importar o kanban (ele importa a caixa daqui)
+  maestroDe: (espacoId) =>
+    escolherMaestro(
+      sessoesDoEspaco(espacoId).map((s) => ({
+        id: s.id,
+        nome: s.espec.nome,
+        funcao: s.espec.funcao,
+        criadoPor: s.espec.criadoPor,
+        agente: s.espec.agente,
+        vivo: !!s.processo && !s.fim
+      }))
+    )?.id ?? null,
   shell: (id) => sessaoPorId(id)?.espec.agente === 'shell',
   tela: async (id, linhas) => {
     const s = sessaoPorId(id)
@@ -326,6 +344,10 @@ export const caixa = criarCaixa({
     // `ficou`/`incerto`: junto do recado vão as últimas linhas do destino (o registro corta em 4000 letras)
     const texto = tela === undefined ? recado.texto : `${recado.texto.slice(0, 2400)}\n[tela do destino]\n${tela.slice(-1400)}`
     if (para) registrar(de ?? para, para, `caixa-${recado.tipo}-${fim}`, texto)
+    // automações (1.9.6): "entrega chegou", no espaço de quem recebeu. A cadeia (se veio de automação) o motor acha.
+    if (para && recado.tipo === 'entrega' && (fim === 'entregue' || fim === 'incerto')) {
+      emitir(para.espacoId, { tipo: 'entrega', de: recado.de, deNome: recado.deNome, para: para.id, paraNome: para.espec.nome, texto: recado.texto.slice(0, 1500) })
+    }
   }
 })
 
@@ -455,7 +477,8 @@ const nomeDoEspaco = (id: string): string => resumosDosEspacos().find((espaco) =
 
 /**
  * A loja é quem grava propriedade e cordas. Centralizar a passagem mantém `fechar` e `passar` com o mesmo bastão,
- * inclusive quando os cartões estão em janelas diferentes.
+ * inclusive quando os cartões estão em janelas diferentes. É o `ork fechar`: passa só os filhos. O `ork passar` é
+ * `passarPapel`, logo abaixo.
  */
 export async function transferirSessoes(antigo: Sessao, sucessor: Sessao, transferidas: Sessao[]): Promise<void> {
   if (!transferidas.length) return
@@ -521,4 +544,31 @@ export async function transferirSessoes(antigo: Sessao, sucessor: Sessao, transf
   }
   for (const s of transferidas) s.espec = { ...s.espec, criadoPor: sucessor.id }
   if (sucessorEraDoAntigo) sucessor.espec = { ...sucessor.espec, criadoPor: undefined }
+}
+
+/**
+ * `ork passar` (1.9.6): passa o papel inteiro — os filhos, todas as cordas do antigo e a caixa dele (filas e quem
+ * espera entrega), mesmo sem filhos. Só dentro de um espaço (`recusaDaPassagem`, conferida antes, por quem chama):
+ * assim o quadro é UMA transformação na janela do espaço, que aplica tudo ou nada, e a caixa (só memória, síncrona)
+ * muda depois de ela confirmar. Falhou: nada mudou, e o antigo não deve sair.
+ */
+export async function passarPapel(antigo: Sessao, sucessor: Sessao, filhos: Sessao[]): Promise<{ recados: number; pendencias: number }> {
+  const fora = [sucessor, ...filhos].filter((s) => s.espacoId !== antigo.espacoId)
+  if (fora.length) throw new Error(`não passei nada: ${fora.map((s) => `"${s.espec.nome}"`).join(', ')} em outro espaço`)
+  const sucessorEraDoAntigo = sucessor.espec.criadoPor === antigo.id
+  await abrirJanelaPronta(antigo.espacoId)
+  const r = await pedirAJanela({
+    tipo: 'passar',
+    espacoId: antigo.espacoId,
+    ids: filhos.map((s) => s.id),
+    sucessor: sucessor.id,
+    novoCriador: sucessor.id,
+    antigo: antigo.id,
+    ...(sucessorEraDoAntigo ? { donoDoSucessor: null } : {}),
+    papel: true
+  })
+  if (!r.ok) throw new Error(`não passei nada: ${r.erro}`)
+  for (const s of filhos) s.espec = { ...s.espec, criadoPor: sucessor.id }
+  if (sucessorEraDoAntigo) sucessor.espec = { ...sucessor.espec, criadoPor: undefined }
+  return caixa.passar(antigo.id, sucessor.id)
 }

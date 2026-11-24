@@ -1,0 +1,340 @@
+/* ------------------------------------------------------------------ nós Código e HTTP, e a confirmação de ligar (1.9.6, F4)
+ * Só tokens (R7): nenhuma cor literal. Carregado com os formulários dos nós e com a confirmação (a página é preguiçosa).
+ */
+
+/* ---------- realce de sintaxe (os mesmos tokens do cartão de código) ---------- */
+.codigo-camada .hljs-comment,
+.codigo-camada .hljs-quote,
+.codigo-realce .hljs-comment,
+.codigo-realce .hljs-quote {
+  color: var(--cod-comentario);
+  font-style: italic;
+}
+
+.codigo-camada .hljs-keyword,
+.codigo-camada .hljs-selector-tag,
+.codigo-camada .hljs-literal,
+.codigo-camada .hljs-tag,
+.codigo-camada .hljs-name,
+.codigo-camada .hljs-doctag,
+.codigo-realce .hljs-keyword,
+.codigo-realce .hljs-selector-tag,
+.codigo-realce .hljs-literal,
+.codigo-realce .hljs-tag,
+.codigo-realce .hljs-name,
+.codigo-realce .hljs-doctag {
+  color: var(--cod-palavra);
+}
+
+.codigo-camada .hljs-meta,
+.codigo-camada .hljs-section,
+.codigo-realce .hljs-meta,
+.codigo-realce .hljs-section {
+  color: var(--cod-controle);
+}
+
+.codigo-camada .hljs-string,
+.codigo-camada .hljs-link,
+.codigo-camada .hljs-symbol,
+.codigo-camada .hljs-bullet,
+.codigo-realce .hljs-string,
+.codigo-realce .hljs-link,
+.codigo-realce .hljs-symbol,
+.codigo-realce .hljs-bullet {
+  color: var(--cod-texto-literal);
+}
+
+.codigo-camada .hljs-number,
+.codigo-realce .hljs-number {
+  color: var(--cod-numero);
+}
+
+.codigo-camada .hljs-title.function_,
+.codigo-camada .hljs-built_in,
+.codigo-realce .hljs-title.function_,
+.codigo-realce .hljs-built_in {
+  color: var(--cod-funcao);
+}
+
+.codigo-camada .hljs-title,
+.codigo-camada .hljs-type,
+.codigo-realce .hljs-title,
+.codigo-realce .hljs-type {
+  color: var(--cod-tipo);
+}
+
+.codigo-camada .hljs-variable,
+.codigo-camada .hljs-attr,
+.codigo-camada .hljs-attribute,
+.codigo-camada .hljs-property,
+.codigo-camada .hljs-params,
+.codigo-camada .hljs-template-variable,
+.codigo-realce .hljs-variable,
+.codigo-realce .hljs-attr,
+.codigo-realce .hljs-attribute,
+.codigo-realce .hljs-property,
+.codigo-realce .hljs-params,
+.codigo-realce .hljs-template-variable {
+  color: var(--cod-variavel);
+}
+
+.codigo-camada .hljs-regexp,
+.codigo-realce .hljs-regexp {
+  color: var(--cod-regex);
+}
+
+/* ---------- o campo de código: uma camada pintada atrás de um textarea transparente ----------
+ * As duas camadas precisam ter exatamente a mesma fonte, o mesmo recuo e a mesma quebra, senão o texto digitado e o
+ * colorido se desencontram.
+ */
+.codigo-caixa {
+  position: relative;
+  min-height: 220px;
+  height: 260px;
+  resize: vertical;
+  overflow: hidden;
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel);
+}
+
+.codigo-caixa:focus-within {
+  border-color: var(--destaque);
+}
+
+.codigo-camada,
+.codigo-campo {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 0;
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: 0;
+  tab-size: 2;
+  white-space: pre;
+  word-wrap: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.codigo-camada {
+  overflow: hidden;
+  color: var(--cod-texto);
+  pointer-events: none;
+}
+
+.codigo-campo {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  resize: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--texto);
+  outline: 0;
+}
+
+.codigo-campo::selection {
+  background: color-mix(in srgb, var(--destaque) 35%, transparent);
+}
+
+.codigo-campo:disabled {
+  /* só leitura: o texto aparece pela camada colorida, mais apagada */
+  opacity: 1;
+  cursor: default;
+}
+
+.codigo-caixa:has(.codigo-campo:disabled) {
+  opacity: 0.75;
+}
+
+.codigo-contador {
+  align-self: flex-end;
+  font-size: 11px;
+}
+
+/* ---------- nó HTTP: credencial e conferência do domínio ---------- */
+.http-credencial {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.http-credencial select {
+  flex: 1;
+  min-width: 0;
+}
+
+.http-conferencia {
+  --cor: var(--texto-suave);
+  padding: var(--espaco-1) var(--espaco-2);
+  border-left: 3px solid var(--cor);
+  border-radius: var(--raio-micro);
+  background: var(--quadro-fundo);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* rede local no nó HTTP (#91): o aviso e o botão Permitir / Tirar permissão logo abaixo */
+.http-rede {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espaco-2);
+  margin: 0;
+}
+
+.http-rede p {
+  margin: 0;
+}
+
+.http-rede svg {
+  vertical-align: -2px;
+  color: var(--cor);
+}
+
+.http-conferencia.ok {
+  --cor: var(--vivo);
+}
+
+.http-conferencia.aviso {
+  --cor: var(--atencao);
+}
+
+.http-conferencia.erro {
+  --cor: var(--perigo);
+}
+
+/* ---------- confirmação de ligar um fluxo sensível ---------- */
+.dialogo.dialogo-ligar {
+  display: flex;
+  flex-direction: column;
+  width: min(780px, 92vw);
+  max-height: 88vh;
+  overflow: hidden;
+}
+
+.dialogo-ligar .dialogo-texto {
+  flex-shrink: 0;
+}
+
+.ligar-frases {
+  flex-shrink: 0;
+  margin: 0 0 var(--espaco-3);
+  padding: var(--espaco-2) var(--espaco-3) var(--espaco-2) var(--espaco-5);
+  border-left: 3px solid var(--atencao);
+  border-radius: var(--raio-micro);
+  background: var(--quadro-fundo);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ligar-nos {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  margin-bottom: var(--espaco-3);
+  overflow: auto;
+}
+
+.ligar-no {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  padding: var(--espaco-3);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--pilula-fundo);
+}
+
+.ligar-no.novo,
+.ligar-no.mudou {
+  border-color: color-mix(in srgb, var(--atencao) 65%, var(--borda));
+  border-left: 3px solid var(--atencao);
+}
+
+.ligar-no-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.ligar-no-topo h4 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.ligar-selo {
+  --cor-selo: var(--texto-suave);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 8px;
+  border: 1px solid color-mix(in srgb, var(--cor-selo) 55%, var(--borda));
+  border-radius: var(--raio-pilula);
+  color: var(--cor-selo);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ligar-selo.igual {
+  --cor-selo: var(--vivo);
+}
+
+.ligar-selo.atencao,
+.ligar-selo.agente {
+  --cor-selo: var(--atencao);
+}
+
+.ligar-marca {
+  margin: 0;
+  color: var(--atencao);
+  font-size: 12px;
+}
+
+.ligar-bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ligar-bloco-rotulo {
+  color: var(--texto-suave);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ligar-texto {
+  max-height: 240px;
+  margin: 0;
+  padding: var(--espaco-2) var(--espaco-3);
+  overflow: auto;
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel);
+  color: var(--cod-texto);
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  tab-size: 2;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.ligar-texto.simples {
+  color: var(--texto);
+}

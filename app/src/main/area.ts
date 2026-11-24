@@ -1,4 +1,5 @@
 import { clipboard, ClipboardItem, ipcMain, nativeImage, net, protocol } from 'electron'
+import { ESQUEMA_PRIVILEGIADO_DO_CODIGO } from './fluxos/codigo'
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -55,7 +56,9 @@ const escaparHtml = (t: string): string => t.replace(/[&<>"]/g, (c) => ({ '&': '
 export function registrarEsquemas(): void {
   protocol.registerSchemesAsPrivileged([
     { scheme: 'ork-imagem', privileges: { standard: true, secure: true, supportFetchAPI: true } },
-    { scheme: 'ork-pagina', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }
+    { scheme: 'ork-pagina', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
+    // o nó Código dos Fluxos (S4): servido só na partição dele (main/fluxos/codigo.ts)
+    ESQUEMA_PRIVILEGIADO_DO_CODIGO
   ])
 }
 

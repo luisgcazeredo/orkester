@@ -58,7 +58,7 @@ Para mexer no quadro **de fora** do app — o seu Claude, o Codex, qualquer clie
 | `ork teclas <nome> <tecla>…` | responde menus e perguntas: `enter`, `esc`, `tab`, `shift-tab`, setas, `ctrl-c`, `y`, `n`, números |
 | `ork limpar <nome>` | zera o contexto da sessão (`/clear` no Claude, `/new` no Codex) |
 | `ork fechar <nome>` | fecha uma sessão que **você** abriu; o que ela abriu passa para você |
-| `ork passar <nome>` | entrega a um sucessor vivo as sessões que você abriu |
+| `ork passar <nome>` | passa o seu papel inteiro a um sucessor vivo: as sessões que você abriu, todas as suas cordas (não só as dos filhos), os recados parados na sua caixa e as entregas que você esperava (um `ork entregar` sem `--para` passa a chegar a ele). Vale mesmo sem filhos. Só dentro de um espaço: é recusado, antes de mudar qualquer coisa, se o sucessor está em outro espaço ou se você tem sessões abertas em outro espaço (feche-as antes com `ork fechar`). Um recado ou uma entrega endereçado a um cartão que não existe mais vai ao Maestro do espaço, com uma linha dizendo isso. É tudo ou nada — se algo falhar, nada muda e você não deve dar `ork sair` |
 | `ork sair` | fecha o próprio cartão; com `--com-as-minhas`, leva junto a árvore que você abriu |
 
 Opções do `ork abrir`:
@@ -69,13 +69,16 @@ Opções do `ork abrir`:
 --pasta P           a pasta em que o terminal abre
 --funcao "Papel"    nasce com o prompt dessa função, na pasta dela, no preset dela (motor + nível)
 --preset "Nome"     troca o preset só desta sessão ("Claude forte")
+--modelo M          o modelo (veja `ork modelos`); manda sobre a função
+--esforco E         o esforço (low … max; ultra só no Codex); manda sobre a função
+--tarefa N          põe o agente trabalhando na tarefa #N do kanban
 --pedido "texto"    o primeiro pedido, já digitado
 --arquivo p.md      o primeiro pedido, lido de um arquivo
 --esperar           só volta quando ele terminar
 --tempo S           quantos segundos esperar
 ```
 
-`ork pedir` aceita `--arquivo`, `--sem-esperar` e `--tempo`. `ork entregar` aceita `--arquivo` e `--para "Nome"`.
+`ork pedir` aceita `--arquivo`, `--tarefa`, `--sem-esperar` e `--tempo`. `ork entregar` aceita `--arquivo` e `--para "Nome"`.
 
 ### A caixa de entrada
 
@@ -97,6 +100,8 @@ para o PowerShell não executar nada.
 | `ork funcoes` | lista os papéis guardados, para usar em `ork abrir --funcao` |
 | `ork banda` | lista as bandas do andar e quem está dentro de cada uma |
 | `ork banda criar "Nome" <cartão>…` | põe uma moldura em volta desses agentes: todos passam a se falar |
+| `ork modelos` | os modelos de Claude e Codex, os esforços que cada um aceita e os padrões |
+| `ork modelo <cartão> [<modelo>] [--esforco nível]` | troca o modelo e/ou o esforço de um cartão que você abriu, com ele livre; o cartão reabre e a conversa continua |
 | `ork trocar <cartão> <claude\|codex\|shell>` | troca o agente de um cartão que você abriu; lugar, nome e cordas ficam |
 | `ork partitura` | lista os times salvos |
 | `ork partitura usar "Nome"` | sobe esse time ao seu lado, ligado a você |
@@ -162,6 +167,59 @@ grava nascem sozinhos ali, com o diff do git.
 | `ork arvore mostrar <arquivo>…` | abre esses arquivos como cartões; `--arvore "Nome"` escolhe onde |
 | `ork arvore dar "Agente" <arquivo>…` | entrega esses cartões de código a outro agente do quadro |
 | `ork arvore desfazer "Nome"` | desfaz a árvore; os arquivos dela voltam para a principal |
+
+## Kanban
+
+O kanban do espaço (o mesmo da página Kanban). Um agente só alcança o kanban do próprio espaço, e o nome dele fica
+no histórico de cada tarefa.
+
+| Comando | O que faz |
+|---|---|
+| `ork kanban [ver] [--coluna C] [--para Nome\|eu\|ninguem] [--etiqueta e]` | as tarefas por coluna, com quem trabalha em cada uma; `ork kanban ver 12` mostra a #12 inteira |
+| `ork kanban criar "Título" [--descricao T \| --arquivo f.md] [--coluna C] [--para Nome] [--etiqueta a,b]` | cria uma tarefa; sem `--coluna`, nasce em Fazendo (Demandas é do usuário) |
+| `ork kanban pegar <n>` | você entra na lista de quem trabalha nela; de Demandas ou Com o Maestro ela vai para Fazendo |
+| `ork kanban soltar <n> [Nome]` | você sai da lista (tirar outro: só o Maestro e o usuário) |
+| `ork kanban mover <n> "Coluna" [--posicao topo\|fim\|N]` | muda de coluna; Com o Maestro é do usuário, a coluna final do usuário e do Maestro |
+| `ork kanban editar <n> [--titulo T] [--descricao T \| --arquivo f.md] [--etiqueta +a,-b]` | troca título, descrição ou etiquetas |
+| `ork kanban atribuir <n> Nome\|eu\|ninguem` | põe na lista e avisa o agente na caixa dele (`ninguem` esvazia) |
+| `ork kanban comentar <n> "texto"` | comenta (também `--arquivo f.md`) |
+| `ork kanban apagar <n> --confirmar` | manda para a lixeira (a página recupera) |
+| `ork kanban coluna criar "Nome"` | também `renomear "Velho" "Novo"` e `apagar "Nome"` |
+
+`ork abrir --tarefa N` e `ork pedir --tarefa N` põem o agente trabalhando na tarefa #N e citam a tarefa no pedido.
+
+O `--arquivo` pode vir com BOM do UTF-8 (o `Set-Content -Encoding utf8` do Windows PowerShell grava um): o `ork` tira ao ler, em todos os comandos.
+
+## Fluxos
+
+Os fluxos do espaço (os mesmos da página Fluxos): automações em nós, com um gatilho e o que fazer depois. O formato
+JSON, os ajustes de cada nó e as regras estão em [`fluxos.pt-BR.md`](fluxos.pt-BR.md). Um agente só alcança os fluxos
+do próprio espaço. O fluxo é achado pelo nome (sem diferenciar maiúsculas) ou pelo começo dele.
+
+| Comando | O que faz |
+|---|---|
+| `ork fluxo [listar]` | os fluxos do espaço: ligado ou não, gatilhos, pasta, a última execução e os que não abrem |
+| `ork fluxo ver "Nome" [--json]` | um fluxo inteiro: nós e ligações; `--json` devolve o JSON que `criar` e `editar` recebem |
+| `ork fluxo criar --arquivo f.json [--pasta "P"]` | cria a partir do JSON (o nome vai dentro dele); nasce desligado; `--pasta` é uma pasta que já existe |
+| `ork fluxo editar "Nome" --arquivo f.json` | troca o nome, os nós e as ligações pelo JSON |
+| `ork fluxo ligar "Nome"` / `ork fluxo desligar "Nome"` | liga ou desliga |
+| `ork fluxo rodar "Nome"` | roda agora, pelo gatilho Manual, e mostra o que cada nó fez |
+| `ork fluxo execucoes "Nome" [--n 10]` | as últimas execuções: resultado, tempo e o nó que deu erro |
+| `ork fluxo apagar "Nome" --confirmar` | apaga o fluxo e as execuções dele, para sempre |
+
+Regras para o agente:
+
+- **Código, HTTP ou Comando no shell:** o fluxo nasce (ou fica, ao editar) desligado, e `ligar` é recusado. Só o
+  usuário liga, pela página, vendo esses nós. O `rodar` também recusa enquanto esses nós não foram aprovados por ele.
+- **Alcance:** o fluxo só cita cartões que o agente alcança (corda, banda ou quem ele abriu): destino do recado,
+  quem recebe a entrega, quem o gatilho vigia e o shell do comando. Recado sem `entregaPara` devolve a entrega ao
+  próprio agente. A cada disparo, recado e gatilho são conferidos de novo (o shell do comando, não: o usuário o viu
+  ao ligar); fora do alcance, o fluxo pula a vez, e sem o cartão do agente um fluxo com recado desliga.
+- **Rede local:** os endereços locais permitidos (`rede.locaisPermitidos`) só mudam pela página, pelo usuário. Um `rede` no JSON de agente é ignorado, o fluxo fica
+  como estava e a resposta traz um aviso.
+- **Credencial:** o nó HTTP cita só o nome de uma credencial que o usuário guardou. Não há comando para ler ou criar
+  credencial.
+- Criar, editar, ligar, desligar e apagar por agente aparecem no canto da janela do usuário.
 
 ---
 

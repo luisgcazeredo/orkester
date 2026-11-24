@@ -1,0 +1,212 @@
+/* ------------------------------------------------------------------ execuções dos fluxos (1.9.6, F3)
+ * Só tokens (R7): nenhuma cor literal. A lista (`Execucoes`), a faixa da execução aberta e o desenho das ligações.
+ */
+
+.exec-flex {
+  flex: 1;
+}
+
+/* ---------- a lista ---------- */
+.exec-painel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  min-width: 0;
+  font-family: var(--fonte-interface);
+  color: var(--texto);
+}
+
+.exec-topo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.exec-topo h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.exec-atualizar,
+.exec-fechar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel);
+  color: var(--texto);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.exec-atualizar:hover:not(:disabled),
+.exec-fechar:hover {
+  border-color: var(--destaque);
+}
+
+.exec-atualizar:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.exec-vazio,
+.exec-nota {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.exec-erro {
+  margin: 0;
+  color: var(--perigo);
+  font-size: 12px;
+}
+
+.exec-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 100%;
+  overflow: auto;
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+}
+
+.exec-linha {
+  display: grid;
+  grid-template-columns: 110px 96px 64px minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--espaco-2);
+  width: 100%;
+  padding: 6px var(--espaco-3);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.exec-lista li + li .exec-linha {
+  border-top: 1px solid var(--borda-suave);
+}
+
+.exec-linha:hover {
+  background: var(--hover);
+}
+
+.exec-linha:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: -2px;
+}
+
+.exec-linha.aberta {
+  background: color-mix(in srgb, var(--destaque) 16%, transparent);
+  box-shadow: inset 3px 0 0 var(--destaque);
+}
+
+.exec-quando,
+.exec-duracao {
+  font-family: var(--fonte-mono);
+  white-space: nowrap;
+}
+
+.exec-origem {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* o motivo ocupa uma linha só dele, embaixo */
+.exec-linha .exec-motivo {
+  grid-column: 1 / -1;
+  padding-left: 0;
+}
+
+.exec-resultado {
+  --cor-res: var(--texto-suave);
+  color: var(--cor-res);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.exec-resultado.ok {
+  --cor-res: var(--vivo);
+}
+
+.exec-resultado.atencao {
+  --cor-res: var(--atencao);
+}
+
+.exec-resultado.perigo {
+  --cor-res: var(--perigo);
+}
+
+.exec-motivo {
+  --cor-res: var(--texto-suave);
+  color: var(--cor-res);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.exec-motivo.atencao {
+  --cor-res: var(--atencao);
+}
+
+.exec-motivo.perigo {
+  --cor-res: var(--perigo);
+}
+
+/* ---------- a faixa da execução aberta (alto do editor) ---------- */
+.exec-faixa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-3);
+  padding: var(--espaco-2) var(--espaco-3);
+  border-bottom: 1px solid var(--borda);
+  border-left: 3px solid var(--destaque);
+  background: var(--painel);
+  font-family: var(--fonte-interface);
+  font-size: 13px;
+}
+
+/* ---------- as ligações com uma execução aberta ---------- */
+.ed-ligacao.exec-passou .ed-ligacao-linha {
+  stroke: var(--entrou);
+  stroke-width: 3;
+}
+
+.ed-ligacao.exec-vazia .ed-ligacao-linha {
+  stroke-dasharray: 5 5;
+}
+
+.ed-ligacao.exec-parada .ed-ligacao-linha {
+  opacity: 0.35;
+}
+
+.exec-item {
+  pointer-events: none;
+}
+
+.exec-item rect {
+  fill: var(--painel-alto);
+  stroke: var(--borda);
+  stroke-width: 1;
+}
+
+.exec-item text {
+  fill: var(--texto);
+  font-family: var(--fonte-interface);
+  font-size: 11px;
+  font-weight: 600;
+}

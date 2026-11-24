@@ -32,7 +32,7 @@ const lugar = (nome: string): OpcaoDoVerbo => numero(nome, -1_000_000, 1_000_000
 const obrigatorio = (nome: string): ArgumentoDoVerbo => ({ nome, obrigatorio: true })
 
 export const VERBOS = [
-  { nome: 'ajuda', aliases: ['help'], posicionais: [], opcoes: [], descricao: 'mostra esta ajuda', ajuda: '' },
+  { nome: 'ajuda', aliases: ['help'], posicionais: [{ nome: 'comando' }], opcoes: [], descricao: 'mostra esta ajuda (ou só a de um comando)', ajuda: '' },
   { nome: 'quem', aliases: [], posicionais: [], opcoes: [], descricao: 'quem é você, seus ligados e o último contexto conhecido', ajuda: '  ork quem                           quem é você, seus ligados e o último contexto conhecido' },
   { nome: 'orcamento', aliases: [], posicionais: [], opcoes: [], descricao: 'mede o contexto do Claude livre; Codex declara que não expõe', ajuda: '  ork orcamento                      mede o contexto do Claude livre; Codex declara que não expõe' },
   { nome: 'espacos', aliases: [], posicionais: [], opcoes: [], descricao: 'lista todos os espaços, janela, cartões e marca o seu', ajuda: '  ork espacos                        lista todos os espaços, janela, cartões e marca o seu' },
@@ -136,6 +136,21 @@ export const VERBOS = [
       '  ork kanban coluna criar "Nome" | renomear "Velho" "Novo" | apagar "Nome"'
   },
   {
+    // `--espaco` é declarado só para o agente ouvir um "não" claro; pela chave ele sai antes da validação
+    nome: 'fluxo', aliases: ['fluxos'], posicionais: [{ nome: 'listar|ver|criar|editar|ligar|desligar|rodar|execucoes|apagar' }, { nome: 'nome', resto: true }],
+    opcoes: [texto('arquivo'), texto('pasta'), bandeira('json'), bandeira('confirmar'), numero('n', 1, 50), texto('espaco')],
+    descricao: 'os fluxos do espaço: ver, criar, editar, ligar, rodar',
+    ajuda:
+      '  ork fluxo [listar]                   os fluxos do espaço: ligado ou não, gatilhos, a última execução\n' +
+      '  ork fluxo ver "Nome" [--json]        um fluxo inteiro: nós e ligações (--json: o formato de criar e editar)\n' +
+      '  ork fluxo criar --arquivo f.json [--pasta "P"]\n                                      cria desligado; o nome vai no JSON\n' +
+      '  ork fluxo editar "Nome" --arquivo f.json\n                                      troca nome, nós e ligações (com Código, HTTP ou comando, desliga)\n' +
+      '  ork fluxo ligar|desligar "Nome"      com Código, HTTP ou comando, só o usuário liga, pela página\n' +
+      '  ork fluxo rodar "Nome"               roda agora pelo gatilho Manual e mostra cada nó\n' +
+      '  ork fluxo execucoes "Nome" [--n 10]  as últimas execuções\n' +
+      '  ork fluxo apagar "Nome" --confirmar  apaga o fluxo e as execuções dele'
+  },
+  {
     nome: 'pagina', aliases: ['página'], posicionais: [obrigatorio('responder'), obrigatorio('página'), { nome: 'texto', resto: true }],
     opcoes: [texto('arquivo')],
     descricao: 'responde a uma página "+" ligada ao seu cartão',
@@ -155,7 +170,11 @@ export const VERBOS = [
   },
   { nome: 'limpar', aliases: [], posicionais: [obrigatorio('nome')], opcoes: [], descricao: 'zera o contexto da sessão', ajuda: '  ork limpar <nome>                  zera o contexto da sessão (/clear no Claude, /new no Codex)' },
   { nome: 'fechar', aliases: [], posicionais: [obrigatorio('nome')], opcoes: [], descricao: 'fecha uma sessão que você abriu', ajuda: '  ork fechar <nome>                  fecha uma sessão que você abriu; o que ela abriu passa para você' },
-  { nome: 'passar', aliases: [], posicionais: [obrigatorio('nome')], opcoes: [], descricao: 'passa ao sucessor vivo as sessões que você abriu', ajuda: '  ork passar <nome>                  passa ao sucessor vivo (aberto por você ou ligado) as outras sessões que abriu' },
+  {
+    nome: 'passar', aliases: [], posicionais: [obrigatorio('nome')], opcoes: [],
+    descricao: 'passa o seu papel ao sucessor vivo: sessões que você abriu, cordas e caixa de entrada',
+    ajuda: '  ork passar <nome>                  passa o seu papel ao sucessor vivo (aberto por você ou ligado): as sessões que\n                                      abriu, todas as suas cordas, os recados parados na sua caixa e as entregas que\n                                      esperava (sem --para, elas chegam a ele). Vale mesmo sem filhos; falhou, nada muda.\n                                      Só dentro do seu espaço: sucessor ou sessão sua em outro espaço é recusado'
+  },
   {
     nome: 'sair', aliases: [], posicionais: [], opcoes: [texto('motivo'), bandeira('com-as-minhas')],
     descricao: 'fecha seu cartão; com as minhas, fecha toda a árvore de sessões que você abriu',

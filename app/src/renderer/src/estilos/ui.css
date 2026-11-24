@@ -531,6 +531,8 @@ body.em-gesto webview {
   flex-direction: column;
   align-items: center;
   gap: 8px;
+  /* acima da barrinha da seleção (12) para o menu Terminal não ficar cortado por ela, e abaixo da vista de andares (15) */
+  z-index: 13;
 }
 
 .barra-ferramentas {

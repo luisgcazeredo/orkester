@@ -20,7 +20,7 @@ import {
   Sun,
   Type,
   Users,
-  type LucideIcon, Settings, Bot, Clock, Plug } from 'lucide-react'
+  type LucideIcon, Settings, Bot, Clock, Palette, Plug, Workflow, SquareKanban } from 'lucide-react'
 import type { No } from '../../../shared/modelo'
 import { temaEscuro } from '../../../shared/temas'
 import {
@@ -42,8 +42,11 @@ import { abrirNovoAndar } from './acoesAndar'
 import { colar } from './area'
 import { abrirAtalhos } from './Atalhos'
 import { enquadrarTudo } from './Controles'
-import { abrirAgentes, abrirRotinas } from '../paginas/abrir'
-import { irParaPagina } from '../casca/paginas'
+import { abrirAgentes, abrirKanban, abrirRotinas } from '../paginas/abrir'
+import { irParaPagina, paginaAtiva } from '../casca/paginas'
+import { apiDeFluxos } from '../paginas/fluxos/fluxosApi'
+import { abrirFluxo } from '../paginas/fluxos/pedido'
+import { abrirConfiguracoes } from '../paginas/configuracoes/abrir'
 import { anexarArquivoEm, arvoreEm, portalEm } from './menus'
 
 // Ctrl+K: uma caixa de busca para achar qualquer coisa (cartão, andar, espaço) e rodar qualquer comando
@@ -65,7 +68,7 @@ function fechar(): void {
 
 interface Item {
   rotulo: string
-  grupo: 'Comando' | 'Cartão' | 'Andar' | 'Espaço'
+  grupo: 'Comando' | 'Cartão' | 'Andar' | 'Espaço' | 'Fluxo'
   icone: LucideIcon
   detalhe?: string
   acao: () => void
@@ -118,6 +121,18 @@ const ICONE_DO_CARTAO: Record<Exclude<No['tipo'], 'terminal'>, LucideIcon> = {
   banda: Users
 }
 
+/**
+ * Comando que mexe no quadro: vindo de outra página (Fluxos, Rotinas…), vai ao quadro primeiro, senão o cartão nasceria, ou a tela
+ * andaria, num quadro que a pessoa não está vendo. A guarda de rascunho (editor de Fluxos) pode segurar a troca: aí não faz nada.
+ */
+const noQuadro = (fazer: () => void) => (): void => {
+  if (paginaAtiva() !== 'quadro') {
+    irParaPagina('quadro')
+    if (paginaAtiva() !== 'quadro') return
+  }
+  fazer()
+}
+
 /** Leva a tela até o cartão (no zoom atual, se ele couber) e o seleciona. */
 function irAteCartao(no: No): void {
   const cam = planoAtual()!.camera
@@ -140,14 +155,14 @@ function montarItens(): Item[] {
     rotulo,
     grupo: 'Comando',
     icone,
-    acao: () => {
+    acao: noQuadro(() => {
       const { x, y } = centro()
       fazer(x, y)
-    }
+    })
   })
   return [
     ...preferencias.presets.map((p) =>
-      criar(`Novo terminal: ${p.nome}`, ICONE_AGENTE[p.agente] ?? SquareTerminal, (x, y) => adicionarNo({ tipo: 'terminal', preset: p }, x, y))
+      criar(`Novo terminal: ${p.nome}`, ICONE_AGENTE[p.agente] ?? SquareTerminal, (x, y) => adicionarNo({ tipo: 'terminal', preset: p }, x, y, { noCentro: true }))
     ),
     criar('Novo post-it', StickyNote, (x, y) => adicionarNo({ tipo: 'postit' }, x, y)),
     criar('Novo texto', Type, (x, y) => adicionarNo({ tipo: 'texto' }, x, y)),
@@ -155,34 +170,39 @@ function montarItens(): Item[] {
     criar('Anexar arquivo…', Paperclip, (x, y) => void anexarArquivoEm(x, y)),
     criar('Árvore de uma pasta…', FolderTree, (x, y) => void arvoreEm(x, y)),
     criar('Colar', ClipboardPaste, (x, y) => void colar({ x, y })),
-    { rotulo: 'Novo andar…', grupo: 'Comando', icone: Plus, acao: abrirNovoAndar },
+    { rotulo: 'Novo andar…', grupo: 'Comando', icone: Plus, acao: noQuadro(abrirNovoAndar) },
     { rotulo: 'Nova janela', grupo: 'Comando', icone: AppWindow, detalhe: 'Ctrl+Shift+N', acao: () => abrirNovaJanela() },
-    { rotulo: 'Ver tudo', grupo: 'Comando', icone: Scan, detalhe: 'Ctrl+1', acao: enquadrarTudo },
-    { rotulo: 'Selecionar tudo', grupo: 'Comando', icone: Scan, detalhe: 'Ctrl+A', acao: selecionarTudo },
-    { rotulo: miniMapa ? 'Esconder mini-mapa' : 'Mostrar mini-mapa', grupo: 'Comando', icone: IconeMapa, acao: alternarMiniMapa },
+    { rotulo: 'Ver tudo', grupo: 'Comando', icone: Scan, detalhe: 'Ctrl+1', acao: noQuadro(enquadrarTudo) },
+    { rotulo: 'Selecionar tudo', grupo: 'Comando', icone: Scan, detalhe: 'Ctrl+A', acao: noQuadro(selecionarTudo) },
+    { rotulo: miniMapa ? 'Esconder mini-mapa' : 'Mostrar mini-mapa', grupo: 'Comando', icone: IconeMapa, acao: noQuadro(alternarMiniMapa) },
     temaEscuro(preferencias.tema)
       ? { rotulo: 'Tema claro', grupo: 'Comando', icone: Sun, acao: () => definirTema('claro') }
       : { rotulo: 'Tema escuro', grupo: 'Comando', icone: Moon, acao: () => definirTema('escuro') },
     { rotulo: 'Atalhos do teclado', grupo: 'Comando', icone: Keyboard, detalhe: '?', acao: abrirAtalhos },
     { rotulo: 'Rotinas (página)', grupo: 'Comando', icone: Clock, acao: () => abrirRotinas() },
+    { rotulo: 'Kanban (página)', grupo: 'Comando', icone: SquareKanban, acao: () => abrirKanban() },
+    { rotulo: 'Fluxos (página)', grupo: 'Comando', icone: Workflow, acao: () => void irParaPagina('fluxos') },
     { rotulo: 'Agentes (página)', grupo: 'Comando', icone: Bot, acao: () => abrirAgentes('agora') },
     { rotulo: 'Funções (página Agentes)', grupo: 'Comando', icone: Bot, acao: () => abrirAgentes('funcoes') },
     { rotulo: 'Presets (página Agentes)', grupo: 'Comando', icone: Bot, acao: () => abrirAgentes('presets') },
     { rotulo: 'Partituras (página Agentes)', grupo: 'Comando', icone: Bot, acao: () => abrirAgentes('partituras') },
-    { rotulo: 'Conexões (página)', grupo: 'Comando', icone: Plug, acao: () => irParaPagina('conexoes') },
-    { rotulo: 'Configurações…', grupo: 'Comando', icone: Settings, detalhe: 'abre Conexões', acao: () => irParaPagina('conexoes') },
+    { rotulo: 'Configurações', grupo: 'Comando', icone: Settings, acao: () => abrirConfiguracoes() },
+    { rotulo: 'Geral (Configurações)', grupo: 'Comando', icone: Settings, acao: () => abrirConfiguracoes('geral') },
+    { rotulo: 'Aparência: temas e cor de destaque (Configurações)', grupo: 'Comando', icone: Palette, acao: () => abrirConfiguracoes('aparencia') },
+    { rotulo: 'Conexões (Configurações)', grupo: 'Comando', icone: Plug, acao: () => abrirConfiguracoes('conexoes') },
+    { rotulo: 'Atalhos (Configurações)', grupo: 'Comando', icone: Keyboard, acao: () => abrirConfiguracoes('atalhos') },
     ...plano.nos.map(
       (n): Item => ({
         rotulo: nomeDoCartao(n, notas),
         grupo: 'Cartão',
         icone: n.tipo === 'terminal' ? (ICONE_AGENTE[n.agente] ?? SquareTerminal) : ICONE_DO_CARTAO[n.tipo],
-        acao: () => irAteCartao(n)
+        acao: noQuadro(() => irAteCartao(n))
       })
     ),
     ...(espaco.andares.length
       ? [
-          { rotulo: 'Térreo', grupo: 'Andar' as const, icone: Home, acao: () => irParaAndar(null) },
-          ...espaco.andares.map((a) => ({ rotulo: a.nome, grupo: 'Andar' as const, icone: Layers, detalhe: a.git?.ramo, acao: () => irParaAndar(a.id) }))
+          { rotulo: 'Térreo', grupo: 'Andar' as const, icone: Home, acao: noQuadro(() => irParaAndar(null)) },
+          ...espaco.andares.map((a) => ({ rotulo: a.nome, grupo: 'Andar' as const, icone: Layers, detalhe: a.git?.ramo, acao: noQuadro(() => irParaAndar(a.id)) }))
         ]
       : []),
     ...espacos
@@ -222,11 +242,38 @@ export function Paleta() {
   return <CaixaPaleta />
 }
 
+/** Os fluxos do espaço aberto, lidos ao abrir a Paleta: achar um pelo nome o abre no editor. Falha de leitura: sem fluxos na busca. */
+function usarFluxosDaPaleta(): Item[] {
+  const [itens, setItens] = useState<Item[]>([])
+  useEffect(() => {
+    const espacoId = lerEstado().espaco?.id
+    if (!espacoId || !window.ork.fluxos) return
+    let vivo = true
+    apiDeFluxos()
+      .listar(espacoId)
+      .then(
+        (lista) => {
+          if (!vivo) return
+          setItens(
+            lista.fluxos.map((f): Item => ({ rotulo: f.nome, grupo: 'Fluxo', icone: Workflow, detalhe: f.ligado ? 'ligado' : 'desligado', acao: () => abrirFluxo(espacoId, f.id) }))
+          )
+        },
+        () => undefined
+      )
+    return () => {
+      vivo = false
+    }
+  }, [])
+  return itens
+}
+
 function CaixaPaleta() {
   const [busca, setBusca] = useState('')
   const [indice, setIndice] = useState(0)
   const lista = useRef<HTMLDivElement>(null)
-  const itens = useMemo(montarItens, [])
+  const doQuadro = useMemo(montarItens, [])
+  const fluxos = usarFluxosDaPaleta()
+  const itens = useMemo(() => [...doQuadro, ...fluxos], [doQuadro, fluxos])
   const achados = useMemo(() => {
     const b = normalizar(busca.trim())
     return itens

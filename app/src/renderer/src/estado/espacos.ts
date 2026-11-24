@@ -1,7 +1,9 @@
 import { type Funcao, type Partitura, type Tema } from '../../../shared/modelo'
 import type { Destaque } from '../../../shared/temas'
 import { type AvisoJanelas, type ResultadoDoPrimeiroPedido } from '../../../shared/api'
+import { pedidoParaDigitarAgora } from '../../../shared/pedidoPendente'
 import { aplicarPartitura, MAX_PARTITURAS, partituraDe } from '../../../shared/quadro/partituras'
+import { podeSairAgora } from '../casca/paginas'
 import { irParaAndar } from './andares'
 import { atenderAgente } from './caixa'
 import { agora, novoId } from './nos'
@@ -69,6 +71,9 @@ export async function abrirEspaco(id: string, andarId?: string | null): Promise<
     if (andarId !== undefined) irParaAndar(andarId)
     return
   }
+  // rascunho não salvo na página (editor de Fluxos): a mesma guarda da troca de página pergunta antes, e refaz esta
+  // abertura se a pessoa deixar. Aberto em outra janela não pergunta: ela só vem para a frente e esta fica como está.
+  if (!estado.emOutrasJanelas.includes(id) && !podeSairAgora(() => void abrirEspaco(id, andarId))) return
   // cliques rápidos em vários espaços: vale só o último
   const pedido = ++pedidoDeAbertura
   // não salvou: fica onde está (o aviso de erro aparece) para a mudança não se perder
@@ -308,13 +313,34 @@ export function anotarAvisoDoPrimeiroPedido(espacoId: string, cartaoId: string, 
  */
 const pedidosEmVoo = new Map<string, symbol>()
 
-/** Tira o aviso (dispensado pelo usuário, ou o pedido saiu). Só remove: não registra nada no lugar. */
-export function dispensarAvisoDoPrimeiroPedido(espacoId: string, cartaoId: string): void {
-  const chave = chaveDoAviso(espacoId, cartaoId)
+/** O texto de cada primeiro pedido que ainda não saiu, para o "Digitar agora" do selo. Some quando sai ou é dispensado. */
+const textosPendentes = new Map<string, string>()
+
+function tirarAviso(chave: string): void {
   pedidosEmVoo.delete(chave)
   if (!(chave in estado.avisosDoPrimeiroPedido)) return
   const { [chave]: _tirado, ...resto } = estado.avisosDoPrimeiroPedido
   definir({ avisosDoPrimeiroPedido: resto })
+}
+
+/** Tira o aviso (dispensado pelo usuário, ou o pedido saiu). Só remove: não registra nada no lugar. */
+export function dispensarAvisoDoPrimeiroPedido(espacoId: string, cartaoId: string): void {
+  const chave = chaveDoAviso(espacoId, cartaoId)
+  textosPendentes.delete(chave)
+  tirarAviso(chave)
+}
+
+/**
+ * "Digitar agora" do selo: o usuário resolveu a pergunta que prendia o agente (MCP novo, confiar na pasta…) e manda
+ * digitar o pedido de novo. Só vale se nada foi digitado (ver `podeDigitarAgora`); o selo some e, se o agente ainda
+ * não estiver pronto, volta com o novo resultado.
+ */
+export function digitarPedidoAgora(espacoId: string, cartaoId: string): void {
+  const chave = chaveDoAviso(espacoId, cartaoId)
+  const texto = pedidoParaDigitarAgora(estado.avisosDoPrimeiroPedido[chave], textosPendentes.get(chave))
+  if (texto === null) return
+  tirarAviso(chave)
+  entregarPrimeiroPedido(cartaoId, texto)
 }
 
 /** Manda o primeiro pedido; se o processo principal não confirmar que saiu, o cartão ganha um selo de aviso. */
@@ -328,6 +354,7 @@ export function entregarPrimeiroPedido(
   const chave = chaveDoAviso(espacoId, id)
   const marca = Symbol(chave)
   pedidosEmVoo.set(chave, marca)
+  textosPendentes.set(chave, texto)
   // a marca some quando o usuário dispensa (ou outro pedido do mesmo cartão a troca): resposta sem marca é descartada
   const vale = (): boolean => pedidosEmVoo.get(chave) === marca
   enviar(id, texto)

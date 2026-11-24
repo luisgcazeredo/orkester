@@ -16,7 +16,7 @@ Two rules apply to everything below:
 
 ## Connecting a client
 
-1. In Orkester, click the gear (or the plug icon) in the page bar on the left to open the **Conexões** (Connections) page, or search **Conexões** in the command palette.
+1. In Orkester, click the gear at the foot of the page bar on the left and go to **Configurações › Conexões** (settings › connections), **Chaves** (keys) tab; or search **Conexões (Configurações)** in the command palette (Ctrl+K).
 2. Name the key after whoever will use it — "Claude Code", "laptop" — and click **Generate key**.
 3. Pick your client's tab, click **Copy**, paste. Start a **new** session of the client: tools are loaded when
    a session starts.
@@ -80,10 +80,37 @@ a window; with several open, it refuses and lists them.
 | `quadro` | `espaco?` | Reads the visible floor: numbered cards, with position and state. |
 | `funcoes` | `espaco?` | Lists the saved roles that `abrir_cartao` uses by name. |
 | `ver_cartao` | `cartao`, `linhas?` (1–2000, default 50), `espaco?` | Reads an agent's screen right now, and whether it is idle, working or waiting on a question. `cartao` is the card's name or its beginning. |
-| `abrir_cartao` | `funcao?`, `agente?` (`claude` · `codex` · `shell`), `preset?`, `nome?`, `pasta?`, `espaco?` | Opens a new session. With `funcao`, engine and level come from the role's preset; without it, `agente` is required. `preset` overrides by name ("Claude forte"). `pasta` is relative to the workspace folder. |
+| `abrir_cartao` | `funcao?`, `agente?` (`claude` · `codex` · `shell`), `preset?`, `nome?`, `pasta?`, `modelo?`, `esforco?`, `tarefa?`, `espaco?` | Opens a new session. With `funcao`, engine, model and effort come from the role; without it, `agente` is required. `preset` overrides by name ("Claude forte"); `modelo` and `esforco` (`low` … `max`; `ultra` is Codex only) override the role. `tarefa` (the N of #N) puts the agent to work on that kanban task. `pasta` is relative to the workspace folder. |
+| `modelos` | `espaco?` | The Claude and Codex models, the efforts each accepts and the defaults. |
+| `trocar_modelo` | `cartao`, `modelo?`, `esforco?`, `espaco?` | Changes the model and/or effort of an idle agent: the card reopens and the conversation goes on. Refuses while it is busy. |
 | `partituras` | `espaco?` | Lists the saved teams (scores), with their agents, roles and links. |
 | `subir_partitura` | `nome`, `espaco?` | Raises a saved team on the visible floor. An unknown name is refused with the list of the ones that exist. |
 | `importar_catalogo` | `pasta`, `espaco?` | Turns the `.md` sheets of a folder into roles — the same format as `ork catalogo importar`, described in [`ork.md`](ork.md). Updates by name instead of duplicating; never deletes. |
+| `kanban` | `numero?`, `coluna?`, `responsavel?`, `etiqueta?`, `espaco?` | The tasks by column, with number, labels and who works on each. With `numero`, the whole task. |
+| `kanban_criar` | `titulo`, `descricao?`, `coluna?`, `responsavel?`, `etiquetas?`, `espaco?` | Creates a task and returns its number (#N). Without `coluna`, the user creates it in Demandas and an agent in Fazendo. |
+| `kanban_mover` | `numero`, `coluna`, `posicao?` (`topo` · `fim` · N), `espaco?` | Moves the task to another column. Moving to Com o Maestro is delegating (the user only); the final column belongs to the user and the Maestro. |
+| `kanban_editar` | `numero`, `titulo?`, `descricao?`, `etiquetas?`, `espaco?` | Changes title, description or labels (`+a,-b` adds and removes). |
+| `kanban_atribuir` | `numero`, `responsavel`, `espaco?` | Puts an agent on the task's list of workers and tells it in its inbox (`ninguem` empties it). |
+| `kanban_soltar` | `numero`, `quem?`, `espaco?` | Takes an agent off the list. |
+| `kanban_comentar` | `numero`, `texto`, `espaco?` | Comments on the task. |
+| `kanban_apagar` | `numero`, `confirmar: true`, `espaco?` | Sends the task to the bin (the Kanban page restores it). |
+| `fluxo_ver` | `nome?`, `json?`, `espaco?` | Without `nome`, the space's flows: on or off, triggers and the last run. With `nome`, one whole flow; with `json: true`, the JSON that `fluxo_criar` and `fluxo_editar` take. A credential shows only by name. |
+| `fluxo_criar` | `fluxo`, `pasta?`, `espaco?` | Creates a flow from the JSON (object or text; cards and columns can go by name only). Born off. `pasta` is a folder that already exists on the Fluxos page. |
+| `fluxo_editar` | `nome`, `fluxo`, `espaco?` | Replaces the name, nodes and links with the JSON sent. |
+| `fluxo_ligar` | `nome`, `espaco?` | Turns the flow on. Refuses one with Code, HTTP or a command, and one that still has a card or column to choose. |
+| `fluxo_desligar` | `nome`, `espaco?` | Turns the flow off; nothing else changes in it. |
+| `fluxo_rodar` | `nome`, `espaco?` | Runs it once, now, through the Manual trigger, and returns what each node did. Refuses without a Manual trigger, or with Code, HTTP or a command not yet approved. |
+| `fluxo_execucoes` | `nome`, `n?` (1–50, default 10), `espaco?` | The last runs, with the result, the time and the node that failed. |
+| `fluxo_apagar` | `nome`, `confirmar: true`, `espaco?` | Deletes the flow and its runs, for good. |
+
+The kanban acts **as the caller**: from an Orkester terminal, as that agent (the same rules as `ork kanban`, its own
+space only, its name in the history — do not send `espaco`); from outside, as you.
+
+Flows also act as the caller, with the rules of `ork fluxo` ([`ork.md`](ork.md#flows)). With one difference: **a flow
+with Code, HTTP or a command does not turn on through MCP, not even with your key.** The client creates and edits, the
+flow stays off, and you turn it on on the Fluxos page, seeing those nodes. The allowed local addresses (`rede.locaisPermitidos`) also only change on the page (a `rede` in the JSON is ignored, with a warning). There is no
+tool for credentials. The format
+and the nodes are in [`fluxos.md`](fluxos.md).
 
 Answers are plain text, the same text `ork` prints. A refusal comes back as a tool error (`isError: true`)
 whose text says why — the client sees it and can correct itself.
@@ -94,7 +121,7 @@ whose text says why — the client sees it and can correct itself.
 |---|---|
 | `o Orkester não está aberto nesta máquina` | The app is closed (or is a version older than 1.3). Open it. |
 | `falta a chave` | `ORK_CHAVE` is missing from the server's configuration. |
-| `chave inválida ou revogada` | Wrong key, or revoked in the Conexões page. Generate another. |
+| `chave inválida ou revogada` | Wrong key, or revoked in Configurações › Conexões. Generate another. |
 | `o Orkester fechou desde a última vez` | The app was closed after the client connected. Reopen it; no restart of the client needed. |
 | `o Orkester não respondeu em 30 s` | The app is open but stuck. |
 
@@ -103,7 +130,7 @@ The messages are in Portuguese, like the rest of the interface.
 ## What the key is and is not
 
 - **Is:** intent (nothing outside the canvas reaches the board without one), a name, revocation that takes
-  effect on the next call, and a record — the Conexões page shows when each key was created and last used. Revoked
+  effect on the next call, and a record — Configurações › Conexões shows when each key was created and last used. Revoked
   keys are marked, not deleted, so the record of who had access survives.
 - **Is not:** a boundary against programs already running as you. Anything that runs under your user can
   read `~/.orkester` anyway. The key is about knowing who did what and cutting access, not about keeping

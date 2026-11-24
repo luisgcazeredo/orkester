@@ -46,6 +46,7 @@ Três ideias seguram o resto:
 | **Bandas** | Grupos desenhados como moldura: quem está dentro fala com todos os de dentro. |
 | **Partituras** | Times inteiros salvos — agentes, funções, recados, cordas, bandas — que sobem de uma vez num espaço novo, em qualquer projeto. |
 | **Rotinas** | Um pedido digitado num cartão a cada X minutos, todo dia ou toda semana. Se o terminal estiver ocupado, parado numa pergunta ou encerrado, a rotina pula a vez em vez de escrever no meio do trabalho. |
+| **Fluxos** | Automações desenhadas em nós, no estilo de uma tela de automação: um gatilho (tarefa que muda de coluna no Kanban, entrega, agente que parou, relógio ou um botão) e o que fazer — recado a um agente, tarefa, aviso, condição, JavaScript isolado, chamada HTTP com credencial cifrada. Travas contra laço e excesso, histórico de execuções, e o que roda código ou fala com a internet só liga com a sua confirmação. Guia: [`docs/fluxos.pt-BR.md`](docs/fluxos.pt-BR.md). |
 | **Andares** | Cópias isoladas do repositório por `git worktree`, para dois times mexerem no mesmo projeto sem se atropelar. |
 | **Árvores de código** | Os arquivos que o agente toca viram cartões ao lado dele, com o diff do git, agrupados por frente de trabalho. |
 | **Várias janelas** | Cada espaço abre na sua janela, e o app reabre as que estavam abertas, onde estavam. |
@@ -91,6 +92,13 @@ npm run dev        # app com recarga automática
 
 As ferramentas de teste do projeto não fazem parte deste repositório.
 
+## Manual de uso
+
+Primeira vez no Orkester? **[`docs/manual.pt-BR.md`](docs/manual.pt-BR.md)** explica cada página, botão, menu e
+atalho: o quadro, os cartões de agente, cordas, bandas, partituras, andares, Leitor, Rotinas, Agentes, Kanban,
+Fluxos, Configurações (aparência, conexões, credenciais, atalhos) e páginas próprias, mais onde ficam os dados e os problemas
+comuns.
+
 ## O comando `ork`
 
 Dentro de qualquer terminal do quadro, o agente tem um comando próprio:
@@ -110,15 +118,18 @@ São seis de cerca de trinta verbos. **A referência completa está em
 ## Ligar o seu Claude (MCP)
 
 O `ork` é para os agentes *dentro* do quadro. Para mexer no quadro **de fora** — o seu Claude Code, o Claude
-Desktop, o Codex, qualquer cliente MCP — abra a página Conexões (a engrenagem), gere uma chave e cole o bloco
-que o app te dá. O cliente passa a ler o quadro, abrir agentes, subir times salvos e importar fichas de time,
-como se fosse você. O Orkester precisa estar aberto.
+Desktop, o Codex, qualquer cliente MCP — abra Configurações › Conexões (a engrenagem), gere uma chave e cole o
+bloco que o app te dá. O cliente passa a ler o quadro, abrir agentes, subir times salvos, importar fichas de time,
+mexer no Kanban e nos fluxos, como se fosse você. O Orkester precisa estar aberto.
 
 **Ferramentas, configuração e o que a chave protege e o que não protege: [`docs/mcp.pt-BR.md`](docs/mcp.pt-BR.md).**
 
 ## Suas próprias páginas
 
-Escreva uma páginazinha em HTML/JS simples e ponha na barra de páginas com o **+**, isolada do seu PC: **[`docs/paginas.pt-BR.md`](docs/paginas.pt-BR.md)**.
+Escreva uma página em HTML, CSS e JavaScript puro, sem build, e ponha na barra de páginas com o **+**, isolada do
+seu PC. Ela pode mostrar o time ao vivo, mandar pedidos a agentes que você ligar a ela, guardar dados e falar com
+APIs que você permitir. O guia de quem constrói (API `orkPagina`, permissões, limites, receitas prontas e como pedir
+a um agente para criar): **[`docs/paginas.pt-BR.md`](docs/paginas.pt-BR.md)**.
 
 ## Por dentro
 
@@ -132,7 +143,7 @@ app/src/main/      processo principal: terminais, verbos do `ork`, dados em disc
 app/src/renderer/  o quadro em React
 app/src/cli/       o comando `ork` que o agente chama
 app/src/mcp/       o servidor MCP que um cliente de fora roda
-docs/              as referências do `ork` e do MCP
+docs/              o manual de uso, as referências do `ork` e do MCP e os guias dos fluxos e das páginas próprias
 ```
 
 ## Estado

@@ -45,7 +45,7 @@ function enderecoDoCano(): string {
 function chave(): string {
   const k = (process.env.ORK_CHAVE ?? '').trim()
   if (!k) {
-    throw new Error('falta a chave: ponha ORK_CHAVE na configuração deste servidor (gere uma em Conexões, no Orkester)')
+    throw new Error('falta a chave: ponha ORK_CHAVE na configuração deste servidor (gere uma no Orkester, em Configurações › Conexões › Chaves)')
   }
   return k
 }
@@ -369,6 +369,105 @@ servidor.registerTool(
     inputSchema: { numero, confirmar: z.literal(true).describe('Precisa ser true: a tarefa vai para a lixeira.'), espaco: espacoDoKanban }
   },
   ({ numero: n, espaco: ondeEspaco }) => rodarKanban(['apagar', String(n)], comEspaco({ confirmar: true }, ondeEspaco))
+)
+
+// ---------- fluxos: o mesmo `ork fluxo <ação>`; como o kanban, age como quem chama (crachá ou chave) ----------
+
+const nomeDoFluxo = z.string().describe('Nome do fluxo (ou o começo dele).')
+const corpoDoFluxo = z
+  .union([z.string(), z.record(z.string(), z.unknown())])
+  .describe('O fluxo: o JSON do fluxo_ver com `json` (orkester, versao, nome, nos, ligacoes), como objeto ou texto.')
+const espacoDoFluxo = z
+  .string()
+  .optional()
+  .describe('Nome do espaço. Sem isto, vale o único aberto numa janela. Num terminal do Orkester você age como o seu agente e só alcança o próprio espaço (não mande isto).')
+
+const rodarFluxo = async (posicionais: string[], opcoes: Record<string, string | number | true | undefined>, espaco?: string, corpo?: unknown) => {
+  try {
+    const textoDoPedido = corpo === undefined ? '' : typeof corpo === 'string' ? corpo : JSON.stringify(corpo)
+    const limpas: Record<string, string | number | true> = {}
+    for (const [k, v] of Object.entries(opcoes)) if (v !== undefined && v !== '') limpas[k] = v
+    if (espaco?.trim()) limpas.espaco = espaco.trim()
+    return texto(await pedir('fluxo', posicionais, limpas, quemChama(process.env), textoDoPedido))
+  } catch (e) {
+    return falha(e)
+  }
+}
+
+servidor.registerTool(
+  'fluxo_ver',
+  {
+    ...metaDaFerramenta('fluxo_ver'),
+    inputSchema: {
+      nome: nomeDoFluxo.optional(),
+      json: z.boolean().optional().describe('Com `nome`: devolve o JSON (o formato de fluxo_criar e fluxo_editar).'),
+      espaco: espacoDoFluxo
+    }
+  },
+  ({ nome, json, espaco: ondeEspaco }) => rodarFluxo(nome?.trim() ? ['ver', nome] : ['listar'], { json: json && nome?.trim() ? true : undefined }, ondeEspaco)
+)
+
+servidor.registerTool(
+  'fluxo_criar',
+  {
+    ...metaDaFerramenta('fluxo_criar'),
+    inputSchema: { fluxo: corpoDoFluxo, pasta: z.string().optional().describe('Nome de uma pasta que já existe na página Fluxos.'), espaco: espacoDoFluxo }
+  },
+  ({ fluxo, pasta, espaco: ondeEspaco }) => rodarFluxo(['criar'], { pasta }, ondeEspaco, fluxo)
+)
+
+servidor.registerTool(
+  'fluxo_editar',
+  {
+    ...metaDaFerramenta('fluxo_editar'),
+    inputSchema: { nome: nomeDoFluxo, fluxo: corpoDoFluxo, espaco: espacoDoFluxo }
+  },
+  ({ nome, fluxo, espaco: ondeEspaco }) => rodarFluxo(['editar', nome], {}, ondeEspaco, fluxo)
+)
+
+servidor.registerTool(
+  'fluxo_ligar',
+  {
+    ...metaDaFerramenta('fluxo_ligar'),
+    inputSchema: { nome: nomeDoFluxo, espaco: espacoDoFluxo }
+  },
+  ({ nome, espaco: ondeEspaco }) => rodarFluxo(['ligar', nome], {}, ondeEspaco)
+)
+
+servidor.registerTool(
+  'fluxo_desligar',
+  {
+    ...metaDaFerramenta('fluxo_desligar'),
+    inputSchema: { nome: nomeDoFluxo, espaco: espacoDoFluxo }
+  },
+  ({ nome, espaco: ondeEspaco }) => rodarFluxo(['desligar', nome], {}, ondeEspaco)
+)
+
+servidor.registerTool(
+  'fluxo_rodar',
+  {
+    ...metaDaFerramenta('fluxo_rodar'),
+    inputSchema: { nome: nomeDoFluxo, espaco: espacoDoFluxo }
+  },
+  ({ nome, espaco: ondeEspaco }) => rodarFluxo(['rodar', nome], {}, ondeEspaco)
+)
+
+servidor.registerTool(
+  'fluxo_execucoes',
+  {
+    ...metaDaFerramenta('fluxo_execucoes'),
+    inputSchema: { nome: nomeDoFluxo, n: z.number().int().min(1).max(50).optional().describe('Quantas, das mais novas. Padrão 10.'), espaco: espacoDoFluxo }
+  },
+  ({ nome, n, espaco: ondeEspaco }) => rodarFluxo(['execucoes', nome], { n: n === undefined ? undefined : String(n) }, ondeEspaco)
+)
+
+servidor.registerTool(
+  'fluxo_apagar',
+  {
+    ...metaDaFerramenta('fluxo_apagar'),
+    inputSchema: { nome: nomeDoFluxo, confirmar: z.literal(true).describe('Precisa ser true: o fluxo e as execuções dele somem para sempre.'), espaco: espacoDoFluxo }
+  },
+  ({ nome, espaco: ondeEspaco }) => rodarFluxo(['apagar', nome], { confirmar: true }, ondeEspaco)
 )
 
 // sem `await` no topo: o bundler do principal pode gerar CommonJS, onde isso não existe

@@ -6,6 +6,7 @@ import { DialogoAceite } from '../paginas/extra/DialogoAceite'
 import { usarPaginas } from '../paginas/extra/estado'
 import { abrirPainelDePaginas, PainelDePaginas } from '../paginas/extra/PainelMais'
 import { iniciarPaginasExtras } from '../paginas/extra/PaginaExtra'
+import { abrirConfiguracoes, PAGINA_CONFIGURACOES } from '../paginas/configuracoes/abrir'
 
 function IconeNaBarra({ pagina: { icone: Icone, imagem, inicial } }: { pagina: Pagina }) {
   if (imagem) return <img className="extra-icone-img" src={imagem} width={18} height={18} alt="" draggable={false} />
@@ -19,7 +20,7 @@ function IconeNaBarra({ pagina: { icone: Icone, imagem, inicial } }: { pagina: P
 }
 
 /**
- * Trilho fino de ícones, um por página registrada, na ponta esquerda da janela, ANTES da lista de espaços (não a substitui). É GERAL: não depende de haver espaço aberto nem da lista estar recolhida. No pé fica a engrenagem, separada dos ícones das páginas, que abre direto a página Conexões. O ícone da página
+ * Trilho fino de ícones, um por página registrada, na ponta esquerda da janela, ANTES da lista de espaços (não a substitui). É GERAL: não depende de haver espaço aberto nem da lista estar recolhida. No pé fica a engrenagem, separada dos ícones das páginas, que abre a página Configurações (1.9.6: na última seção aberta; Temas e Conexões moram lá dentro e não têm ícone próprio). O ícone da página
  * em tela fica marcado (`aria-current`). O clique só chama `irParaPagina`, o único escritor da página ativa.
  * Páginas extras (`nativa: false`, do registro do main) vêm depois das nativas, separadas por um traço. O "+" fica SEMPRE
  * (1.9.5, S6) e abre o painel das páginas (guia, exemplo, pasta, pedir a um agente); com a chave geral desligada o painel
@@ -32,7 +33,7 @@ export function BarraPaginas() {
   const temApi = !!window.ork.paginas
   useEffect(iniciarPaginasExtras, [])
   const todas = paginasRegistradas()
-  const nativas = todas.filter((p) => p.nativa)
+  const nativas = todas.filter((p) => p.nativa && p.naBarra !== false)
   const extras = todas.filter((p) => !p.nativa)
   const botao = (p: Pagina) => (
     <button
@@ -43,7 +44,11 @@ export function BarraPaginas() {
       aria-label={p.nativa ? p.titulo : `${p.titulo} (página extra)`}
       aria-current={p.id === ativa ? 'page' : undefined}
       data-pagina-id={p.id}
-      onClick={() => irParaPagina(p.id)}
+      onClick={() => {
+        // o ícone da página que já está em tela não troca de página: deixa ela decidir (Fluxos volta da edição à lista)
+        if (p.id === ativa) p.aoReclicar?.()
+        else irParaPagina(p.id)
+      }}
     >
       <IconeNaBarra pagina={p} />
     </button>
@@ -66,7 +71,15 @@ export function BarraPaginas() {
           <Plus size={18} strokeWidth={1.8} />
         </button>
       )}
-      <button type="button" className="barra-pagina barra-engrenagem" title="Configurações (Conexões)" aria-label="Configurações: abre a página Conexões" data-configuracoes onClick={() => irParaPagina('conexoes')}>
+      <button
+        type="button"
+        className={`barra-pagina barra-engrenagem ${ativa === PAGINA_CONFIGURACOES ? 'ativo' : ''}`}
+        title="Configurações: geral, aparência, conexões e atalhos"
+        aria-label="Configurações"
+        aria-current={ativa === PAGINA_CONFIGURACOES ? 'page' : undefined}
+        data-configuracoes
+        onClick={() => abrirConfiguracoes()}
+      >
         <Settings size={18} strokeWidth={1.8} />
       </button>
       <DialogoAceite />

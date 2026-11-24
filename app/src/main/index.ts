@@ -2,8 +2,11 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, screen, session, shell, type
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { CANAIS_APP } from '../shared/api'
+import { lerRespostaAoFechar, perguntaAoFechar, type Fechamento } from './fecharJanela'
 import { registrarAndares } from './andares'
 import { pararRotinas, registrarRotinas } from './rotinas'
+import { cofreDeCredenciais, motorDoCodigo, pararFluxos, registrarFluxos } from './fluxos'
+import { registrarCredenciais } from './fluxos/credenciais'
 import { registrarPanorama } from './panorama'
 import { registrarArea, registrarEsquemas, servirImagens } from './area'
 import { instalarIpcSeguro } from './ipcSeguro'
@@ -23,6 +26,8 @@ import { acompanharJanela, configurarJanelas, gravarSessaoAgora, lembrarInicial,
 import { janelasParaAbrir } from '../shared/janelas'
 import { encerrarDoEspaco, encerrarTodos, registrarTerminais } from './terminais'
 import { rodarAutoteste, rodarMedicao } from './ferramentas-dev'
+import { iniciarBandeja } from './bandeja'
+import type { Bandeja } from './regrasDaBandeja'
 
 /**
  * Endurecimento do executável (fuses, em `package.json` → `build.electronFuses`), decidido em 06/11/2026:
@@ -65,15 +70,16 @@ function abrirNoNavegador(endereco: string): void {
 }
 
 /**
- * Pede à janela que salve o que estiver pendente. `true`: gravou (ou a janela não respondeu em 5 s,
- * travada, e não há o que esperar); `false`: tentou e a gravação falhou.
+ * Pede à janela que salve o que estiver pendente e diz o que ela respondeu: `pode` (gravou, ou não respondeu em 5 s,
+ * travada, e não há o que esperar), `falhou` (tentou e a gravação falhou) ou `rascunho-de-fluxo` (o editor de Fluxos
+ * tem mudanças não salvas; a janela responde na hora, sem perguntar nada, então o prazo não corta a pergunta do main).
  */
-function pedirSalvamento(janela: BrowserWindow): Promise<boolean> {
+function pedirFechamento(janela: BrowserWindow): Promise<Fechamento> {
   return new Promise((resolver) => {
-    const pronto = (_evento: unknown, gravou?: boolean): void => {
+    const pronto = (_evento: unknown, resposta?: unknown): void => {
       clearTimeout(limite)
       janela.webContents.ipc.removeListener(CANAIS_APP.podeFechar, pronto)
-      resolver(gravou !== false)
+      resolver(lerRespostaAoFechar(resposta))
     }
     const limite = setTimeout(() => pronto(null, true), 5000)
     janela.webContents.ipc.on(CANAIS_APP.podeFechar, pronto)
@@ -81,7 +87,18 @@ function pedirSalvamento(janela: BrowserWindow): Promise<boolean> {
   })
 }
 
+/** O autoteste: `true` = nada a perguntar ao fechar. */
+const pedirSalvamento = async (janela: BrowserWindow): Promise<boolean> => (await pedirFechamento(janela)).tipo === 'pode'
+
 let autotesteRodando = false
+
+/**
+ * As janelas do app (as de `criarJanela`). A "última janela" é a última destas, e não a última `BrowserWindow`:
+ * uma janela escondida de ajudante (o nó Código dos Fluxos) não pode segurar o app vivo sem janela e sem ícone.
+ */
+const janelasDoApp = new Set<BrowserWindow>()
+/** Criada no `whenReady`. Fluxo ligado + última janela fechada = o app fica na bandeja (main/bandeja.ts). */
+let bandeja: Bandeja | null = null
 
 /** No autoteste a janela abre no segundo monitor (se houver), para não cobrir o que se está vendo no principal. */
 function posicaoAutoteste(largura: number, altura: number): { x?: number; y?: number } {
@@ -107,6 +124,8 @@ function posicaoDaPrevia(): { x: number; y: number } {
  * `caixa`: onde ela estava na sessão passada; sem ela, a janela nasce deslocada da que está na frente.
  */
 function criarJanela(espacoInicial: string | null = null, caixa?: Partial<Rectangle> & { maximizada?: boolean }): BrowserWindow {
+  // uma janela voltou (Abrir da bandeja, atalho, Ctrl+Shift+N): o ícone da bandeja some e a sessão volta a ser gravada
+  bandeja?.voltou()
   // janela nova aparece um pouco deslocada da que está na frente, para não esconder uma atrás da outra
   const frente = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
   const posicao = previa
@@ -156,9 +175,12 @@ function criarJanela(espacoInicial: string | null = null, caixa?: Partial<Rectan
   const idConteudo = janela.webContents.id
   lembrarInicial(idConteudo, espacoInicial)
   acompanharJanela(janela)
+  janelasDoApp.add(janela)
   janela.on('closed', () => {
     soltarJanela(idConteudo)
     soltarAbasDaJanela(idConteudo)
+    janelasDoApp.delete(janela)
+    if (janelasDoApp.size === 0) aoFecharUltima()
   })
 
   // A janela tem acesso a terminais: nunca pode virar uma página de fora. Links vão para o navegador.
@@ -193,20 +215,31 @@ function criarJanela(espacoInicial: string | null = null, caixa?: Partial<Rectan
   let podeFechar = autoteste
   let fechando = false
   async function tentarFechar(): Promise<void> {
-    if (!(await pedirSalvamento(janela))) {
+    // falha de salvar ou rascunho de fluxo: o texto e os botões vêm de fecharJanela.ts
+    const pergunta = perguntaAoFechar(await pedirFechamento(janela))
+    if (pergunta) {
       const { response } = await dialog.showMessageBox(janela, {
         type: 'warning',
         title: 'Orkester',
-        message: 'Não consegui salvar as últimas mudanças.',
-        detail: 'Se fechar agora, o que mudou desde o último salvamento se perde.',
-        buttons: ['Tentar de novo', 'Fechar sem salvar', 'Cancelar'],
+        message: pergunta.mensagem,
+        detail: pergunta.detalhe,
+        buttons: pergunta.botoes.map((b) => b.texto),
         defaultId: 0,
-        cancelId: 2
+        cancelId: pergunta.cancelar
       })
-      if (response === 0) return tentarFechar()
-      if (response === 2) return
+      const acao = pergunta.botoes[response]?.acao ?? 'ficar'
+      if (acao === 'tentar') return tentarFechar()
+      if (acao === 'ficar') return
     }
     podeFechar = true
+    // a última janela: o ícone da bandeja nasce **antes** de ela sumir (incidente de 10/11: app vivo sem ícone)
+    if (janelasDoApp.size === 1 && janelasDoApp.has(janela)) {
+      try {
+        bandeja?.preparar({ autoteste, medindo })
+      } catch {
+        /* sem ícone: ao fechar, o app sai pelo caminho de sempre */
+      }
+    }
     if (!janela.isDestroyed()) janela.close()
   }
   janela.on('close', (evento) => {
@@ -249,6 +282,8 @@ function abrirAsJanelasDaSessao(): void {
 // Dentro do portal: janelas novas vão para o navegador do sistema; o site não sai de http/https.
 // Página "+" (achada pela sessão): nenhuma janela nova e navegação só dentro de ork-pagina://<id>/.
 app.on('web-contents-created', (_evento, conteudo) => {
+  // a janela do nó Código (S4) é travada pelo próprio motor dele, antes de qualquer outra regra
+  if (motorDoCodigo.guardar(conteudo)) return
   if (conteudo.getType() !== 'webview') return
   if (guardarPagina(conteudo)) return
   conteudo.setWindowOpenHandler(({ url }) => {
@@ -275,7 +310,12 @@ if (!autoteste && !medindo && !app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   app.on('second-instance', () => {
-    const janela = BrowserWindow.getAllWindows()[0]
+    // só na bandeja (sem janela do app): o atalho reabre a sessão, como o "Abrir" do ícone
+    if (janelasDoApp.size === 0) {
+      if (bandeja?.ativa() && !bandeja.saindo()) abrirAsJanelasDaSessao()
+      return
+    }
+    const janela = [...janelasDoApp][0]
     if (janela) {
       if (janela.isMinimized()) janela.restore()
       janela.focus()
@@ -286,7 +326,22 @@ if (!autoteste && !medindo && !app.requestSingleInstanceLock()) {
     // o portal se apresenta como Chrome comum: com "Electron" no nome, sites como o login do Google recusam
     const portal = session.fromPartition('persist:portal')
     portal.setUserAgent(portal.getUserAgent().replace(/ (Electron|Orkester)\/\S+/gi, ''))
-    configurarJanelas(criarJanela, idsDosEspacos, gravarSessaoDeJanelas)
+    // Na bandeja a sessão de janelas fica congelada: a carência de `janelas.ts` tiraria da lista, 8 s depois, as
+    // janelas que fecharam ao ir para a bandeja, e o "Abrir" (ou a próxima vez que o app subir) viria vazio.
+    configurarJanelas(criarJanela, idsDosEspacos, (s) => {
+      if (!bandeja?.ativa()) gravarSessaoDeJanelas(s)
+    })
+    bandeja = iniciarBandeja({
+      abrir: () => {
+        const janela = [...janelasDoApp][0]
+        if (!janela) abrirAsJanelasDaSessao()
+        else {
+          if (janela.isMinimized()) janela.restore()
+          janela.focus()
+        }
+      },
+      sair: sairDoApp
+    })
     registrarJanelas()
     registrarDados()
     registrarChaves()
@@ -302,6 +357,8 @@ if (!autoteste && !medindo && !app.requestSingleInstanceLock()) {
     registrarCodigo()
     registrarLeitor()
     registrarRotinas()
+    registrarFluxos()
+    registrarCredenciais(ipcMain, cofreDeCredenciais)
     registrarPanorama()
     registrarPaginas()
     quandoApagarEspaco(encerrarDoEspaco)
@@ -326,7 +383,10 @@ app.on('before-quit', () => {
  * lição é mais geral: **sair não pode depender de todo o resto ter corrido bem.** Por isso o prazo duro
  * abaixo, que mata o processo mesmo que algo novo trave aqui amanhã.
  */
-app.on('window-all-closed', () => {
+let saindoDoApp = false
+function sairDoApp(): void {
+  if (saindoDoApp) return
+  saindoDoApp = true
   // O prazo duro é a **primeira** coisa: armá-lo depois de `encerrarTodos()` deixava de fora justamente o
   // que pode travar (o kill do node-pty no Windows tem caso documentado de deadlock). Achado na revisão de
   // 10/11/2026 — a rede de segurança estava pendurada abaixo do buraco.
@@ -340,7 +400,30 @@ app.on('window-all-closed', () => {
   }, 5000)
   forca.unref()
   pararRotinas()
+  pararFluxos()
   encerrarTodos()
   // o Chrome do app fecha direito antes (sem o aviso de "não foi fechado corretamente" na próxima vez)
   void encerrarNavegador().finally(() => app.quit())
-})
+}
+
+/**
+ * A última janela do app fechou. Com fluxo ligado o app fica na bandeja: nada de `encerrarTodos`, os agentes e os
+ * fluxos seguem vivos. Sem fluxo ligado (ou no autoteste e na medição, ou se o ícone não nascer) sai pelo caminho
+ * de sempre, o de cima, com o prazo de 5 s. "Sair" do ícone e os ligados chegando a 0 na bandeja também vão por ele.
+ * Roda uma vez por fechamento: o `closed` da última janela e o `window-all-closed` chamam os dois.
+ */
+function aoFecharUltima(): void {
+  if (saindoDoApp || janelasDoApp.size > 0 || bandeja?.ativa()) return
+  try {
+    if (bandeja && !autoteste && !medindo) {
+      // a sessão como estava ao fechar vai para o disco antes de congelar (na bandeja ela não é regravada)
+      gravarSessaoAgora()
+      if (bandeja.entrar({ autoteste, medindo }) === 'bandeja') return
+    }
+  } catch {
+    /* qualquer tropeço da bandeja: sai */
+  }
+  sairDoApp()
+}
+
+app.on('window-all-closed', aoFecharUltima)

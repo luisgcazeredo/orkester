@@ -17,7 +17,8 @@ function fechar(): void {
   avisar()
 }
 
-const SECOES: Array<[string, Array<[string, string]>]> = [
+/** A folha do quadro: a janela do `?` e a seção Atalhos das Configurações leem esta mesma lista. */
+export const SECOES: Array<[string, Array<[string, string]>]> = [
   [
     'Ferramentas',
     [
@@ -55,6 +56,7 @@ const SECOES: Array<[string, Array<[string, string]>]> = [
       ['Ctrl + 1', 'Ver tudo'],
       ['Ctrl + K', 'Busca: cartão, andar, espaço ou comando'],
       ['Ctrl + Shift + N', 'Nova janela (outro espaço ao mesmo tempo)'],
+      ['Ctrl + Shift + E', 'Mostra ou esconde o Explorador (barra das pastas)'],
       ['?', 'Esta folha']
     ]
   ]

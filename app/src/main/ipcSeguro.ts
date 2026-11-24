@@ -11,12 +11,29 @@
  */
 import type { IpcMain, IpcMainEvent, IpcMainInvokeEvent } from 'electron'
 
-type Remetente = { sender?: { getType?: () => string } | null } | null | undefined
+type Remetente = { sender?: { getType?: () => string; id?: number } | null } | null | undefined
 
-/** O remetente é uma janela do app? Remetente sem `getType`, que falha, ou de outro tipo: não. */
+/**
+ * webContents do tipo `'window'` que NÃO são janela do app: a janela escondida do nó Código dos fluxos
+ * (main/fluxos/codigo.ts). Ela já nasce sem preload (não alcança o `ipcRenderer`); esta é a segunda trava.
+ */
+const recusados = new Set<number>()
+
+/** Nenhum canal do `ipcMain` atende este webContents (até `liberarRemetente`, quando ele for destruído). */
+export function recusarRemetente(webContentsId: number): void {
+  recusados.add(webContentsId)
+}
+
+export function liberarRemetente(webContentsId: number): void {
+  recusados.delete(webContentsId)
+}
+
+/** O remetente é uma janela do app? Remetente sem `getType`, que falha, de outro tipo ou recusado: não. */
 export function remetenteDaJanela(evento: Remetente): boolean {
   try {
-    return evento?.sender?.getType?.() === 'window'
+    const sender = evento?.sender
+    if (sender?.getType?.() !== 'window') return false
+    return !(typeof sender.id === 'number' && recusados.has(sender.id))
   } catch {
     return false
   }

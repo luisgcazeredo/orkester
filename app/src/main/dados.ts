@@ -87,6 +87,29 @@ function gravarJson(caminho: string, valor: unknown): void {
   gravar(caminho, JSON.stringify(valor, null, 2))
 }
 
+/**
+ * Gravação atômica dos arquivos que o principal é dono (kanban, automações): temporário + `rename`, e o temporário
+ * não fica para trás se algo falhar. `guardarRuim`: o arquivo atual estava ilegível; antes de trocá-lo, uma cópia
+ * `.ruim` (para o usuário recuperar à mão).
+ */
+export function gravarJsonAtomico(destino: string, valor: unknown, guardarRuim: boolean): void {
+  const temporario = `${destino}.${process.pid}.tmp`
+  if (guardarRuim) {
+    try {
+      copyFileSync(destino, `${destino}.ruim`)
+    } catch {
+      // não existia: nada a guardar
+    }
+  }
+  try {
+    writeFileSync(temporario, JSON.stringify(valor, null, 2), 'utf8')
+    renameSync(temporario, destino)
+  } catch (e) {
+    rmSync(temporario, { force: true })
+    throw e
+  }
+}
+
 function pastaDoEspaco(id: string): string {
   if (!ID_VALIDO.test(id)) throw new Error('id de espaço inválido')
   return join(PASTA_ESPACOS, id)
@@ -633,6 +656,19 @@ export function registrarDados(): void {
     if (!existsSync(caminho)) return 'não encontrado'
     shell.showItemInFolder(caminho)
     return ''
+  })
+
+  // Configurações › Geral (1.9.6): mostra e abre só estas duas pastas do app, nunca um caminho vindo da janela
+  ipcMain.handle(CANAIS_DADOS.pastasDoApp, () => ({ dados: resolve(RAIZ), registro: resolve(RAIZ, 'registro') }))
+  ipcMain.handle(CANAIS_DADOS.abrirPastaDoApp, async (_e, qual: unknown): Promise<string> => {
+    if (qual !== 'dados' && qual !== 'registro') return 'pasta desconhecida'
+    const alvo = qual === 'dados' ? resolve(RAIZ) : resolve(RAIZ, 'registro')
+    try {
+      mkdirSync(alvo, { recursive: true })
+    } catch (erro) {
+      return (erro as Error).message
+    }
+    return shell.openPath(alvo)
   })
 
   ipcMain.handle(CANAIS_DADOS.criarEspaco, (evento, nome: string, pasta: string): ResumoEspaco => {

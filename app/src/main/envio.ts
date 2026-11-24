@@ -176,6 +176,39 @@ type DependenciasDoEnvio = {
   tentativasDeEnter?: number
   /** só na retomada: true = o usuário voltou ao campo (ou o destino ocupou); não aperta mais Enter */
   interromper?: () => boolean
+  /**
+   * Cancelamento (Fluxos: a trava global de digitar tem prazo). Abortado, nenhuma tecla a mais sai: a próxima colagem,
+   * Enter, leitura ou espera lança `EnvioCancelado`. O que já foi colado fica no campo, sem Enter.
+   */
+  sinal?: AbortSignal
+}
+
+/** O envio parou porque o `sinal` foi abortado: depois disso, nada mais foi escrito no terminal. */
+export class EnvioCancelado extends Error {
+  constructor() {
+    super('envio cancelado: nada mais foi escrito no terminal (sem Enter)')
+  }
+}
+
+/** As dependências com o `sinal` conferido antes de cada escrita, leitura e espera (sem sinal, as mesmas). */
+function comSinal(d: DependenciasDoEnvio): DependenciasDoEnvio {
+  const sinal = d.sinal
+  if (!sinal) return d
+  const parar = (): void => {
+    if (sinal.aborted) throw new EnvioCancelado()
+  }
+  return {
+    ...d,
+    escreverColagem: () => (parar(), d.escreverColagem()),
+    escrever: (dados) => (parar(), d.escrever(dados)),
+    tela: async () => (parar(), d.tela()),
+    esperar: async (ms) => {
+      parar()
+      await d.esperar(ms)
+      parar()
+    },
+    interromper: () => sinal.aborted || !!d.interromper?.()
+  }
 }
 
 /**
@@ -207,7 +240,8 @@ async function esperarTelaParar(d: Pick<DependenciasDoEnvio, 'tela' | 'esperar'>
  * Escreve a colagem, espera ela aparecer, aperta Enter e confirma que o pedido saiu.
  * Sem sinal de que a colagem chegou, **não aperta Enter** (devolve 'ficou').
  */
-export async function confirmarEnvio(d: DependenciasDoEnvio): Promise<ResultadoDoEnvio> {
+export async function confirmarEnvio(dep: DependenciasDoEnvio): Promise<ResultadoDoEnvio> {
+  const d = comSinal(dep)
   // A tela de referência vem ANTES de a colagem ser escrita: o PTY pode renderizar o texto antes da primeira
   // leitura, e aí "a tela mudou" nunca seria visto (e o Enter nunca iria).
   const antesDaColagem = await d.tela()

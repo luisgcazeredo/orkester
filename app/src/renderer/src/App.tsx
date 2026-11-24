@@ -4,9 +4,22 @@ import { iniciar, salvarParaFechar, usarLoja } from './estado/loja'
 import { classeDoDestaque, classeDoTema } from '../../shared/temas'
 import { Casca, Dialogos } from './casca/Casca'
 import { BarraPaginas } from './casca/BarraPaginas'
-import { despacharAtalho, irParaPagina, paginaAtiva, registrarPagina } from './casca/paginas'
+import { despacharAtalho, haSaidaPendente, nomeDaSaidaPendente, irParaPagina, paginaAtiva, paginasRegistradas, registrarPagina, trocarPaginasExtras } from './casca/paginas'
+import { ehAtalhoDaPaleta } from './casca/atalhoDaPaleta'
 import { BarraExplorador } from './ui/BarraExplorador'
+import { menuAberto } from './ui/MenuContexto'
+import { abrirPaleta } from './ui/Paleta'
 import { ListaDeEspacos } from './ui/ListaDeEspacos'
+
+/** O `keydown` global: Ctrl+K abre a Paleta em qualquer página (no quadro, quem trata é o atalho dele); o resto é da página ativa. */
+function aoTeclar(e: KeyboardEvent): void {
+  if (ehAtalhoDaPaleta(e, { pagina: paginaAtiva(), menuAberto: menuAberto(), dialogoAberto: !!document.querySelector('.dialogo-fundo') })) {
+    e.preventDefault()
+    abrirPaleta()
+    return
+  }
+  despacharAtalho(e)
+}
 
 export function App() {
   const temEspaco = usarLoja((e) => e.espaco !== null)
@@ -27,10 +40,11 @@ export function App() {
 
   useEffect(() => {
     void iniciar()
-    window.addEventListener('keydown', despacharAtalho)
-    window.ork.aoPedirFechar(salvarParaFechar)
-    if (window.ork.autoteste) window.__teste = { loja, casca: { registrarPagina, irParaPagina, paginaAtiva } }
-    return () => window.removeEventListener('keydown', despacharAtalho)
+    window.addEventListener('keydown', aoTeclar)
+    // rascunho não salvo (editor de Fluxos): salva o resto e responde o motivo, para o main perguntar antes de fechar
+    window.ork.aoPedirFechar(async () => ((await salvarParaFechar()) ? !haSaidaPendente() || { gravou: false, motivo: 'rascunho-de-fluxo', nome: nomeDaSaidaPendente() } : false))
+    if (window.ork.autoteste) window.__teste = { loja, casca: { registrarPagina, irParaPagina, paginaAtiva, paginasRegistradas, trocarPaginasExtras } }
+    return () => window.removeEventListener('keydown', aoTeclar)
   }, [])
 
   return (

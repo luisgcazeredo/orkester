@@ -1,6 +1,7 @@
-import { memo, useEffect, useRef, useState } from 'react'
-import { FileCode, Folder, Mail, PanelBottom, Paperclip, TriangleAlert } from 'lucide-react'
-import { chaveDoAviso, dispensarAvisoDoPrimeiroPedido, usarLoja } from '../estado/loja'
+import { Fragment, memo, useEffect, useRef, useState } from 'react'
+import { FileCode, Folder, Mail, PanelBottom, Paperclip, Send, TriangleAlert } from 'lucide-react'
+import { chaveDoAviso, digitarPedidoAgora, dispensarAvisoDoPrimeiroPedido, usarLoja } from '../estado/loja'
+import { podeDigitarAgora } from '../../../shared/pedidoPendente'
 import { carregarCaixas, MOTIVO_CURTO, usarCaixa } from '../estado/caixas'
 import type { NoTerminal } from '../../../shared/modelo'
 import { MolduraNo, type Marca } from '../quadro/MolduraNo'
@@ -8,7 +9,7 @@ import { CorpoXterm } from '../terminal/CorpoXterm'
 import { abrirMenu } from '../ui/MenuContexto'
 import { anexarArquivosAoPrompt, anexarPastaAoPrompt } from '../ui/anexar'
 import { itensDoCodigoDoTerminal } from '../ui/menus'
-import { rotuloModelo } from '../../../shared/modelos'
+import { partesDoRotulo } from '../../../shared/modelos'
 import { COR_AGENTE, ICONE_AGENTE } from './icones'
 import { abrirKanban } from '../paginas/abrir'
 import { ligarTarefasNoQuadro, usarTarefasDoCartao } from '../paginas/kanban/tarefasNoQuadro'
@@ -16,7 +17,7 @@ import { ligarTarefasNoQuadro, usarTarefasDoCartao } from '../paginas/kanban/tar
 const TEXTO_DO_AVISO = {
   ficou: 'O primeiro pedido foi escrito no campo do agente e NÃO foi enviado.',
   incerto: 'Não deu para confirmar o primeiro pedido: pode ter saído. Veja a tela antes de repetir.',
-  'nao-pronto': 'O agente não ficou pronto (talvez esteja perguntando algo): o primeiro pedido NÃO foi digitado.',
+  'nao-pronto': 'O agente não ficou pronto (talvez esteja perguntando algo): o primeiro pedido NÃO foi digitado. Resolva a pergunta e clique em "digitar agora".',
   'sem-sessao': 'O primeiro pedido NÃO foi digitado: não há processo para este cartão.',
   erro: 'Falha na comunicação ao enviar o primeiro pedido: não dá para saber se saiu. Veja a tela antes de repetir.'
 } as const
@@ -81,9 +82,14 @@ export const PecaTerminal = memo(function PecaTerminal({ no, selecionado, pastaD
         <Icone size={13} style={{ color: COR_AGENTE[no.agente] }} strokeWidth={2.2} />
         <span className="terminal-nome">{no.nome}</span>
         <span className="terminal-indice">{indice}</span>
-        {rotuloModelo(no) && (
-          <span className="terminal-selo" data-teste="rotulo-modelo" title="Modelo e esforço deste agente">
-            {rotuloModelo(no)}
+        {partesDoRotulo(no).length > 0 && (
+          <span className="terminal-selo" data-teste="rotulo-modelo" title="Modelo e esforço que este agente roda (padrão = o do motor)">
+            {partesDoRotulo(no).map((p, i) => (
+              <Fragment key={i}>
+                {i > 0 && ' · '}
+                {p.padrao ? <span className="terminal-selo-padrao">{p.texto}</span> : p.texto}
+              </Fragment>
+            ))}
           </span>
         )}
         {no.criadoPor && <span className="terminal-selo" title="Aberto por um agente pelo ork">agente</span>}
@@ -108,6 +114,17 @@ export const PecaTerminal = memo(function PecaTerminal({ no, selecionado, pastaD
             onClick={() => espacoId && dispensarAvisoDoPrimeiroPedido(espacoId, no.id)}
           >
             <TriangleAlert size={10} /> pedido?
+          </button>
+        )}
+        {podeDigitarAgora(aviso) && (
+          <button
+            className="terminal-selo terminal-selo-aviso"
+            data-teste="digitar-pedido-agora"
+            title="O agente já está livre? Digita o pedido da função agora (espera ele ficar pronto, até 90 s)."
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => espacoId && digitarPedidoAgora(espacoId, no.id)}
+          >
+            <Send size={10} /> digitar agora
           </button>
         )}
         {caixa && caixa.fila > 0 && (

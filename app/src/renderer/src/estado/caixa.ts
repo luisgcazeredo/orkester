@@ -1,6 +1,6 @@
-import { type ArvoreDeCodigo, type NoTerminal, PRESETS_PADRAO } from '../../../shared/modelo'
+import { type ArvoreDeCodigo, type No, type NoTerminal, PRESETS_PADRAO } from '../../../shared/modelo'
 import { type PedidoDoAgente, type RespostaAoAgente } from '../../../shared/api'
-import { rotuloModelo } from '../../../shared/modelos'
+import { modeloEfetivo, rotuloModelo, TEXTO_PADRAO } from '../../../shared/modelos'
 import { juntarCatalogo, textoDoRelatorio } from '../../../shared/catalogo'
 import { abrir, fechar, mudarModelo, passar } from '../../../shared/quadro/transformacoes'
 import { acharAlvos, mexerNoQuadro } from '../../../shared/quadro/agente'
@@ -115,7 +115,22 @@ function atenderModelo(pedido: { alvo: string; modelo?: string; esforco?: string
   mudarPlano(() => feito.plano, false)
   // o `sincronizar` sai no mesmo instante, então o main já tem a espec nova quando o pedido de reabrir chega
   window.ork.terminal.trocar(feito.id)
-  return { ok: true, texto: feito.texto }
+  return { ok: true, texto: textoDaTroca(feito.plano.nos.find((n) => n.id === feito.id), feito.nome, pedido, feito.texto) }
+}
+
+/**
+ * O que o `ork modelo` responde: o modelo e o esforço que o processo passa a rodar (os efetivos, lidos do comando),
+ * e quando só um dos dois mudou, o que ficou no outro, para o agente não achar que o esforço foi zerado.
+ */
+function textoDaTroca(no: No | undefined, nome: string, pedido: { modelo?: string; esforco?: string }, padrao: string): string {
+  if (!no || no.tipo !== 'terminal') return padrao
+  const rotulo = rotuloModelo(no)
+  if (!rotulo) return padrao
+  const { modelo, esforco } = modeloEfetivo(no.agente, no.comando, no.modelo, no.esforco)
+  const ficou: string[] = []
+  if (pedido.modelo === undefined) ficou.push(`o modelo ficou em ${modelo ?? TEXTO_PADRAO}`)
+  if (pedido.esforco === undefined) ficou.push(`o esforço ficou em ${esforco ?? `${TEXTO_PADRAO} do motor`}`)
+  return `"${nome}" reaberto com ${rotulo}${ficou.length ? ` (${ficou.join('; ')})` : ''}; a conversa continua.`
 }
 
 /** Bandas pelo `ork`: listar as do andar à mostra (com quem está dentro) e criar uma em volta de cartões. */

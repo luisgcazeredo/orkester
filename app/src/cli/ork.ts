@@ -30,17 +30,20 @@ function lerArgumentos(comando: string, argumentos: string[]): { posicionais: st
   return { posicionais, opcoes }
 }
 
+/** Arquivo ou entrada padrão em UTF-8, sem o BOM (o `Set-Content -Encoding utf8` do Windows PowerShell grava um). */
+const lerSemBom = (origem: string | number): string => readFileSync(origem, 'utf8').replace(/^﻿/, '')
+
 function lerTexto(comando: string, posicionais: string[], opcoes: Record<string, string | true>): string {
-  if (typeof opcoes.arquivo === 'string') return readFileSync(opcoes.arquivo, 'utf8')
+  if (typeof opcoes.arquivo === 'string') return lerSemBom(opcoes.arquivo)
   if (comando === 'abrir') return typeof opcoes.pedido === 'string' ? opcoes.pedido : ''
   // `ork entregar "texto"` (e os apelidos): o texto é todo o resto da linha, ou a entrada padrão com `-`
   if (['entregar', 'responder', 'devolver'].includes(comando)) {
-    if (posicionais[0] === '-') return readFileSync(0, 'utf8')
+    if (posicionais[0] === '-') return lerSemBom(0)
     return posicionais.join(' ')
   }
   if (comando !== 'pedir') return ''
   // `ork pedir Nome -`: o pedido vem pela entrada padrão
-  if (posicionais[1] === '-') return readFileSync(0, 'utf8')
+  if (posicionais[1] === '-') return lerSemBom(0)
   return posicionais.slice(1).join(' ')
 }
 

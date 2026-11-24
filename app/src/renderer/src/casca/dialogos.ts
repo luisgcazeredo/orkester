@@ -4,6 +4,8 @@ import { Atalhos } from '../ui/Atalhos'
 import { MenuContexto } from '../ui/MenuContexto'
 import { Paleta } from '../ui/Paleta'
 import { Perguntas } from '../ui/Perguntas'
+import { AvisoDeFluxo } from '../paginas/fluxos/AvisoDeFluxo'
+import { DocDoNoDialogo } from '../paginas/fluxos/DocDoNo'
 
 /** Menus e diálogos montados no fim do App, nesta ordem (a mesma de antes da casca: muda a ordem no DOM e o empilhamento). */
 export const DIALOGOS: { id: string; Componente: () => JSX.Element | null }[] = [
@@ -11,5 +13,7 @@ export const DIALOGOS: { id: string; Componente: () => JSX.Element | null }[] = 
   { id: 'novo-andar', Componente: DialogoNovoAndar },
   { id: 'perguntas', Componente: Perguntas },
   { id: 'atalhos', Componente: Atalhos },
-  { id: 'paleta', Componente: Paleta }
+  { id: 'paleta', Componente: Paleta },
+  { id: 'aviso-fluxo', Componente: AvisoDeFluxo },
+  { id: 'doc-do-no', Componente: DocDoNoDialogo }
 ]

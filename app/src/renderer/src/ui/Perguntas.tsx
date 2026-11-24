@@ -12,7 +12,7 @@ interface BotaoPergunta {
 }
 
 type Pergunta =
-  | { tipo: 'texto'; titulo: string; rotulo: string; valor: string; confirmar: string; responder: (r: string | null) => void }
+  | { tipo: 'texto'; titulo: string; rotulo: string; valor: string; confirmar: string; maxLength?: number; responder: (r: string | null) => void }
   | {
       tipo: 'confirmar'
       titulo: string
@@ -30,9 +30,10 @@ const mostrar = (p: Pergunta | null): void => {
   ouvintes.forEach((o) => o())
 }
 
-export function perguntarTexto(titulo: string, rotulo: string, valor = '', confirmar = 'OK'): Promise<string | null> {
+/** `maxLength`: o campo não aceita mais letras que isso (digitando ou colando). */
+export function perguntarTexto(titulo: string, rotulo: string, valor = '', confirmar = 'OK', maxLength?: number): Promise<string | null> {
   return new Promise((resolver) =>
-    mostrar({ tipo: 'texto', titulo, rotulo, valor, confirmar, responder: (r) => (mostrar(null), resolver(r)) })
+    mostrar({ tipo: 'texto', titulo, rotulo, valor, confirmar, maxLength, responder: (r) => (mostrar(null), resolver(r)) })
   )
 }
 
@@ -62,6 +63,7 @@ function PerguntaTexto({ p }: { p: Extract<Pergunta, { tipo: 'texto' }> }) {
         <span>{p.rotulo}</span>
         <input
           autoFocus
+          maxLength={p.maxLength}
           value={valor}
           onFocus={(e) => e.currentTarget.select()}
           onChange={(e) => setValor(e.target.value)}

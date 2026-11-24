@@ -1,4 +1,4 @@
-import { BookOpen, Bot, Clock, LayoutGrid, Palette, Plug, SquareKanban } from 'lucide-react'
+import { BookOpen, Bot, Clock, LayoutGrid, Settings, SquareKanban, Workflow } from 'lucide-react'
 import { lazy, Suspense } from 'react'
 import * as loja from '../estado/loja'
 import {
@@ -11,6 +11,7 @@ import { colar, copiarSelecao } from '../ui/area'
 import { abrirAtalhos } from '../ui/Atalhos'
 import { enquadrarTudo, zoomPeloCentro } from '../ui/Controles'
 import { abrirPaleta } from '../ui/Paleta'
+import { voltarParaAListaDeFluxos } from '../paginas/fluxos/pedido'
 import { menuAberto } from '../ui/MenuContexto'
 import { Quadro } from '../quadro/Quadro'
 import { BarraSelecao } from '../ui/BarraSelecao'
@@ -22,6 +23,7 @@ import { pegarPedido } from '../paginas/leitor/pedido'
 import { atalhosDoKanban } from '../paginas/kanban/atalhos'
 import { pegarPedidoDoKanban } from '../paginas/abrir'
 import { iniciarTemas } from '../paginas/temas/aplicar'
+import { PAGINA_CONFIGURACOES } from '../paginas/configuracoes/abrir'
 import { DIALOGOS } from './dialogos'
 import { FronteiraDePagina } from './FronteiraDePagina'
 import { acharPagina, ligarPaginaAtiva, paginaAtiva, paginasMontadas, PAGINA_INICIAL, registrarPagina, temPagina } from './paginas'
@@ -120,9 +122,9 @@ function PaginaLeitor() {
 // Rotinas e Agentes também carregam sob demanda. Falha ao carregar: mostra o erro em vez de deixar a tela em branco.
 const falhou = (nome: string) => () => ({ default: () => <p className="leitor-vazio" role="alert">Não deu para carregar {nome}. Feche e abra o Orkester de novo.</p> })
 const RotinasPreguicosa = lazy(() => import('../paginas/rotinas/Rotinas').then((m) => ({ default: m.Rotinas }), falhou('as Rotinas')))
-const ConexoesPreguicosa = lazy(() => import('../paginas/conexoes/Conexoes').then((m) => ({ default: m.Conexoes }), falhou('as Conexões')))
 const AgentesPreguicosa = lazy(() => import('../paginas/agentes/Agentes').then((m) => ({ default: m.Agentes }), falhou('os Agentes')))
-const TemasPreguicosa = lazy(() => import('../paginas/temas/Temas').then((m) => ({ default: m.Temas }), falhou('os Temas')))
+const FluxosPreguicosa = lazy(() => import('../paginas/fluxos/Fluxos').then((m) => ({ default: m.Fluxos }), falhou('os Fluxos')))
+const ConfiguracoesPreguicosa = lazy(() => import('../paginas/configuracoes/Configuracoes').then((m) => ({ default: m.Configuracoes }), falhou('as Configurações')))
 // Kanban: se a página não carrega, o pedido do menu do cartão ("Ver tarefas dele") é descartado junto
 const KanbanPreguicoso = lazy(() =>
   import('../paginas/kanban/PaginaKanban').then(
@@ -150,10 +152,18 @@ function PaginaRotinas() {
   )
 }
 
-function PaginaConexoes() {
+function PaginaFluxos() {
   return (
     <Suspense fallback={null}>
-      <ConexoesPreguicosa />
+      <FluxosPreguicosa />
+    </Suspense>
+  )
+}
+
+function PaginaConfiguracoes() {
+  return (
+    <Suspense fallback={null}>
+      <ConfiguracoesPreguicosa />
     </Suspense>
   )
 }
@@ -162,14 +172,6 @@ function PaginaAgentes() {
   return (
     <Suspense fallback={null}>
       <AgentesPreguicosa />
-    </Suspense>
-  )
-}
-
-function PaginaTemas() {
-  return (
-    <Suspense fallback={null}>
-      <TemasPreguicosa />
     </Suspense>
   )
 }
@@ -203,8 +205,10 @@ if (!temPagina('leitor')) registrarPagina({ id: 'leitor', titulo: 'Leitor de Mar
 if (!temPagina('rotinas')) registrarPagina({ id: 'rotinas', titulo: 'Rotinas', icone: Clock, nativa: true, Componente: PaginaRotinas })
 if (!temPagina('agentes')) registrarPagina({ id: 'agentes', titulo: 'Agentes', icone: Bot, nativa: true, Componente: PaginaAgentes })
 if (!temPagina('kanban')) registrarPagina({ id: 'kanban', titulo: 'Kanban', icone: SquareKanban, nativa: true, atalhos: atalhosDoKanban, Componente: PaginaKanban })
-if (!temPagina('conexoes')) registrarPagina({ id: 'conexoes', titulo: 'Conexões', icone: Plug, nativa: true, Componente: PaginaConexoes })
-if (!temPagina('temas')) registrarPagina({ id: 'temas', titulo: 'Temas', icone: Palette, nativa: true, Componente: PaginaTemas })
+if (!temPagina('fluxos')) registrarPagina({ id: 'fluxos', titulo: 'Fluxos', icone: Workflow, nativa: true, aoReclicar: voltarParaAListaDeFluxos, Componente: PaginaFluxos })
+// Configurações (1.9.6): sem ícone na lista da barra, quem abre é a engrenagem do pé. Temas e Conexões moram dentro dela.
+if (!temPagina(PAGINA_CONFIGURACOES))
+  registrarPagina({ id: PAGINA_CONFIGURACOES, titulo: 'Configurações', icone: Settings, nativa: true, naBarra: false, Componente: PaginaConfiguracoes })
 
 // os temas do usuário e os plugins de CSS valem desde a partida, mesmo sem abrir a página (ver paginas/temas/aplicar.ts)
 iniciarTemas()

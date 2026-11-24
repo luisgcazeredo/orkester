@@ -1,0 +1,249 @@
+/* ------------------------------------------------------------------ página Configurações (1.9.6, A2)
+ * A engrenagem abre esta página: navegação lateral à esquerda, a seção à direita. Aparência e Conexões são as páginas
+ * Temas e Conexões inteiras, embutidas sem mudança. Só tokens (R7): nenhuma cor literal aqui.
+ */
+
+.configuracoes {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  background: var(--quadro-fundo);
+  color: var(--texto);
+  font-family: var(--fonte-interface);
+}
+
+.config-nav {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 196px;
+  padding: var(--espaco-4) var(--espaco-3);
+  border-right: 1px solid var(--borda);
+  background: var(--lateral-fundo);
+}
+
+.config-nav-titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0 0 var(--espaco-3);
+  padding: 0 var(--espaco-2);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.config-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: 7px var(--espaco-2);
+  border: 1px solid transparent;
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--texto-suave);
+  font-size: 13px;
+  text-align: left;
+}
+
+.config-nav-item:hover {
+  background: var(--hover);
+  color: var(--texto);
+}
+
+.config-nav-item.ativo {
+  border-color: var(--borda);
+  background: var(--lateral-ativo);
+  color: var(--texto);
+}
+
+.config-nav-item.ativo svg {
+  color: var(--destaque);
+}
+
+.config-conteudo {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Temas e Conexões: a página de antes, ocupando a área da seção */
+.config-embutida {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---------- Geral e Atalhos: cartões ---------- */
+
+.config-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+  gap: var(--espaco-3);
+  max-width: 1100px;
+}
+
+.config-cartao {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espaco-2);
+  min-width: 0;
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 1px solid var(--pilula-borda);
+  border-radius: var(--raio);
+  background: var(--pilula-fundo);
+  font-size: 13px;
+}
+
+.config-cartao p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.config-cartao-titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0 0 var(--espaco-1);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.config-cartao-titulo svg {
+  color: var(--texto-suave);
+}
+
+.config-versao {
+  font-size: 15px;
+}
+
+.config-miudo {
+  font-size: 12px;
+}
+
+.config-chave {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  cursor: pointer;
+}
+
+.config-chave input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--destaque);
+}
+
+.config-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--destaque);
+  font-size: 13px;
+  text-align: left;
+}
+
+.config-link:hover {
+  color: var(--texto);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.config-subtitulo {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--texto-suave);
+}
+
+.config-atalhos {
+  align-items: stretch;
+  gap: var(--espaco-1);
+}
+
+.config-atalho {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr;
+  align-items: baseline;
+  gap: var(--espaco-3);
+  padding: 3px 0;
+}
+
+.config-atalho kbd {
+  justify-self: start;
+}
+
+.configuracoes .suave {
+  color: var(--texto-suave);
+}
+
+/* Geral › Onde ficam os dados: caminho (quebra onde precisar) e o botão "Abrir pasta" */
+.config-pasta {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  width: 100%;
+  padding: var(--espaco-2) 0;
+  border-top: 1px solid var(--borda-suave);
+}
+
+.config-pasta:first-of-type {
+  border-top: 0;
+}
+
+.config-pasta-texto {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.config-pasta code {
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+  word-break: normal;
+}
+
+/* cada pasta do caminho é um bloco: a linha quebra entre pastas (depois do separador), nunca num hífen do nome;
+   dentro do nome, só como último recurso, quando ele sozinho não cabe na linha */
+.config-caminho-parte {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.config-botao {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: 6px var(--espaco-3);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--texto);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.config-botao:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.config-botao:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.config-erro {
+  color: var(--perigo);
+}

@@ -19,8 +19,12 @@ export interface Pagina {
   Componente: () => JSX.Element
   /** Fica montada (só escondida) quando outra página está em tela: o quadro precisa, ou os terminais cairiam junto. */
   manterMontada?: boolean
+  /** `false`: sem ícone na lista da barra (Configurações: quem a abre é a engrenagem do pé). */
+  naBarra?: boolean
   /** Atalhos próprios da página (R6): só chamados com ela ativa. */
   atalhos?: (e: KeyboardEvent) => void
+  /** O clique no ícone da página que já está em tela (Fluxos: do editor, volta à lista). */
+  aoReclicar?: () => void
 }
 
 export const PAGINA_INICIAL = 'quadro'
@@ -82,10 +86,40 @@ export function paginaAtiva(): string {
   return armazem.ler()
 }
 
-/** Único escritor da página ativa. Id não registrado: devolve `false` e não muda nada. */
+/**
+ * Guarda de saída da página ativa (o editor de Fluxos com rascunho não salvo). Uma só por vez (a última registrada
+ * vale); o que `guardarSaida` devolve a solta. Vale para trocar de página e de espaço.
+ */
+export interface GuardaDeSaida {
+  /** Antes de sair: `true` = pode sair agora; `false` = segura, pergunta e, se a pessoa deixar, chama `refazer`. */
+  trocar: (refazer: () => void) => boolean
+  /** Há algo que se perde se a janela fechar agora (a janela responde "não salvou" ao main, que pergunta). */
+  pendente: () => boolean
+  /** O nome do que está pendente (o fluxo do rascunho), para a pergunta do main ao fechar. */
+  nome?: () => string
+}
+let guarda: GuardaDeSaida | null = null
+
+export const haSaidaPendente = (): boolean => !!guarda?.pendente()
+export const nomeDaSaidaPendente = (): string | undefined => guarda?.nome?.()
+
+/** Para quem tira a pessoa da página por outro caminho (trocar de espaço): `false` = a guarda segurou e refaz depois. */
+export const podeSairAgora = (refazer: () => void): boolean => !guarda || guarda.trocar(refazer)
+
+export function guardarSaida(g: GuardaDeSaida): () => void {
+  guarda = g
+  return () => {
+    if (guarda === g) guarda = null
+  }
+}
+
+/**
+ * Único escritor da página ativa. Id não registrado: devolve `false` e não muda nada. Com a guarda segurando, devolve
+ * `true` (o id existe) sem trocar: quem segura refaz a troca se a pessoa deixar.
+ */
 export function irParaPagina(id: string): boolean {
   if (!paginas.has(id)) return false
-  if (armazem.ler() !== id) armazem.escrever(id)
+  if (armazem.ler() !== id && podeSairAgora(() => irParaPagina(id))) armazem.escrever(id)
   return true
 }
 
@@ -147,4 +181,5 @@ export function trocarPaginasExtras(extras: Pagina[]): void {
 export function limparPaginas(): void {
   paginas.clear()
   montadas = []
+  guarda = null
 }

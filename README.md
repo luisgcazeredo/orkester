@@ -47,6 +47,7 @@ Three ideas hold the rest together:
 | **Bands** | Groups drawn as a frame: whoever sits inside talks to everyone else inside. |
 | **Scores** | Whole teams saved — agents, roles, briefings, links, bands — raised at once in a new workspace, on any project. |
 | **Routines** | A request typed into a card every X minutes, daily or weekly. If the terminal is busy, waiting on a question or finished, the routine skips its turn instead of typing in the middle of the work. |
+| **Flows** | Automations drawn as nodes, in the style of an automation canvas: a trigger (a Kanban task changing column, a delivery, an agent that stopped, a clock or a button) and what to do — a message to an agent, a task, a notice, a condition, isolated JavaScript, an HTTP call with an encrypted credential. Guards against loops and excess, a run history, and anything that runs code or talks to the internet only turns on with your confirmation. Guide: [`docs/fluxos.md`](docs/fluxos.md). |
 | **Floors** | Isolated copies of the repository through `git worktree`, so two teams can work on the same project without stepping on each other. |
 | **Code trees** | The files an agent touches become cards beside it, with the git diff, grouped by line of work. |
 | **Several windows** | Each workspace opens in its own window, and the app reopens the ones you had open, where you had them. |
@@ -92,6 +93,12 @@ npm run dev        # app with hot reload
 
 The project's test tools are not part of this repository.
 
+## User manual
+
+New to Orkester? **[`docs/manual.md`](docs/manual.md)** walks through every page, button, menu and shortcut: the
+canvas, agent cards, links, bands, scores, floors, the Reader, Routines, Agents, Kanban, Flows,
+Settings (appearance, connections, credentials, shortcuts) and own pages, plus where your data lives and common problems.
+
 ## The `ork` command
 
 Inside any terminal on the canvas, the agent has a command of its own:
@@ -110,15 +117,18 @@ Those are six of about thirty verbs. **The full reference is in [`docs/ork.md`](
 ## Connect your own Claude (MCP)
 
 The `ork` command is for agents *on* the canvas. To drive the canvas from **outside** — your own Claude Code,
-Claude Desktop, Codex, any MCP client — open the Conexões (Connections) page (the gear), generate a key and paste the
-snippet the app gives you. The client can then read the board, open agents, raise saved teams and import
-team sheets, acting as you. Orkester has to be open.
+Claude Desktop, Codex, any MCP client — open Configurações › Conexões (the gear, then Connections), generate a key and
+paste the snippet the app gives you. The client can then read the board, open agents, raise saved teams, import
+team sheets, work the Kanban and the flows, acting as you. Orkester has to be open.
 
 **Tools, configuration and what the key does and does not protect: [`docs/mcp.md`](docs/mcp.md).**
 
 ## Your own pages
 
-Write a small page in plain HTML/JS and add it to the page bar with **+**, isolated from your PC: **[`docs/paginas.md`](docs/paginas.md)**.
+Write a page in plain HTML, CSS and JavaScript, no build step, and add it to the page bar with **+**, isolated from
+your PC. It can show the team live, send requests to agents you link to it, keep its own data and talk to APIs you
+allow. The builder's guide (the `orkPagina` API, permissions, limits, ready-made recipes and how to ask an agent to
+build one): **[`docs/paginas.md`](docs/paginas.md)**.
 
 ## Under the hood
 
@@ -132,7 +142,7 @@ app/src/main/      main process: terminals, `ork` verbs, data on disk
 app/src/renderer/  the canvas, in React
 app/src/cli/       the `ork` command the agent calls
 app/src/mcp/       the MCP server an outside client runs
-docs/              the `ork` and MCP references
+docs/              the user manual, the `ork` and MCP references and the flows and own-pages guides
 ```
 
 ## Status

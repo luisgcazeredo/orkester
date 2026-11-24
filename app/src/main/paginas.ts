@@ -61,6 +61,7 @@ import { PASTA_DADOS, idsDosEspacos, resumosDosEspacos } from './dados'
 import { avisar, avisarTodas, espacoDaJanela } from './janelas'
 import { cordasDoEspaco, sessaoPorId, sessoesDoEspaco, telaDe, type Sessao } from './terminais'
 import { caixa, situacaoNaTela } from './espera'
+import { endurecerSessao } from './sandbox'
 
 const AUTOTESTE = process.argv.includes('--autoteste')
 const PASTA_PAGINAS = join(PASTA_DADOS, 'paginas')
@@ -281,7 +282,7 @@ function guardarProposta(p: Omit<PropostaGuardada, 'token' | 'criadaEm'>): Propo
 /** Lê a pasta escolhida e monta a proposta (nova ou atualização). `idEsperado`: "Atualizar da pasta". */
 function proporDaPasta(pasta: string, idEsperado?: string): RespostaDaProposta {
   if (soLeitura) return { ok: false, erro: soLeitura }
-  if (!reg().ligadas) return { ok: false, erro: 'Ligue "Páginas próprias" em Conexões antes.' }
+  if (!reg().ligadas) return { ok: false, erro: 'Ligue "Páginas próprias" antes, em Configurações › Conexões › Páginas.' }
   const lida = lerArvore(pasta)
   if (!lida.ok) return lida
   const m = manifestoDaArvore(lida.valor)
@@ -512,28 +513,8 @@ function prepararSessao(id: string): Session {
   const ses = session.fromPartition(`pagina-${id}`)
   if (paginaDaSessao.get(ses) === id) return ses
   paginaDaSessao.set(ses, id)
-  ses.setPermissionRequestHandler((_conteudo, _permissao, responder) => responder(false))
-  ses.setPermissionCheckHandler(() => false)
-  ses.setDevicePermissionHandler(() => false)
-  ses.setDisplayMediaRequestHandler((_pedido, responder) => responder(null))
-  ses.setSpellCheckerEnabled(false)
-  ses.on('will-download', (evento, item) => {
-    downloadsBarrados++
-    evento.preventDefault()
-    item.cancel()
-  })
-  ses.on('select-hid-device', (evento, _d, responder) => {
-    evento.preventDefault()
-    responder('')
-  })
-  ses.on('select-serial-port', (evento, _l, _w, responder) => {
-    evento.preventDefault()
-    responder('')
-  })
-  ses.on('select-usb-device', (evento, _d, responder) => {
-    evento.preventDefault()
-    responder()
-  })
+  // a mesma receita do nó Código dos fluxos (main/sandbox.ts)
+  endurecerSessao(ses, () => void downloadsBarrados++)
   // a lista de hosts é lida a cada pedido: revogar `rede` corta na hora (a CSP muda na próxima carga)
   ses.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (detalhes, responder) => {
     const p = ativa(id)
@@ -1179,7 +1160,7 @@ export function registrarPaginas(): void {
   }))
 
   ipcMain.handle(CANAIS_PAGINAS.escolherPasta, async (evento: IpcMainInvokeEvent): Promise<RespostaDaProposta> => {
-    if (!reg().ligadas) return { ok: false, erro: 'Ligue "Páginas próprias" em Conexões antes.' }
+    if (!reg().ligadas) return { ok: false, erro: 'Ligue "Páginas próprias" antes, em Configurações › Conexões › Páginas.' }
     let pasta: string | undefined
     // autoteste: a pasta vem do cenário (paginasNoTeste.usarPasta, uma vez; ou a variável de ambiente do cenário "paginas")
     const doTeste = AUTOTESTE ? (pastaDoTeste ?? process.env[VARIAVEL_DA_PASTA_DE_TESTE] ?? null) : null

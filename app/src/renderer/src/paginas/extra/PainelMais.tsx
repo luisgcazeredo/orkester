@@ -1,10 +1,9 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { ArrowLeft, Ban, BookOpen, Bot, Check, FolderOpen, LayoutDashboard, PanelLeft, Power, ShieldCheck } from 'lucide-react'
 import { colunaDoPapel } from '../../../../shared/kanban'
-import { irParaPagina } from '../../casca/paginas'
 import { lerEstado, usarLoja } from '../../estado/loja'
 import { Dialogo } from '../../ui/Dialogo'
-import { pedirAbaDeConexoes } from '../conexoes/aba'
+import { abrirConfiguracoes } from '../configuracoes/abrir'
 import { mensagemDeErro } from './contrato'
 import { abrirProposta } from './DialogoAceite'
 import { alternarChaveDasPaginas, apiPaginas, iniciarEstadoDasPaginas, usarPaginas } from './estado'
@@ -70,9 +69,8 @@ function Desligadas() {
 
 function Guia() {
   function abrirConexoes(): void {
-    pedirAbaDeConexoes('paginas')
     fechar()
-    irParaPagina('conexoes')
+    abrirConfiguracoes('conexoes', 'paginas')
   }
   const icones = [FolderOpen, ShieldCheck, PanelLeft]
   return (
@@ -118,7 +116,7 @@ function Guia() {
       <p className="suave extra-guia-revogar">
         Mudou de ideia? Em{' '}
         <button type="button" className="extra-link" onClick={abrirConexoes} data-abrir-conexoes-paginas>
-          Conexões → Páginas
+          Configurações › Conexões › Páginas
         </button>{' '}
         você revoga cada permissão, desliga ou remove a página.
       </p>

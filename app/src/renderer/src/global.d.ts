@@ -6,7 +6,7 @@ declare global {
   interface Window {
     ork: ApiOrkester
     /** Só existe no autoteste: acesso às ações do quadro. */
-    __teste?: { loja: typeof loja; casca: Pick<typeof casca, 'registrarPagina' | 'irParaPagina' | 'paginaAtiva'> }
+    __teste?: { loja: typeof loja; casca: Pick<typeof casca, 'registrarPagina' | 'irParaPagina' | 'paginaAtiva' | 'paginasRegistradas' | 'trocarPaginasExtras'> }
   }
 }
 

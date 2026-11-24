@@ -147,7 +147,7 @@ export function BarraFerramentas() {
                     onClick={() => {
                       setMenuTerminal(false)
                       const { x, y } = noCentro()
-                      adicionarNo({ tipo: 'terminal', preset: p }, x, y)
+                      adicionarNo({ tipo: 'terminal', preset: p }, x, y, { noCentro: true })
                     }}
                   >
                     <Icone size={15} style={{ color: COR_AGENTE[p.agente] }} />
@@ -175,7 +175,7 @@ export function BarraFerramentas() {
                       const preset = presets.find((p) => p.id === primeira.preset) ?? presets[0]
                       setMenuTerminal(false)
                       const { x, y } = noCentro()
-                      adicionarNo({ tipo: 'terminal', preset, funcao: primeira }, x, y)
+                      adicionarNo({ tipo: 'terminal', preset, funcao: primeira }, x, y, { noCentro: true })
                     }}
                   />
                 )}
@@ -193,7 +193,7 @@ export function BarraFerramentas() {
                       onClick={() => {
                         setMenuTerminal(false)
                         const { x, y } = noCentro()
-                        adicionarNo({ tipo: 'terminal', preset, funcao: f }, x, y)
+                        adicionarNo({ tipo: 'terminal', preset, funcao: f }, x, y, { noCentro: true })
                       }}
                     >
                       <Icone size={15} style={{ color: COR_AGENTE[preset.agente] }} />

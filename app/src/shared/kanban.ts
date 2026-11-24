@@ -14,6 +14,11 @@ export const VERSAO_DO_KANBAN = 2
 export interface Quem {
   id?: string
   nome: string
+  /**
+   * Feito por uma automação (1.9.6): a regra e a cadeia que levou a ela. Só em memória (o principal tira antes de
+   * aplicar e gravar): é o que faz o movimento não disparar outra regra.
+   */
+  automacao?: { id: string; cadeia: string[] }
 }
 
 /** Um agente por id do cartão (estável entre reaberturas) e o nome da hora, para o caso de o cartão sumir. */
@@ -1269,6 +1274,20 @@ export function linhaDaTarefaNoPedido(t: Pick<Tarefa, 'numero' | 'titulo'>, colu
   const revisao = colunaDoPapel(colunas, 'revisao')
   const fim = revisao ? ` e ork kanban mover ${t.numero} ${colunaNoComando(revisao.nome)}` : ''
   return `Tarefa #${t.numero} do kanban: "${linha(t.titulo)}". Você já está nela; ao terminar: ork kanban comentar ${t.numero} "o que fez e onde"${fim}.`
+}
+
+/**
+ * As tarefas que mudaram de coluna entre dois estados do arquivo (as automações, 1.9.6, disparam nisto). Tarefa nova
+ * não conta (não havia coluna antes); a que foi para a lixeira também não (saiu de `tarefas`).
+ */
+export function mudancasDeColuna(
+  antes: Pick<ArquivoDoKanban, 'tarefas'>,
+  depois: Pick<ArquivoDoKanban, 'tarefas'>
+): { numero: number; titulo: string; deColuna: string; paraColuna: string }[] {
+  const colunaAntes = new Map(antes.tarefas.map((t) => [t.numero, t.coluna]))
+  return depois.tarefas
+    .filter((t) => colunaAntes.has(t.numero) && colunaAntes.get(t.numero) !== t.coluna)
+    .map((t) => ({ numero: t.numero, titulo: t.titulo, deColuna: colunaAntes.get(t.numero)!, paraColuna: t.coluna }))
 }
 
 // ---------- o `ork kanban <ação>` vira operação (o `ork`, a chave de usuário e o MCP passam por aqui) ----------

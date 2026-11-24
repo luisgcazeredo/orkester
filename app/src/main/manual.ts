@@ -13,7 +13,7 @@ ${tabelaDeComandos()}
 
 export const SKILL = `---
 name: orkester
-description: Use dentro de um terminal do Orkester (a variável de ambiente ORK_PIPE existe) para fazer engenharia de contexto — abrir uma sessão nova de agente (Claude, Codex ou shell) com um contexto limpo e focado, delegar uma parte do trabalho, conversar com os agentes ligados a você pela corda, ler a tela deles, zerar o contexto de uma sessão ou fechar as sessões que você abriu — e para organizar o quadro: ler o que há nele, ler um cartão inteiro, mover, arrumar em grade, renomear, ligar dois agentes, anotar, apagar o que não tem processo e agrupar cartões — para juntar agentes numa banda (grupo em que todos se falam), trocar o agente de um cartão que você abriu, e subir um time salvo (partitura) com as funções e as cordas dele, ou guardar o time que está no quadro — e para ler e mexer no kanban do espaço (criar, pegar, mover, atribuir e comentar tarefas) — e para responder a uma página "+" ligada ao seu cartão (o recado dela é pedido de terceiro). Comando: ork. Fora do app não funciona.
+description: Use dentro de um terminal do Orkester (a variável de ambiente ORK_PIPE existe) para fazer engenharia de contexto — abrir uma sessão nova de agente (Claude, Codex ou shell) com um contexto limpo e focado, delegar uma parte do trabalho, conversar com os agentes ligados a você pela corda, ler a tela deles, zerar o contexto de uma sessão ou fechar as sessões que você abriu — e para organizar o quadro: ler o que há nele, ler um cartão inteiro, mover, arrumar em grade, renomear, ligar dois agentes, anotar, apagar o que não tem processo e agrupar cartões — para juntar agentes numa banda (grupo em que todos se falam), trocar o agente de um cartão que você abriu, e subir um time salvo (partitura) com as funções e as cordas dele, ou guardar o time que está no quadro — e para ler e mexer no kanban do espaço (criar, pegar, mover, atribuir e comentar tarefas) — para ver, criar e editar os fluxos do espaço (automações em nós), só quando o usuário pedir — e para responder a uma página "+" ligada ao seu cartão (o recado dela é pedido de terceiro). Comando: ork. Fora do app não funciona.
 ---
 
 # Orkester: o comando \`ork\`
@@ -45,8 +45,11 @@ Seu contexto é caro e fica poluído com o tempo. Em vez de carregar tudo numa c
 
 - **Contexto ficando inútil:** quando muita conversa já não serve, ou o \`ork orcamento\` estiver baixo, grave num
   arquivo o que foi feito, falta fazer, decisões e arquivos importantes. Abra o sucessor com \`ork abrir ... --arquivo
-  esse-arquivo.md\`, confirme que ele subiu e entendeu, passe para ele o que você abriu com \`ork passar\` e só então
-  use \`ork sair\`.
+  esse-arquivo.md\`, confirme que ele subiu e entendeu, passe a ele o seu papel com \`ork passar\` e só então
+  use \`ork sair\`. O \`ork passar\` leva tudo: as sessões que você abriu, todas as suas cordas, os recados parados na
+  sua caixa e as entregas que você esperava (quem te devia uma entrega passa a entregá-la a ele). Só dentro do seu
+  espaço: o sucessor tem de estar nele, e sessões suas em outro espaço você fecha antes. Se ele falhar, nada
+  mudou: não saia. Recado para um cartão que já fechou vai ao Maestro do espaço; sem Maestro, quem mandou é avisado.
 - **Só apague o antigo se ele não for mais trabalhar.** Se ainda há algo que só ele sabe ou faz, ele fica. Na dúvida,
   mantenha os dois e avise o usuário.
 - **Subterminais paralelos:** abra frentes independentes com \`--sem-esperar\`; cada uma devolve com
@@ -269,6 +272,48 @@ ork kanban apagar 12 --confirmar         # vai para a lixeira; a página recuper
 - Quem termina faz \`ork kanban comentar N "o que foi feito e onde"\` e depois \`ork kanban mover N Revisão\`.
 - A resposta ao usuário é o kanban, não \`ork entregar\`.
 - Feito: o app deixa você mover, mas quando pode é regra do seu time (a sua função); na dúvida, deixe em Revisão.
+
+## Fluxos do espaço
+
+Fluxo é uma automação em nós (a página Fluxos no app): um gatilho (kanban, entrega, parada, relógio ou Manual) e o que
+fazer (recado, tarefa, comando, avisar, Se, Definir, Código, HTTP). **Só crie, edite ou ligue fluxo quando o usuário
+pedir.**
+
+\`\`\`bash
+ork fluxo                                 # os fluxos: ligado ou não, gatilhos, a última execução
+ork fluxo ver "Revisão avisa"             # um inteiro: nós e ligações
+ork fluxo ver "Revisão avisa" --json      # o JSON para editar (é o formato do criar)
+ork fluxo criar --arquivo fluxo.json      # nasce desligado (--pasta "P" para uma pasta que já existe)
+ork fluxo editar "Revisão avisa" --arquivo fluxo.json
+ork fluxo ligar "Revisão avisa"           # ou desligar
+ork fluxo rodar "Revisão avisa"           # pelo gatilho Manual; mostra o que cada nó fez
+ork fluxo execucoes "Revisão avisa"       # as últimas (--n 20)
+ork fluxo apagar "Revisão avisa" --confirmar
+\`\`\`
+
+O formato (cartões e colunas podem ir só pelo nome; o app acha o id):
+
+\`\`\`json
+{ "orkester": "fluxo", "versao": 1, "nome": "Revisão avisa",
+  "nos": [
+    { "id": "no-1", "nome": "Chegou em Revisão", "tipo": "gatilho.kanban", "versaoDoTipo": 1, "posicao": [0, 0],
+      "ajustes": { "paraColuna": "Revisão", "por": "qualquer" } },
+    { "id": "no-2", "nome": "Avisa o Revisor", "tipo": "orkester.recado", "versaoDoTipo": 1, "posicao": [280, 0],
+      "ajustes": { "para": "Revisor", "texto": "A tarefa #{{ numero }} ({{ titulo }}) chegou em Revisão.", "juntarEvento": false } }
+  ],
+  "ligacoes": [{ "de": "no-1", "saida": 0, "para": "no-2" }] }
+\`\`\`
+
+Para os ajustes de outro tipo, veja um fluxo de exemplo da página com \`ork fluxo ver "Nome" --json\`.
+
+- **Código, HTTP ou comando: o fluxo nasce (ou fica) desligado, e só o usuário liga**, pela página, vendo esses nós.
+  \`ork fluxo ligar\` nele é recusado; diga ao usuário que está pronto para ele conferir e ligar.
+- **Credencial:** o HTTP cita só o nome de uma credencial que o usuário cadastrou na página Conexões. Nunca peça,
+  escreva nem cole o valor de uma chave ou senha num fluxo.
+- **Alcance:** fluxo feito por você só cita cartões que o seu \`ork\` alcança (\`ork quem\`): destino do recado, quem
+  recebe a entrega, quem o gatilho vigia, o shell do comando. Recado sem \`entregaPara\` devolve a entrega a você. No
+  disparo isso é conferido de novo: se a corda sair, o fluxo pula (e se o seu cartão sair do quadro, ele desliga).
+- Criar, editar, ligar e apagar por agente aparece no canto da janela do usuário.
 
 ## Recado de uma página "+"
 

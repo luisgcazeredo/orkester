@@ -15,7 +15,7 @@ if (!readdirSync(join(app, 'release')).includes(`Orkester-Instalador-${version}.
 // com o app aberto a atualização falha; fechar à força perderia o que não foi salvo, então só avisa
 const aberto = execFileSync('tasklist', ['/FI', 'IMAGENAME eq Orkester.exe', '/NH'], { encoding: 'utf8' })
 if (aberto.includes('Orkester.exe')) {
-  console.error('O Orkester está aberto. Feche o app e rode de novo.')
+  console.error('O Orkester está aberto. Feche o app (com fluxo ligado: Sair no ícone da bandeja) e rode de novo.')
   process.exit(1)
 }
 

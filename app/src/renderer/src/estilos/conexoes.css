@@ -425,3 +425,65 @@
 .conexoes .espaco-flex {
   flex: 1;
 }
+
+/* ------------------------------------------------------------------ aba Credenciais (1.9.6, F4) */
+.credencial-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  max-width: 560px;
+}
+
+.credencial-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--texto-suave);
+}
+
+.credencial-campo input,
+.credencial-campo select,
+.credencial-campo textarea,
+.credencial-form > input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.credencial-campo textarea {
+  resize: vertical;
+  font-family: var(--fonte-mono);
+  font-size: 12.5px;
+}
+
+.credencial-ajuda {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.credencial-linha {
+  display: flex;
+  gap: var(--espaco-2);
+}
+
+.credencial-linha input {
+  flex: 1;
+  min-width: 0;
+}
+
+.credencial-valor {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0;
+  font-size: 13px;
+}
+
+.credencial-dominio {
+  display: inline-block;
+  margin: 0 var(--espaco-1) 0 0;
+  padding: 0 6px;
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  background: var(--lateral-filtro);
+}

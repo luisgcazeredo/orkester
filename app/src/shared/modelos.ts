@@ -138,7 +138,91 @@ export function aplicarModelo(agente: Agente, comando: string, modelo?: string, 
   return [motor, ...novos, ...mantidos].join(' ')
 }
 
-/** O rótulo do cartão: `opus · xhigh`, só o modelo ou só o esforço quando é o que há; vazio sem nada. */
-export function rotuloModelo(no: { modelo?: string; esforco?: Esforco }): string {
-  return [modeloValido(no.modelo) ? no.modelo : undefined, esforcoValido(no.esforco) ? no.esforco : undefined].filter(Boolean).join(' · ')
+/** O valor de uma flag `chave=valor` do `-c` do Codex, sem aspas; `undefined` se a chave é outra. */
+function valorDoConfig(texto: string, chave: string): string | undefined {
+  const t = semAspas(texto)
+  const i = t.indexOf('=')
+  if (i < 0 || t.slice(0, i).trim() !== chave) return undefined
+  return semAspas(t.slice(i + 1).trim())
+}
+
+/** Lê o modelo e o esforço escritos numa linha de comando do motor (a última flag vale). Mesmos formatos que `aplicarModelo` tira. */
+function lerDaLinha(agente: 'claude' | 'codex', linha: string): Escolha {
+  const pedacos = linha.match(PEDACO) ?? []
+  if (pedacos[0] === undefined || !eOMotor(pedacos[0], agente)) return {}
+  let m: string | undefined
+  let e: string | undefined
+  const resto = pedacos.slice(1)
+  for (let i = 0; i < resto.length; i++) {
+    const p = resto[i]
+    const proximo = i + 1 < resto.length ? resto[i + 1] : undefined
+    if (agente === 'claude') {
+      if (p === '--model' && proximo !== undefined) { m = semAspas(proximo); i++ }
+      else if (p.startsWith('--model=')) m = semAspas(p.slice('--model='.length))
+      else if (p === '--effort' && proximo !== undefined) { e = semAspas(proximo); i++ }
+      else if (p.startsWith('--effort=')) e = semAspas(p.slice('--effort='.length))
+      continue
+    }
+    if ((p === '-m' || p === '--model') && proximo !== undefined) { m = semAspas(proximo); i++; continue }
+    if (p.startsWith('--model=')) { m = semAspas(p.slice('--model='.length)); continue }
+    if (/^-m[^-\s]/.test(p)) { m = semAspas(p.slice(2)); continue }
+    const configJunto = /^(?:--config=|-c(?=\S))(.*)$/.exec(p)
+    let config: string | undefined
+    if (configJunto) config = configJunto[1]
+    else if ((p === '-c' || p === '--config') && proximo !== undefined) { config = proximo; i++ }
+    if (config === undefined) continue
+    m = valorDoConfig(config, 'model') ?? m
+    e = valorDoConfig(config, 'model_reasoning_effort') ?? e
+  }
+  const esforco = esforcoValido(e) && (agente === 'codex' || ESFORCOS_CLAUDE.includes(e)) ? e : undefined
+  return { ...(modeloValido(m) ? { modelo: m } : {}), ...(esforco ? { esforco } : {}) }
+}
+
+/**
+ * O modelo e o esforço que o processo roda de fato: lê da linha que sai de `aplicarModelo` (campos do cartão por
+ * cima do que está escrito no comando), com o mesmo parser. O que nenhum dos dois diz fica de fora (vale o padrão
+ * do motor). Shell não tem modelo.
+ */
+export function modeloEfetivo(agente: Agente, comando: string | undefined, modelo?: string, esforco?: Esforco): { modelo?: string; esforco?: Esforco } {
+  if (agente === 'shell') return {}
+  // sem comando (quem chama só tem os campos), valem os campos; com comando, vale só o que o processo roda: um
+  // comando que não começa pelo motor passa sem mexida, então os campos não chegam a ele
+  if (!comando?.trim()) {
+    const e = esforcoValido(esforco) && (agente === 'codex' || ESFORCOS_CLAUDE.includes(esforco)) ? esforco : undefined
+    return { ...(modeloValido(modelo) ? { modelo } : {}), ...(e ? { esforco: e } : {}) }
+  }
+  return lerDaLinha(agente, aplicarModelo(agente, comando.trim(), modelo, esforco))
+}
+
+export interface ParteDoRotulo {
+  texto: string
+  /** Veio do padrão do motor, não de uma escolha: a tela mostra em tom suave. */
+  padrao: boolean
+}
+
+export const TEXTO_PADRAO = 'padrão'
+
+/**
+ * As partes do rótulo do cartão. Com `agente`, é o que o processo roda (`modeloEfetivo`): o que não está dito vira
+ * `padrão` (`opus · padrão`, `padrão · medium`, só `padrão`), nunca vazio; shell não tem rótulo. Sem `agente` é o
+ * rótulo antigo, só dos campos (funções e partituras não têm comando): vazio sem nada.
+ */
+export function partesDoRotulo(no: { agente?: Agente; comando?: string; modelo?: string; esforco?: Esforco }): ParteDoRotulo[] {
+  if (no.agente === undefined) {
+    return [modeloValido(no.modelo) ? no.modelo : undefined, esforcoValido(no.esforco) ? no.esforco : undefined]
+      .filter((t): t is string => Boolean(t))
+      .map((texto) => ({ texto, padrao: false }))
+  }
+  if (no.agente === 'shell') return []
+  const { modelo, esforco } = modeloEfetivo(no.agente, no.comando, no.modelo, no.esforco)
+  if (!modelo && !esforco) return [{ texto: TEXTO_PADRAO, padrao: true }]
+  return [
+    { texto: modelo ?? TEXTO_PADRAO, padrao: !modelo },
+    { texto: esforco ?? TEXTO_PADRAO, padrao: !esforco }
+  ]
+}
+
+/** O rótulo do cartão como texto: `opus · xhigh`. Ver `partesDoRotulo` para o que muda com `agente`. */
+export function rotuloModelo(no: { agente?: Agente; comando?: string; modelo?: string; esforco?: Esforco }): string {
+  return partesDoRotulo(no).map((p) => p.texto).join(' · ')
 }

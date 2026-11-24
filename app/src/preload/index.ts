@@ -28,7 +28,7 @@ import {
   type AvisoJanelas,
   type MudancaArquivo,
   type ApiOrkester,
-  type PedidoDoAgente, CANAIS_CHAVES, type ApiChaves, CANAIS_PORTAIS, type ApiPortais, CANAIS_TEMAS, type ApiTemas, CANAIS_KANBAN, type ApiKanban, type ResumoDaCaixa, CANAIS_PAGINAS, type ApiPaginas } from '../shared/api'
+  type PedidoDoAgente, CANAIS_CHAVES, type ApiChaves, CANAIS_PORTAIS, type ApiPortais, CANAIS_TEMAS, type ApiTemas, CANAIS_KANBAN, type ApiKanban, CANAIS_FLUXOS, type ApiFluxos, CANAIS_CREDENCIAIS, type ApiCredenciais, type ResumoDaCaixa, type RespostaAoFechar, CANAIS_PAGINAS, type ApiPaginas } from '../shared/api'
 
 /** Cada canal vira uma função que chama o processo principal e devolve a resposta. */
 function chamadas<T>(canais: Record<string, string>): T {
@@ -158,6 +158,27 @@ const temas = chamadas<ApiTemas>(CANAIS_TEMAS)
 // Kanban do espaço: a página lê e pede mudanças; o principal é o dono do arquivo e avisa as janelas.
 const kanban = chamadas<ApiKanban>(CANAIS_KANBAN)
 
+// Fluxos do espaço: a página lê e pede mudanças; o principal é o dono dos arquivos, roda o motor e avisa as janelas.
+const { mudou: canalDosFluxos, execucaoMudou: canalDasExecucoes, ...canaisDosFluxos } = CANAIS_FLUXOS
+const ouvintesDosFluxos = new Set<(espacoId: string, aviso?: string, tipo?: 'erro') => void>()
+const ouvintesDasExecucoes = new Set<(espacoId: string, fluxoId: string, execId: string) => void>()
+ipcRenderer.on(canalDosFluxos, (_evento, espacoId: string, aviso?: string, tipo?: 'erro') => ouvintesDosFluxos.forEach((o) => o(espacoId, aviso, tipo)))
+ipcRenderer.on(canalDasExecucoes, (_evento, espacoId: string, fluxoId: string, execId: string) => ouvintesDasExecucoes.forEach((o) => o(espacoId, fluxoId, execId)))
+const fluxos: ApiFluxos = {
+  ...chamadas<Omit<ApiFluxos, 'aoMudar' | 'aoMudarExecucao'>>(canaisDosFluxos),
+  aoMudar: (ouvinte) => {
+    ouvintesDosFluxos.add(ouvinte)
+    return () => void ouvintesDosFluxos.delete(ouvinte)
+  },
+  aoMudarExecucao: (ouvinte) => {
+    ouvintesDasExecucoes.add(ouvinte)
+    return () => void ouvintesDasExecucoes.delete(ouvinte)
+  }
+}
+
+// Credenciais dos fluxos (globais, cifradas no main): o valor só vai da janela para o main, nunca volta.
+const credenciais = chamadas<ApiCredenciais>(CANAIS_CREDENCIAIS)
+
 // Páginas "+": a janela lista, propõe, aceita e revoga; o main é o dono do registro e confere tudo. `tema` só avisa.
 const { tema: canalDoTema, ...canaisDePaginas } = CANAIS_PAGINAS
 const paginas: ApiPaginas = {
@@ -208,6 +229,8 @@ const api: ApiOrkester = {
   portais,
   temas,
   kanban,
+  fluxos,
+  credenciais,
   paginas,
   andares,
   area,
@@ -217,7 +240,7 @@ const api: ApiOrkester = {
   portal,
   aoPedirFechar: (salvar) => {
     ipcRenderer.on(CANAIS_APP.vaiFechar, async () => {
-      const gravou = await salvar().catch(() => false)
+      const gravou = await salvar().catch((): RespostaAoFechar => false)
       ipcRenderer.send(CANAIS_APP.podeFechar, gravou)
     })
   },

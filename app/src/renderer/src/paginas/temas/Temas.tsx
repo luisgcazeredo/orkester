@@ -472,7 +472,7 @@ export function Temas() {
   return (
     <div className="temas" data-pagina-geral="temas">
       <header className="temas-cabecalho">
-        <h2>Temas</h2>
+        <h2>Aparência</h2>
         <p className="suave">
           As cores do app em dois passos: a base e a cor de destaque. A mudança aparece na hora, fica guardada e o terminal acompanha. Para mexer em cada cor,
           duplique um tema.

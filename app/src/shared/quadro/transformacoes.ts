@@ -299,6 +299,56 @@ export function fechar(espaco: Espaco, pedido: PedidoFechar): ResultadoTransform
   return { espaco: proximo, resposta: { ok: true } }
 }
 
+interface NaPassagem {
+  nome: string
+  espacoId: string
+}
+
+/**
+ * `ork passar` só dentro de um espaço (1.9.6, revisão): o sucessor e todos os filhos do antigo têm de estar no espaço
+ * dele. Assim o quadro muda numa transformação só (tudo ou nada) e nenhuma corda fica para trás num espaço que o
+ * sucessor não alcança. Devolve o motivo da recusa (dito antes de mudar qualquer coisa), ou null.
+ */
+export function recusaDaPassagem(
+  antigo: Pick<NaPassagem, 'espacoId'>,
+  sucessor: NaPassagem,
+  filhos: NaPassagem[],
+  nomeDoEspaco: (id: string) => string
+): string | null {
+  if (sucessor.espacoId !== antigo.espacoId) {
+    return (
+      `"${sucessor.nome}" está em outro espaço ("${nomeDoEspaco(sucessor.espacoId)}"); o papel só passa dentro do mesmo espaço. ` +
+      'Nada mudou. Abra o sucessor neste espaço e passe a ele.'
+    )
+  }
+  const fora = filhos.filter((f) => f.espacoId !== antigo.espacoId)
+  if (fora.length) {
+    const lista = fora.map((f) => `"${f.nome}" (espaço "${nomeDoEspaco(f.espacoId)}")`).join(', ')
+    return (
+      `você tem ${fora.length === 1 ? 'uma sessão aberta' : `${fora.length} sessões abertas`} em outro espaço: ${lista}. ` +
+      'O papel só passa dentro do mesmo espaço: feche-as antes com `ork fechar <nome>` e passe de novo. Nada mudou.'
+    )
+  }
+  return null
+}
+
+/**
+ * `ork passar` passa o papel (1.9.6): cada corda do antigo troca a ponta dele pelo sucessor, mantendo id e data.
+ * A corda entre os dois fica (o antigo ainda fala com o sucessor até sair); a que daria em corda repetida ou em
+ * auto-corda sai. As cordas que não tocam o antigo não mudam.
+ */
+function cordasDoPapel(cordas: Corda[], antigo: string, sucessor: string): Corda[] {
+  const outraPonta = (corda: Corda, de: string): string | null => (corda.de === de ? corda.para : corda.para === de ? corda.de : null)
+  const doSucessor = new Set(cordas.map((corda) => outraPonta(corda, sucessor)).filter((id): id is string => id !== null))
+  return cordas.flatMap((corda) => {
+    const outro = outraPonta(corda, antigo)
+    if (outro === null || outro === sucessor) return [corda]
+    if (outro === antigo || doSucessor.has(outro)) return []
+    doSucessor.add(outro)
+    return [corda.de === antigo ? { ...corda, de: sucessor } : { ...corda, para: sucessor }]
+  })
+}
+
 /** Transfere cartões entre agentes; cordas só existem no plano onde as duas pontas coexistem. */
 export function passar(
   espaco: Espaco,
@@ -310,6 +360,9 @@ export function passar(
   const procurados = new Set([...ids, ...(temDonoDoSucessor ? [pedido.sucessor] : [])])
   const encontrados = planosDe(espaco).flatMap((plano) => plano.nos).filter((no) => no.tipo === 'terminal' && procurados.has(no.id)).length
   if (encontrados !== procurados.size) return { espaco, resposta: { ok: false, erro: 'um cartão a passar não está mais no quadro' } }
+  if (pedido.papel && !planosDe(espaco).some((plano) => plano.nos.some((no) => no.tipo === 'terminal' && no.id === pedido.antigo))) {
+    return { espaco, resposta: { ok: false, erro: 'o cartão que passa o papel não está mais no quadro' } }
+  }
 
   const transformar = (plano: Plano): Plano => {
     const aqui = new Set(plano.nos.filter((no) => no.tipo === 'terminal').map((no) => no.id))
@@ -326,7 +379,7 @@ export function passar(
     }
     return {
       ...plano,
-      cordas,
+      cordas: pedido.papel && aqui.has(pedido.antigo) && aqui.has(pedido.sucessor) ? cordasDoPapel(cordas, pedido.antigo, pedido.sucessor) : cordas,
       nos: plano.nos.map((no) => {
         if (no.tipo !== 'terminal') return no
         if (temDonoDoSucessor && no.id === pedido.sucessor) return { ...no, criadoPor: pedido.donoDoSucessor ?? undefined }

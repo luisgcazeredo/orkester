@@ -1,6 +1,6 @@
 import { type CorPostIt, type Funcao, type No, type PresetAgente } from '../../../shared/modelo'
 import { resolverModelo } from '../../../shared/modelos'
-import { proximoZ } from '../../../shared/quadro/geometria'
+import { caixaDoNo, lugarDoTerminalNovo, proximoZ, type Caixa } from '../../../shared/quadro/geometria'
 import { TOM_DO_POSTIT } from './coresDeDados'
 import { entregarPrimeiroPedido } from './espacos'
 import { definir, estado, mudarPlano, NADA, planoAtual, registrarHistorico } from './nucleo'
@@ -33,8 +33,17 @@ function tamanhoDaImagem(largura: number, altura: number): { largura: number; al
   return { largura: Math.max(40, Math.round(largura * escala)), altura: Math.max(40, Math.round(altura * escala)) }
 }
 
-/** Cria um nó com o centro em (x, y) do quadro e já o seleciona. */
-export function adicionarNo(novo: NovoNo, x: number, y: number): string {
+const TAMANHO_DO_TERMINAL = { largura: 800, altura: 500 }
+
+function lugarDoTerminal(x: number, y: number, nos: No[], noCentro: boolean): Caixa {
+  return { ...lugarDoTerminalNovo({ x, y }, TAMANHO_DO_TERMINAL, nos.map(caixaDoNo), noCentro), ...TAMANHO_DO_TERMINAL }
+}
+
+/**
+ * Cria um nó com o centro em (x, y) do quadro e já o seleciona. `noCentro`: (x, y) é o centro da tela e não um ponto
+ * pedido (menu Terminal, paleta) — o terminal desvia do que já ocupa o lugar. Sem ele, nasce exatamente no ponto.
+ */
+export function adicionarNo(novo: NovoNo, x: number, y: number, opcoes: { noCentro?: boolean } = {}): string {
   const plano = planoAtual()
   if (!plano) return ''
   registrarHistorico()
@@ -56,7 +65,8 @@ export function adicionarNo(novo: NovoNo, x: number, y: number): string {
         novo.preset.agente === 'shell' ? {} : resolverModelo(undefined, funcaoServe ? novo.funcao : undefined, novo.preset)
       no = {
         ...base,
-        ...centrado(800, 500),
+        // o menu Terminal e a paleta abrem vários seguidos no centro: o seguinte nasce ao lado do anterior, não por cima
+        ...lugarDoTerminal(x, y, plano.nos, !!opcoes.noCentro),
         tipo: 'terminal',
         nome: comoNomear,
         agente: novo.preset.agente,

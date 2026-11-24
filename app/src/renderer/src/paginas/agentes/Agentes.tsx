@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronRight, Inbox, Pencil, Play, SquareKanban, Trash2 } from 'lucide-react'
 import type { Agente, Partitura, ResumoEspaco } from '../../../../shared/modelo'
 import type { AgenteDoPanorama } from '../../../../shared/api'
-import { rotuloModelo } from '../../../../shared/modelos'
+import { rotuloModelo, TEXTO_PADRAO } from '../../../../shared/modelos'
 import { resumoDaPartitura } from '../../../../shared/quadro/partituras'
 import { abrirEspaco, definirPartituras, lerEstado, usarLoja } from '../../estado/loja'
 import { EditorDeFuncoes } from './Funcoes'
@@ -96,8 +96,8 @@ function CartaoAgente({ ag, cor }: { ag: AgenteDoPanorama; cor: string }) {
           {Icone && <Icone size={13} style={{ color: COR_AGENTE[ag.agente] }} aria-hidden />}
           {MOTOR[ag.agente] ?? ag.agente}
         </Campo>
-        <Campo rotulo="Modelo · esforço" classe={modelo ? 'agente-modelo' : 'agente-modelo suave'}>
-          {modelo || 'padrão do motor'}
+        <Campo rotulo="Modelo · esforço" classe={modelo && modelo !== TEXTO_PADRAO ? 'agente-modelo' : 'agente-modelo suave'}>
+          {modelo || TEXTO_PADRAO}
         </Campo>
         <Campo rotulo="Caixa" classe={ag.fila ? 'agente-caixa com-recado' : 'agente-caixa suave'}>
           <Inbox size={13} aria-hidden />

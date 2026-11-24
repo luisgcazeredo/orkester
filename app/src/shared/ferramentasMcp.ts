@@ -99,6 +99,46 @@ export const FERRAMENTAS_MCP = {
     titulo: 'Apagar uma tarefa',
     descricao:
       'Manda a tarefa para a lixeira do kanban; a página Kanban recupera. Exige confirmar.'
+  },
+  fluxo_ver: {
+    titulo: 'Ver os fluxos',
+    descricao:
+      'Sem `nome`, os fluxos do espaço: ligado ou não, gatilhos e a última execução. Com `nome`, um fluxo inteiro (nós e ligações); com `json`, o JSON que fluxo_criar e fluxo_editar recebem. Credencial aparece só pelo nome, nunca o valor.'
+  },
+  fluxo_criar: {
+    titulo: 'Criar um fluxo',
+    descricao:
+      'Cria um fluxo a partir do JSON (o formato do fluxo_ver com `json`; cartões e colunas podem ir só pelo nome). Ele nasce desligado. Com Código, HTTP ou comando, só o usuário o liga, pela página Fluxos.'
+  },
+  fluxo_editar: {
+    titulo: 'Editar um fluxo',
+    descricao:
+      'Troca o nome, os nós e as ligações de um fluxo pelo JSON mandado. Um fluxo com Código, HTTP ou comando editado por aqui fica desligado até o usuário religar pela página.'
+  },
+  fluxo_ligar: {
+    titulo: 'Ligar um fluxo',
+    descricao:
+      'Liga um fluxo para ele disparar sozinho. Recusa o que tem Código, HTTP ou comando (só o usuário liga, pela página Fluxos, vendo esses nós) e o que ainda tem cartão ou coluna a escolher.'
+  },
+  fluxo_desligar: {
+    titulo: 'Desligar um fluxo',
+    descricao:
+      'Desliga um fluxo: ele para de disparar e nada mais muda nele.'
+  },
+  fluxo_rodar: {
+    titulo: 'Rodar um fluxo agora',
+    descricao:
+      'Roda o fluxo uma vez pelo gatilho Manual dele e devolve o que cada nó fez. Sem gatilho Manual, recusa; com Código, HTTP ou comando ainda não aprovado pelo usuário, também.'
+  },
+  fluxo_execucoes: {
+    titulo: 'Últimas execuções de um fluxo',
+    descricao:
+      'As últimas execuções de um fluxo, com o resultado, o tempo e o nó que deu erro.'
+  },
+  fluxo_apagar: {
+    titulo: 'Apagar um fluxo',
+    descricao:
+      'Apaga um fluxo e as execuções dele, para sempre. Exige confirmar.'
   }
 } as const satisfies Record<string, FerramentaMcp>
 

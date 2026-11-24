@@ -1,0 +1,1078 @@
+/* Editor de Fluxos (F2): a área dos nós, a barra do alto, a busca de nós e o painel do nó. Só tokens (tema Escuro,
+   Claro e OLED vêm de tokens.css). Prefixo `ed-` para não cruzar com a lista (`fluxo-`). */
+
+.ed {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  outline: none;
+  background: var(--quadro-fundo);
+  color: var(--texto);
+  font-family: var(--fonte-interface);
+  font-size: 13px;
+}
+
+.ed input,
+.ed select,
+.ed textarea {
+  padding: 5px 8px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel);
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.ed input:focus,
+.ed select:focus,
+.ed textarea:focus {
+  outline: none;
+  border-color: var(--destaque);
+}
+
+.ed input:disabled,
+.ed select:disabled,
+.ed textarea:disabled {
+  opacity: 0.7;
+}
+
+.ed [aria-invalid='true'] {
+  border-color: var(--perigo);
+}
+
+.ed select[data-a-escolher] {
+  border-color: var(--atencao);
+}
+
+.ed code {
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+}
+
+.ed-mono {
+  font-family: var(--fonte-mono) !important;
+  font-size: 12px !important;
+}
+
+.ed-cresce {
+  flex: 1;
+}
+
+/* ---------- barra do alto ---------- */
+
+.ed-topo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: var(--espaco-2) var(--espaco-3);
+  border-bottom: 1px solid var(--borda);
+  background: var(--painel);
+}
+
+.ed-nome-do-fluxo {
+  width: min(320px, 30vw);
+  font-weight: 600;
+}
+
+.ed-sujo {
+  color: var(--atencao);
+  font-size: 12px;
+}
+
+.ed-selo {
+  padding: 1px 8px;
+  border: 1px solid var(--pilula-borda);
+  border-radius: var(--raio-pilula);
+  background: var(--pilula-fundo);
+  color: var(--texto-suave);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.ed-botao,
+.ed-botao-leve {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel);
+  color: var(--texto);
+  white-space: nowrap;
+}
+
+.ed-botao:hover:not(:disabled),
+.ed-botao-leve:hover:not(:disabled),
+.ed-icone:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.ed-botao.primario {
+  border-color: var(--destaque);
+  background: var(--destaque);
+  color: var(--texto-sobre-cor);
+}
+
+.ed-botao.primario:hover:not(:disabled) {
+  background: var(--destaque-forte);
+}
+
+.ed-botao:disabled,
+.ed-icone:disabled,
+.ed-interruptor:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ed-botao-leve {
+  align-self: flex-start;
+  padding: 3px 8px;
+  border-style: dashed;
+  background: transparent;
+  color: var(--texto-suave);
+  font-size: 12px;
+}
+
+.ed-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--texto-suave);
+  flex-shrink: 0;
+}
+
+.ed-botao:focus-visible,
+.ed-icone:focus-visible,
+.ed-interruptor:focus-visible,
+.ed-abas button:focus-visible,
+.ed-busca-lista button:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 1px;
+}
+
+.ed-interruptor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 4px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pilula);
+  background: var(--painel);
+  color: var(--texto-suave);
+}
+
+.ed-interruptor-bola {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--texto-suave);
+}
+
+.ed-interruptor.ligado {
+  border-color: var(--entrou);
+  color: var(--texto);
+}
+
+.ed-interruptor.ligado .ed-interruptor-bola {
+  background: var(--entrou);
+}
+
+/* ---------- aviso ---------- */
+
+.ed-aviso {
+  position: absolute;
+  top: 52px;
+  left: 50%;
+  z-index: 30;
+  max-width: min(640px, 80%);
+  padding: var(--espaco-2) var(--espaco-3);
+  transform: translateX(-50%);
+  border: 1px solid var(--pilula-borda);
+  border-left: 3px solid var(--destaque);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel-alto);
+  box-shadow: var(--sombra);
+}
+
+.ed-aviso.tom-ok {
+  border-left-color: var(--entrou);
+}
+
+.ed-aviso.tom-perigo {
+  border-left-color: var(--perigo);
+}
+
+/* ---------- área ---------- */
+
+.ed-corpo {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.ed-area {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  background-color: var(--quadro-fundo);
+  background-image: radial-gradient(circle at 1px 1px, var(--grade) 1.2px, transparent 1.3px);
+}
+
+.ed-area:active {
+  cursor: grabbing;
+}
+
+.ed-camada {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+}
+
+.ed-ligacoes {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+}
+
+.ed-ligacao-linha {
+  fill: none;
+  stroke: var(--corda);
+  stroke-width: 2;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.ed-ligacao.marcada .ed-ligacao-linha {
+  stroke: var(--destaque);
+  stroke-width: 3;
+}
+
+.ed-ligacao-linha.provisoria {
+  stroke: var(--destaque);
+  stroke-dasharray: 7 6;
+}
+
+.ed-ligacao-toque {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.ed-area-selecao {
+  position: absolute;
+  border: 1px solid var(--destaque);
+  background: color-mix(in srgb, var(--destaque) 10%, transparent);
+  pointer-events: none;
+}
+
+.ed-vazio {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--espaco-2);
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.ed-vazio > * {
+  pointer-events: auto;
+}
+
+.ed-zoom {
+  position: absolute;
+  right: var(--espaco-3);
+  bottom: var(--espaco-3);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pilula);
+  background: var(--painel);
+  box-shadow: var(--sombra-leve);
+  cursor: default;
+  font-size: 11px;
+}
+
+/* ---------- nó ---------- */
+
+.ed-no {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: 0 var(--espaco-3) 0 var(--espaco-2);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--cartao);
+  box-shadow: var(--sombra-leve);
+  cursor: default;
+  user-select: none;
+}
+
+.ed-no.gatilho {
+  border-top-left-radius: 22px;
+  border-bottom-left-radius: 22px;
+}
+
+.ed-no.selecionado {
+  border-color: var(--destaque);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--destaque) 40%, transparent);
+}
+
+.ed-no.exec-ok {
+  border-color: var(--entrou);
+}
+
+.ed-no.exec-erro {
+  border-color: var(--perigo);
+}
+
+.ed-no.exec-nao-rodou {
+  opacity: 0.55;
+}
+
+.ed-no-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--raio-pequeno);
+  background: var(--hover);
+  color: var(--texto);
+}
+
+.ed-no-icone.cat-gatilho {
+  background: color-mix(in srgb, var(--destaque) 22%, transparent);
+  color: var(--destaque);
+}
+
+.ed-no-icone.cat-orkester {
+  background: color-mix(in srgb, var(--entrou) 20%, transparent);
+  color: var(--entrou);
+}
+
+.ed-no-icone.cat-logica {
+  background: color-mix(in srgb, var(--atencao) 20%, transparent);
+  color: var(--atencao);
+}
+
+.ed-no-icone.cat-fora {
+  background: color-mix(in srgb, var(--perigo) 16%, transparent);
+  color: var(--perigo);
+}
+
+.ed-no-textos {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.ed-no-nome {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ed-no-tipo {
+  overflow: hidden;
+  color: var(--texto-suave);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ed .ed-no-renomear {
+  padding: 1px 4px;
+  font-weight: 600;
+}
+
+.ed-no-selos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ed-no-falta {
+  color: var(--atencao);
+}
+
+.ed-no-sensivel {
+  color: var(--perigo);
+}
+
+.ed-porta {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border: 2px solid var(--corda);
+  border-radius: 50%;
+  background: var(--quadro-fundo);
+  box-sizing: border-box;
+}
+
+.ed-porta.saida {
+  cursor: crosshair;
+}
+
+.ed-porta.saida:hover {
+  border-color: var(--destaque);
+  background: var(--destaque);
+}
+
+/* o toque na saída é maior que a bolinha (RAIO_DA_PORTA = 12 px) */
+.ed-porta.saida::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+.ed-porta-rotulo {
+  position: absolute;
+  top: -15px;
+  left: 10px;
+  color: var(--texto-suave);
+  font-size: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.ed-porta.saida-0 {
+  border-color: var(--entrou);
+}
+
+.ed-porta.saida-1 {
+  border-color: var(--perigo);
+}
+
+/* ---------- escolha de nó: painel que desliza da direita, por cima do quadro ---------- */
+
+.ed-escolha {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: min(340px, 90%);
+  border-left: 1px solid var(--borda);
+  background: var(--painel-alto);
+  box-shadow: var(--sombra);
+  cursor: default;
+  animation: ed-entra-da-direita 160ms ease-out;
+}
+
+@keyframes ed-entra-da-direita {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ed-escolha {
+    animation: none;
+  }
+}
+
+.ed-escolha-topo {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: var(--espaco-3) var(--espaco-3) 0;
+}
+
+.ed-escolha-topo h3 {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+}
+
+.ed .ed-busca-campo {
+  flex-shrink: 0;
+  margin: var(--espaco-2) var(--espaco-3) var(--espaco-2);
+}
+
+/* só a lista rola; o título e a busca ficam fixos no topo (min-height: 0 deixa o item de flex encolher) */
+.ed-busca-lista {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  overscroll-behavior: contain;
+  padding: 0 0 var(--espaco-3);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.ed-busca-grupo {
+  display: block;
+  padding: var(--espaco-3) var(--espaco-3) 4px;
+  color: var(--texto-suave);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ed-busca-lista button {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  width: 100%;
+  padding: 8px var(--espaco-3);
+  border: none;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--texto);
+  text-align: left;
+}
+
+/* o "?" da documentação fica sobre o lado direito do item destacado */
+.ed-busca-lista li {
+  position: relative;
+}
+
+.ed-busca-lista .ed-doc-do-no {
+  position: absolute;
+  right: var(--espaco-3);
+  bottom: 12px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--borda);
+  border-radius: 50%;
+  background: var(--painel);
+  color: var(--texto-suave);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ed-busca-lista .ed-doc-do-no:hover,
+.ed-busca-lista .ed-doc-do-no:focus-visible {
+  border-color: var(--destaque);
+  color: var(--destaque);
+}
+
+.ed-busca-lista button.marcado {
+  padding-right: 44px;
+  border-left-color: var(--destaque);
+  background: var(--lateral-ativo);
+}
+
+.ed-busca-lista .ed-no-icone {
+  width: 30px;
+  height: 30px;
+}
+
+.ed-busca-textos {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.ed-busca-textos > span:first-child {
+  font-weight: 600;
+}
+
+.ed-busca-textos .suave {
+  overflow: hidden;
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- "+" de uma saída sem ligação (abre a escolha, e o nó novo já sai ligado) ---------- */
+
+.ed-mais-saida {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 22px;
+  padding: 0;
+  border: 1px solid var(--corda);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel);
+  color: var(--texto-suave);
+  cursor: pointer;
+}
+
+/* o fio curto entre a bolinha da saída e o "+" */
+.ed-mais-saida::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  width: 16px;
+  border-top: 1px solid var(--corda);
+}
+
+.ed-mais-saida:hover,
+.ed-mais-saida:focus-visible {
+  border-color: var(--destaque);
+  color: var(--destaque);
+  outline: none;
+}
+
+/* ---------- fluxo vazio: o "+" grande do meio ---------- */
+
+.ed-primeiro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: var(--espaco-2);
+  border: none;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ed-primeiro-mais {
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border: 2px dashed var(--borda);
+  border-radius: var(--raio-grande);
+  background: var(--painel-alto);
+  color: var(--texto-suave);
+  transition: border-color 120ms, color 120ms;
+}
+
+.ed-primeiro:hover .ed-primeiro-mais,
+.ed-primeiro:focus-visible .ed-primeiro-mais {
+  border-color: var(--destaque);
+  color: var(--destaque);
+}
+
+.ed-primeiro:focus-visible {
+  outline: none;
+}
+
+.ed-primeiro-texto {
+  font-weight: 600;
+}
+
+/* ---------- painel do nó ---------- */
+
+/* cobre o corpo do editor (quadro e coluna das execuções); a barra de cima segue à mão */
+.ed-painel-fundo {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: var(--espaco-5);
+  background: var(--dialogo-veu);
+}
+
+.ed-painel {
+  display: flex;
+  flex-direction: column;
+  width: min(1280px, 100%);
+  height: min(820px, 100%);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-grande);
+  overflow: hidden;
+  background: var(--painel);
+  box-shadow: var(--sombra);
+}
+
+.ed-painel:focus-visible {
+  outline: none;
+}
+
+.ed-painel-topo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: var(--espaco-2) var(--espaco-3);
+  border-bottom: 1px solid var(--borda-suave);
+}
+
+.ed-painel-nome {
+  display: flex;
+  align-items: baseline;
+  gap: var(--espaco-2);
+  flex: 1;
+  min-width: 0;
+}
+
+.ed-painel-nome input {
+  width: min(320px, 40%);
+  font-weight: 600;
+}
+
+.ed-painel-colunas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+
+.ed-painel-coluna {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  min-height: 0;
+  padding: var(--espaco-3);
+  overflow: auto;
+}
+
+.ed-painel-coluna + .ed-painel-coluna {
+  border-left: 1px solid var(--borda-suave);
+}
+
+.ed-painel-ajustes {
+  background: var(--quadro-fundo);
+}
+
+.ed-painel-titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.ed-painel-titulo h4 {
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ed-painel-titulo .ed-abas {
+  margin-left: auto;
+}
+
+.ed-abas {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.ed-abas button {
+  padding: 2px 8px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--texto-suave);
+  font-size: 11px;
+}
+
+.ed-abas button.ativa {
+  border-color: var(--destaque);
+  color: var(--texto);
+}
+
+.ed-json {
+  margin: 0;
+  padding: var(--espaco-2);
+  overflow: auto;
+  border-radius: var(--raio-pequeno);
+  background: var(--quadro-fundo);
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+
+.ed-tabela-rolagem {
+  overflow: auto;
+}
+
+.ed-tabela {
+  border-collapse: collapse;
+  font-size: 12px;
+  user-select: text;
+}
+
+.ed-tabela th,
+.ed-tabela td {
+  max-width: 220px;
+  padding: 3px 8px;
+  overflow: hidden;
+  border: 1px solid var(--borda-suave);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ed-tabela th {
+  background: var(--quadro-fundo);
+  font-weight: 600;
+}
+
+/* ---------- formulários dos nós ---------- */
+
+.ed-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.ed-campo-rotulo {
+  color: var(--texto-suave);
+  font-size: 12px;
+}
+
+.ed-campo-nota,
+.ed-nota {
+  margin: 0;
+  font-size: 12px;
+}
+
+.ed-grupo {
+  gap: 2px;
+}
+
+.ed-marcar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ed-linha,
+.ed-par,
+.ed-condicao {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ed-par input,
+.ed-condicao input {
+  flex: 1;
+}
+
+.ed-pares,
+.ed-condicoes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ed-numero {
+  width: 80px;
+}
+
+.ed-codigo {
+  min-height: 180px;
+  resize: vertical;
+  tab-size: 2;
+}
+
+.ed-falta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--atencao);
+  font-size: 12px;
+}
+
+.ed-erro {
+  margin: 0;
+  color: var(--perigo);
+  font-size: 12px;
+}
+
+.ed-aviso-sensivel {
+  margin: 0;
+  padding: var(--espaco-2);
+  border-left: 3px solid var(--perigo);
+  border-radius: var(--raio-micro);
+  background: var(--quadro-fundo);
+  font-size: 12px;
+}
+
+.ed-erro-geral {
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-3);
+}
+
+/* ---------- na lista: o nome do fluxo abre o editor ---------- */
+
+[data-pagina-geral='fluxos'] .fluxo-abrir {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+[data-pagina-geral='fluxos'] .fluxo-abrir:hover {
+  color: var(--destaque);
+  text-decoration: underline;
+}
+
+[data-pagina-geral='fluxos'] .fluxo-abrir:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 2px;
+}
+
+/* ---------- abas Fluxo | Execuções e a coluna da lista de execuções ---------- */
+
+.ed-abas {
+  display: inline-flex;
+  margin-left: var(--espaco-2);
+  padding: 2px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--quadro-fundo);
+}
+
+.ed-aba {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: var(--raio-pequeno);
+  background: none;
+  color: var(--texto-suave);
+  font: inherit;
+  font-size: 13px;
+}
+
+.ed-aba:hover {
+  color: var(--texto);
+}
+
+.ed-aba.ativa {
+  background: var(--painel-alto);
+  color: var(--texto);
+  font-weight: 600;
+}
+
+.ed-lado {
+  flex: 0 0 var(--ed-largura-do-lado);
+  min-width: 0;
+  padding: var(--espaco-3);
+  overflow-y: auto;
+  border-left: 1px solid var(--borda);
+  background: var(--painel);
+}
+
+.ed-corpo {
+  --ed-largura-do-lado: 360px;
+}
+
+/* a linha da lista (F3) foi feita para um painel mais largo: na coluna, as 3 primeiras colunas encolhem e a origem cabe */
+.ed-lado .exec-linha {
+  grid-template-columns: 60px 84px 52px minmax(0, 1fr);
+}
+
+/* o contêiner do editor recebe o foco só para as teclas: sem o contorno do [tabindex]:focus-visible do ui.css (que vale
+   no resto do app), que aqui virava uma faixa na borda esquerda. Os botões, campos e nós de dentro seguem com o deles. */
+.ed[tabindex]:focus-visible {
+  outline: none;
+}
+
+/* ---------- rede local do fluxo (#91): o selo do topo e a lista que ele abre ---------- */
+
+.ed-botao.ed-selo-rede {
+  border-color: var(--atencao);
+  color: var(--atencao);
+}
+
+.ed-rede-local {
+  position: absolute;
+  top: 52px;
+  right: var(--espaco-3);
+  z-index: 31;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  width: min(380px, 90%);
+  padding: var(--espaco-3);
+  border: 1px solid var(--pilula-borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel-alto);
+  box-shadow: var(--sombra);
+  font-size: 13px;
+}
+
+/* recebe o foco só para o Esc valer: sem contorno na caixa inteira (os botões de dentro seguem com o deles) */
+.ed-rede-local:focus {
+  outline: none;
+}
+
+.ed-rede-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ed-rede-texto {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.ed-rede-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ed-rede-lista li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-2);
+  padding: var(--espaco-1) var(--espaco-2);
+  border-radius: var(--raio-micro);
+  background: var(--quadro-fundo);
+}

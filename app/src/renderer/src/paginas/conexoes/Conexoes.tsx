@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { AppWindow, Check, Copy, Download, Globe, KeyRound, Plug, Plus, Power, PowerOff, RefreshCw, Trash2, Unlink, Wrench } from 'lucide-react'
+import { AppWindow, Check, Copy, Download, Globe, KeyRound, Lock, Plug, Plus, Power, PowerOff, RefreshCw, Trash2, Unlink, Wrench } from 'lucide-react'
 import { comecoParaTela, configuracoesDoMcp, type ComandoDoMcp, type ConfiguracoesDoMcp } from '../../../../shared/chaves'
 import { listarFerramentas } from '../../../../shared/ferramentasMcp'
 import type { ResumoDePortal } from '../../../../shared/portais'
@@ -12,10 +12,11 @@ import { LigarAgente } from '../extra/LigarAgente'
 import { abrirPainelDePaginas } from '../extra/PainelMais'
 import { linhasDePermissao, motivoDaQueda, SEMPRE, textoDePendencia, textoDeDesligada } from '../extra/textos'
 import { aoPedirAbaDeConexoes, pegarAbaDeConexoes, type AbaDeConexoes } from './aba'
+import { Credenciais } from './Credenciais'
 import '../../estilos/conexoes.css'
 
 // Conexões (página geral): tudo o que liga o Orkester ao que está fora dele. Desde a 1.9.5 (S6) é organizada em abas
-// (Chaves · MCP · Páginas · Portais), cada uma com uma frase do que é e cartões com título, selo de estado e as ações
+// (Chaves · MCP · Páginas · Credenciais · Portais), cada uma com uma frase do que é e cartões com título, selo de estado e as ações
 // à vista. Só mostra e organiza o que já existe: o cofre de chaves é main/chaves.ts, a lista das ferramentas sai do
 // registro do servidor (shared/ferramentasMcp.ts), os portais são a partição do Electron (main/portais.ts) e as páginas
 // "+" são do registro do main (main/paginas.ts).
@@ -678,6 +679,7 @@ export function Conexoes() {
     ...(temPaginas
       ? [{ id: 'paginas' as const, titulo: 'Páginas', icone: <AppWindow size={14} />, contagem: lista ? (lista.ligadas ? String(lista.paginas.length) : 'desligadas') : null }]
       : []),
+    { id: 'credenciais', titulo: 'Credenciais', icone: <Lock size={14} />, contagem: null },
     { id: 'portais', titulo: 'Portais', icone: <Globe size={14} />, contagem: comLogin ? String(comLogin) : null }
   ]
   const atual = aba === 'paginas' && !temPaginas ? 'chaves' : aba
@@ -708,6 +710,7 @@ export function Conexoes() {
         {atual === 'chaves' && <Chaves mcp={mcp} chaves={chaves} recarregar={recarregarChaves} nova={nova} definirNova={definirNova} />}
         {atual === 'mcp' && <ServidorMcp mcp={mcp} chavesVivas={vivas} irParaChaves={() => setAba('chaves')} />}
         {atual === 'paginas' && <Paginas />}
+        {atual === 'credenciais' && <Credenciais />}
         {atual === 'portais' && <Portais portais={portais} recarregar={recarregarPortais} />}
       </div>
     </div>

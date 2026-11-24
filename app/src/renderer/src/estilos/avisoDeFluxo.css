@@ -1,0 +1,94 @@
+/* Aviso de fluxo (1.9.6): pílulas no canto inferior direito, acima do conteúdo e abaixo dos diálogos. Só tokens. */
+
+.aviso-fluxo-pilha {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--espaco-2);
+  max-width: min(460px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+/* Com o editor de um fluxo à mostra, a pilha vai para a esquerda e para baixo da barra do editor e da faixa da execução
+ * aberta (os botões Salvar, Rodar e "Voltar a editar" ficam à direita e no alto, e o zoom, embaixo à direita). */
+body:has(.pagina-ativa [data-fluxo-editor]) .aviso-fluxo-pilha {
+  top: 112px;
+  right: auto;
+  bottom: auto;
+  left: var(--aviso-esquerda, 80px); /* depois da barra de páginas: o componente mede a largura dela */
+  align-items: flex-start;
+}
+
+.aviso-fluxo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: var(--espaco-2) var(--espaco-2) var(--espaco-2) var(--espaco-3);
+  border: 1px solid var(--pilula-borda);
+  border-left: 3px solid var(--destaque);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel-alto);
+  box-shadow: var(--sombra);
+  color: var(--texto);
+  font-family: var(--fonte-interface);
+  font-size: 13px;
+  pointer-events: auto;
+}
+
+.aviso-fluxo-icone {
+  flex-shrink: 0;
+  color: var(--destaque);
+}
+
+.aviso-fluxo-texto {
+  min-width: 0;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.aviso-fluxo-botao,
+.aviso-fluxo-fechar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel);
+  color: var(--texto);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.aviso-fluxo-fechar {
+  padding: 3px 4px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--texto-suave);
+}
+
+.aviso-fluxo-botao:hover,
+.aviso-fluxo-fechar:hover {
+  background: var(--hover);
+  color: var(--texto);
+}
+
+.aviso-fluxo-botao:focus-visible,
+.aviso-fluxo-fechar:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 1px;
+}
+
+/* erro (fluxo falhou, ou o motor o desligou): fica até ser fechado, com a borda e o ícone em vermelho */
+.aviso-fluxo.erro {
+  border-left-color: var(--perigo);
+}
+
+.aviso-fluxo.erro .aviso-fluxo-icone {
+  color: var(--perigo);
+}

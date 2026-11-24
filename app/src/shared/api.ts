@@ -204,6 +204,11 @@ export type PedidoDoAgente =
       /** Quem era dono até agora (a corda dele com os cartões sai). */
       antigo: string
       donoDoSucessor?: string | null
+      /**
+       * `ork passar` (1.9.6): passa o papel inteiro. Toda corda do `antigo` (não só as dos filhos) passa ao
+       * `sucessor`, sem auto-corda nem duplicata; a corda entre os dois fica. Ausente no `ork fechar` e no desfazer.
+       */
+      papel?: boolean
     }
 
 /** `modelo`/`esforco`/`agente`: o que o cartão aberto recebeu (só quando há modelo ou esforço), para o aviso de modelo fora da lista. */
@@ -313,6 +318,10 @@ export interface ApiDados {
   mostrarNoExplorer(caminho: string): Promise<string>
   /** Renomeia um espaço que não está aberto nesta janela (se estiver em outra, ela é que renomeia). */
   renomearEspaco(id: string, nome: string): Promise<void>
+  /** Onde o app guarda tudo (Configurações › Geral, 1.9.6): a pasta de dados e a do registro (o log do que os agentes mandaram). */
+  pastasDoApp(): Promise<{ dados: string; registro: string }>
+  /** Abre no Explorer a pasta de dados ou a do registro (cria a do registro se ainda não existe). '' = abriu; senão, o erro. */
+  abrirPastaDoApp(qual: 'dados' | 'registro'): Promise<string>
 }
 
 export interface ApiAndares {
@@ -711,11 +720,19 @@ export interface ApiOrkester {
   portais: ApiPortais
   temas: ApiTemas
   kanban: ApiKanban
+  fluxos: ApiFluxos
+  credenciais: ApiCredenciais
   paginas: ApiPaginas
-  /** Chamado quando a janela vai fechar; `salvar` diz se gravou. Se não gravou, o app pergunta antes de fechar. */
-  aoPedirFechar(salvar: () => Promise<boolean>): void
+  /**
+   * Chamado quando a janela vai fechar; `salvar` diz se gravou. `false` = a gravação falhou; o rascunho do editor de
+   * Fluxos responde com o motivo (e o nome do fluxo). Nos dois casos o app pergunta antes de fechar.
+   */
+  aoPedirFechar(salvar: () => Promise<RespostaAoFechar>): void
   autoteste: boolean
 }
+
+/** A resposta da janela ao `app:vai-fechar` (main/fecharJanela.ts lê e escolhe o texto da pergunta). */
+export type RespostaAoFechar = boolean | { gravou: false; motivo: 'rascunho-de-fluxo'; nome?: string }
 
 export const CANAIS_APP = {
   vaiFechar: 'app:vai-fechar',
@@ -740,6 +757,125 @@ export const CANAIS_KANBAN = {
   ler: 'kanban:ler',
   aplicar: 'kanban:aplicar'
 } as const
+
+/**
+ * Fluxos do espaço (ver shared/fluxos/). O principal é o dono dos arquivos e revalida tudo. Gravar, apagar, ligar, mover,
+ * pastas e rodar: só a janela dona do espaço ou um espaço sem janela. Fluxo com Código, HTTP ou comando só liga (ou
+ * roda) com `mostrado` igual a `assinaturaDoMostrado` do que está no disco.
+ */
+export const CANAIS_FLUXOS = {
+  listar: 'fluxos:listar',
+  ler: 'fluxos:ler',
+  gravar: 'fluxos:gravar',
+  apagar: 'fluxos:apagar',
+  ligar: 'fluxos:ligar',
+  mover: 'fluxos:mover',
+  criarPasta: 'fluxos:criar-pasta',
+  renomearPasta: 'fluxos:renomear-pasta',
+  apagarPasta: 'fluxos:apagar-pasta',
+  rodar: 'fluxos:rodar',
+  execucoes: 'fluxos:execucoes',
+  execucao: 'fluxos:execucao',
+  /** principal → janelas: (espacoId, aviso?). A página relê; `aviso` é a frase pronta para o canto da janela. */
+  mudou: 'fluxos:mudou',
+  /** principal → janelas: (espacoId, fluxoId, execId). Uma execução terminou. */
+  execucaoMudou: 'fluxos:execucao-mudou'
+} as const
+
+/** Uma linha da lista: o fluxo sem os nós (o `ler` traz o fluxo inteiro, para o editor). */
+export interface ResumoDeFluxo {
+  id: string
+  nome: string
+  ligado: boolean
+  /** id da pasta; ausente = raiz. */
+  pasta?: string
+  criadoEm: string
+  criadoPor?: import('./fluxos/tipos').CriadaPor
+  editadoPor?: import('./fluxos/tipos').EditadaPor
+  nos: number
+  /** Os tipos dos nós de gatilho, na ordem do fluxo (só `gatilho.*`). */
+  gatilhos: import('./fluxos/tipos').TipoDeNo[]
+  /** Tem Código, HTTP ou comando: só o usuário liga, depois de confirmar. */
+  sensivel: boolean
+  limite: { porHora: number }
+  desligadoPor?: { motivo: import('./fluxos/tipos').MotivoDoDesligado; em: string }
+  /** A última execução (a última linha do `.jsonl`), se houver. */
+  ultima?: import('./fluxos/tipos').ResumoDaExecucao
+}
+
+/** Arquivo do espaço que não passou na leitura: não roda e não some sozinho. */
+export interface FluxoInvalido {
+  arquivo: string
+  nome?: string
+  motivo: string
+}
+
+export interface ListaDeFluxos {
+  pastas: import('./fluxos/tipos').PastaDeFluxos[]
+  /** Na ordem da lista (`ordem` do `indice.json`). */
+  fluxos: ResumoDeFluxo[]
+  invalidos: FluxoInvalido[]
+}
+
+export type ResultadoDeFluxo = { ok: true } | { ok: false; erro: string }
+/** `desligado`: o gravar desligou o fluxo que estava ligado, e por quê ("desligado: um nó sensível mudou; …", D8). */
+export type FluxoGravadoOk = { ok: true; id: string; desligado?: string } | { ok: false; erro: string }
+export type FluxoRodado = { ok: true; execucao: string } | { ok: false; erro: string }
+/** `tipo: 'erro'` = o aviso é uma falha de fluxo ou um fluxo desligado pelo motor (fica na tela até ser fechado). */
+export type TipoDeAvisoDeFluxo = 'erro'
+export type AoMudarFluxos = (espacoId: string, aviso?: string, tipo?: TipoDeAvisoDeFluxo) => void
+
+export interface ApiFluxos {
+  listar(espaco: string): Promise<ListaDeFluxos>
+  /** O fluxo inteiro, como está no disco; `null` se não existe. */
+  ler(espaco: string, id: string): Promise<import('./fluxos/tipos').FluxoGravado | null>
+  /**
+   * Grava nome, nós e ligações. `id: null` = fluxo novo (nasce desligado, na raiz). Fluxo ligado cujo nó sensível mudou
+   * desde a aprovação volta a desligado; o teto sobe sozinho se um Relógio pedir.
+   */
+  gravar(espaco: string, id: string | null, fluxo: import('./fluxos/tipos').FluxoExportado): Promise<FluxoGravadoOk>
+  apagar(espaco: string, id: string): Promise<ResultadoDeFluxo>
+  /** `mostrado`: `assinaturaDoMostrado` do que a confirmação mostrou (fluxo sensível); o main confere contra o disco. */
+  ligar(espaco: string, id: string, ligado: boolean, mostrado?: string): Promise<ResultadoDeFluxo>
+  /** `pasta: null` = raiz. */
+  mover(espaco: string, id: string, pasta: string | null): Promise<ResultadoDeFluxo>
+  /** `pai: null` = raiz. Nome até 60 letras, único no mesmo pai (sem diferenciar maiúsculas). */
+  criarPasta(espaco: string, nome: string, pai: string | null): Promise<ResultadoDeFluxo>
+  renomearPasta(espaco: string, id: string, nome: string): Promise<ResultadoDeFluxo>
+  /** Apaga a pasta e as de dentro; os fluxos delas sobem para a raiz. */
+  apagarPasta(espaco: string, id: string): Promise<ResultadoDeFluxo>
+  /** Roda o que está salvo pelo gatilho Manual (fora do teto e da trava de laço). Sensível: `mostrado` aprova. */
+  rodar(espaco: string, id: string, mostrado?: string): Promise<FluxoRodado>
+  /** Da mais nova para a mais antiga, no máximo 50. */
+  execucoes(espaco: string, id: string, limite?: number): Promise<import('./fluxos/tipos').ResumoDaExecucao[]>
+  execucao(espaco: string, id: string, execId: string): Promise<import('./fluxos/tipos').Execucao | null>
+  /** Devolve como soltar o ouvinte. */
+  aoMudar(ouvinte: AoMudarFluxos): () => void
+  aoMudarExecucao(ouvinte: (espacoId: string, fluxoId: string, execId: string) => void): () => void
+}
+
+/**
+ * Credenciais dos fluxos (1.9.7, ver shared/fluxos/credenciais.ts): GLOBAIS, cifradas pelo cofre do sistema. A tela
+ * manda o valor só ao criar e ao trocar; nada aqui devolve o valor (depois de salvo, só os 4 últimos, em `fim`).
+ */
+export const CANAIS_CREDENCIAIS = {
+  listar: 'credenciais:listar',
+  criar: 'credenciais:criar',
+  trocarValor: 'credenciais:trocar-valor',
+  editar: 'credenciais:editar',
+  apagar: 'credenciais:apagar'
+} as const
+
+export interface ApiCredenciais {
+  /** Só metadados, e se o cofre do sistema está disponível (sem ele, criar e trocar valor são recusados). */
+  listar(): Promise<import('./fluxos/credenciais').ListaDeCredenciais>
+  criar(pedido: import('./fluxos/credenciais').PedidoDeCredencial): Promise<import('./fluxos/credenciais').ResultadoDaCredencial>
+  trocarValor(id: string, valor: string): Promise<import('./fluxos/credenciais').ResultadoDaCredencial>
+  /** Nome, tipo, cabeçalho e domínios; o valor não muda aqui. */
+  editar(id: string, mudancas: import('./fluxos/credenciais').MudancasDaCredencial): Promise<import('./fluxos/credenciais').ResultadoDaCredencial>
+  /** Os fluxos que a citam não mudam; `usadaEm` diz quais, e o próximo pedido deles dá "credencial X não existe". */
+  apagar(id: string): Promise<import('./fluxos/credenciais').ResultadoDoApagar>
+}
 
 export const CANAIS = {
   sincronizar: 'terminal:sincronizar',
@@ -782,7 +918,9 @@ export const CANAIS_DADOS = {
   listarPasta: 'dados:listar-pasta',
   apagarEspaco: 'dados:apagar-espaco',
   mostrarNoExplorer: 'dados:mostrar-no-explorer',
-  renomearEspaco: 'dados:renomear-espaco'
+  renomearEspaco: 'dados:renomear-espaco',
+  pastasDoApp: 'dados:pastas-do-app',
+  abrirPastaDoApp: 'dados:abrir-pasta-do-app'
 } as const
 
 export const CANAIS_JANELAS = {

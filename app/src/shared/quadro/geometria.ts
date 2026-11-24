@@ -54,4 +54,34 @@ export function lugarPerto(
   return { x: caixa.x, y: caixa.y }
 }
 
+/**
+ * Onde pôr um cartão novo que o usuário pediu "no centro da tela" (menu Terminal, paleta). Livre, fica no centro;
+ * ocupado (o cartão anterior nasceu ali), vai para o vão livre mais perto dele, ao lado, e não por cima (1.9.6).
+ * Devolve o canto de cima à esquerda.
+ */
+export function lugarNoCentro(
+  centro: { x: number; y: number },
+  tamanho: { largura: number; altura: number },
+  ocupados: Caixa[],
+  folga = 30
+): { x: number; y: number } {
+  const noCentro = { x: centro.x - tamanho.largura / 2, y: centro.y - tamanho.altura / 2 }
+  if (!ocupados.some((o) => tocam({ ...noCentro, ...tamanho }, o, folga))) return noCentro
+  return lugarPerto({ ...noCentro, ...tamanho }, tamanho, ocupados, undefined, folga)
+}
+
+/**
+ * Onde nasce um terminal novo. Pedido "no centro da tela" (menu Terminal, paleta): desvia do que já ocupa o centro.
+ * Pedido num ponto exato (botão direito → Terminal, autoteste): fica centrado no ponto clicado, como antes da 1.9.6.
+ */
+export function lugarDoTerminalNovo(
+  ponto: { x: number; y: number },
+  tamanho: { largura: number; altura: number },
+  ocupados: Caixa[],
+  noCentro: boolean
+): { x: number; y: number } {
+  if (!noCentro) return { x: ponto.x - tamanho.largura / 2, y: ponto.y - tamanho.altura / 2 }
+  return lugarNoCentro(ponto, tamanho, ocupados)
+}
+
 export const proximoZ =(plano: Plano): number => Math.max(0, ...plano.nos.map((no) => no.z), ...plano.desenhos.map((desenho) => desenho.z)) + 1

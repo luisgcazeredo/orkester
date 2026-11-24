@@ -4,15 +4,17 @@
 // Dono dos dados = processo principal, não a janela (diferente do quadro): ler → aplicar → gravar é síncrono aqui,
 // então dois agentes mexendo juntos não se atropelam e o MCP mexe num espaço sem janela aberta.
 import { ipcMain } from 'electron'
-import { copyFileSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { CANAIS_KANBAN } from '../shared/api'
 import {
   acaoDoKanban,
   aplicarOperacao,
   escolherMaestro,
+  kanbanVazio,
   lerArquivoDoKanban,
   linhaDaTarefaNoPedido,
+  mudancasDeColuna,
   opcaoTexto,
   operacaoDoComando,
   tarefaParaDelegar,
@@ -22,6 +24,7 @@ import {
   type AgenteDoKanban,
   type ArquivoDoKanban,
   type AvisoDoKanban,
+  type Coluna,
   type LeituraDoKanban,
   type Pessoa,
   type Quem,
@@ -30,7 +33,8 @@ import {
   type Tarefa,
   type TarefaDoAgente
 } from '../shared/kanban'
-import { idsDosEspacos, PASTA_DADOS } from './dados'
+import { gravarJsonAtomico, idsDosEspacos, PASTA_DADOS } from './dados'
+import { emitir } from './eventosDeAutomacao'
 import { caixa, situacaoNaTela } from './espera'
 import { avisarTodas, exigirDono } from './janelas'
 import { sessaoPorId, sessoesDoEspaco, telaDe } from './terminais'
@@ -78,24 +82,9 @@ function ler(espacoId: string): ReturnType<typeof lerArquivoDoKanban> {
   }
 }
 
-/** Grava num temporário e troca de nome: um desligamento no meio não corrompe o arquivo. */
+/** Grava num temporário e troca de nome: um desligamento no meio não corrompe o arquivo (`gravarJsonAtomico`). */
 function gravar(espacoId: string, conteudo: ArquivoDoKanban, guardarRuim: boolean): void {
-  const destino = arquivoDo(espacoId)
-  const temporario = `${destino}.${process.pid}.tmp`
-  if (guardarRuim) {
-    try {
-      copyFileSync(destino, `${destino}.ruim`)
-    } catch {
-      // não existia: nada a guardar
-    }
-  }
-  try {
-    writeFileSync(temporario, JSON.stringify(conteudo, null, 2), 'utf8')
-    renameSync(temporario, destino)
-  } catch (e) {
-    rmSync(temporario, { force: true }) // o temporário não fica para trás
-    throw e
-  }
+  gravarJsonAtomico(arquivoDo(espacoId), conteudo, guardarRuim)
 }
 
 // ---------- quem é quem ----------
@@ -201,8 +190,10 @@ function porNaCaixa(espacoId: string, aviso: AvisoDoKanban, por: Quem): string |
 export function aplicarNoKanban(espacoId: string, operacao: unknown, por: Quem, exceto?: Electron.WebContents): ResultadoDoKanban & { avisados?: string[] } {
   const lido = ler(espacoId)
   if (lido.soLeitura) return { ok: false, erro: lido.soLeitura }
+  // a marca da automação não vai para o arquivo (`criadaPor`/`atualizadaPor`): só decide o evento abaixo
+  const { automacao: _marca, ...quem } = por
   const r = aplicarOperacao(lido.arquivo, operacao, {
-    por,
+    por: quem,
     agora: Date.now(),
     agentes: agentesDo(espacoId),
     maestro: maestroDo(espacoId),
@@ -215,10 +206,44 @@ export function aplicarNoKanban(espacoId: string, operacao: unknown, por: Quem, 
     return { ok: false, erro: `não consegui gravar o kanban: ${e instanceof Error ? e.message : String(e)}` }
   }
   avisarTodas({ tipo: 'kanban', espacoId }, exceto)
+  emitirMudancasDeColuna(espacoId, lido.arquivo, r.arquivo, por)
+  const usadas = avisoDeColunasQueSairam(espacoId, lido.arquivo, r.arquivo)
+  if (usadas) r.texto = `${r.texto} ${usadas}`
   if (!r.avisos?.length) return r
-  const avisados = r.avisos.map((a) => porNaCaixa(espacoId, a, por)).filter((n): n is string => !!n)
+  const avisados = r.avisos.map((a) => porNaCaixa(espacoId, a, quem)).filter((n): n is string => !!n)
   void caixa.rodada()
   return { ...r, avisados }
+}
+
+/** Os Fluxos (main/fluxos/index.ts) dizem o que fazer quando colunas saem do kanban; sem eles, nada. */
+let quandoSairem: (espacoId: string, colunas: { id: string; nome: string }[]) => string | null = () => null
+export function aoSairemColunas(fn: typeof quandoSairem): void {
+  quandoSairem = fn
+}
+
+/**
+ * 1.9.6 D1: coluna apagada (pelo `ork kanban coluna apagar`, pelo MCP ou pela tela) que um fluxo usa → os ligados
+ * desligam e a frase "usada pelos fluxos …" vai junto do resultado. Avisa, não impede. Falha aqui não desfaz o kanban.
+ */
+function avisoDeColunasQueSairam(espacoId: string, antes: ArquivoDoKanban, depois: ArquivoDoKanban): string | null {
+  const sairam = antes.colunas.filter((c) => !depois.colunas.some((d) => d.id === c.id)).map((c) => ({ id: c.id, nome: c.nome }))
+  if (!sairam.length) return null
+  try {
+    return quandoSairem(espacoId, sairam)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Automações (1.9.6): cada tarefa que mudou de coluna vira um evento. Criar não conta (não havia coluna antes).
+ * Movimento feito por uma automação vai marcado (`por: 'automacao'`) e nenhuma regra dispara nele.
+ */
+function emitirMudancasDeColuna(espacoId: string, antes: ArquivoDoKanban, depois: ArquivoDoKanban, por: Quem): void {
+  const quem = por.automacao ? 'automacao' : por.id ? 'agente' : 'usuario'
+  for (const m of mudancasDeColuna(antes, depois)) {
+    emitir(espacoId, { tipo: 'kanban', ...m, por: quem, quem: por.nome, ...(por.id && !por.automacao ? { agente: por.id } : {}) }, por.automacao?.cadeia ?? [])
+  }
 }
 
 export async function lerKanban(espacoId: string): Promise<LeituraDoKanban> {
@@ -253,6 +278,28 @@ export function porNaTarefa(espacoId: string, numero: number, agenteId: string, 
   if (!r.ok) throw new Error(r.erro)
   const t = r.arquivo.tarefas.find((x) => x.numero === numero)
   return { texto: r.texto, linha: t ? linhaDaTarefaNoPedido(t, r.arquivo.colunas) : `Tarefa #${numero} do kanban.` }
+}
+
+/** As colunas do kanban do espaço (as automações, 1.9.6, resolvem e mostram colunas por elas). Erro = as padrão. */
+export function colunasDoKanban(espacoId: string): Coluna[] {
+  try {
+    return ler(espacoId).arquivo.colunas
+  } catch {
+    return kanbanVazio().colunas
+  }
+}
+
+/**
+ * As colunas e as tarefas do kanban do espaço (sem a lixeira), só leitura: as fichas dos fluxos (gatilho, nó Tarefa e
+ * Consultar). Arquivo que não existe ou ilegível = as colunas padrão e nenhuma tarefa.
+ */
+export function tarefasDoKanban(espacoId: string): { colunas: Coluna[]; tarefas: Tarefa[] } {
+  try {
+    const { colunas, tarefas } = ler(espacoId).arquivo
+    return { colunas, tarefas }
+  } catch {
+    return { colunas: kanbanVazio().colunas, tarefas: [] }
+  }
 }
 
 /** As tarefas abertas de cada agente do espaço (id do cartão → da mais recente para a mais antiga), para a página Agentes. */

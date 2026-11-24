@@ -4,17 +4,20 @@ import type { Agente } from '../shared/modelo'
 import type { Esforco } from '../shared/modelos'
 import { MAX_FICHAS, lerFicha, type FichaDeCatalogo } from '../shared/catalogo'
 import type { PedidoNoQuadro } from '../shared/quadro/agente'
+import { recusaDaPassagem } from '../shared/quadro/transformacoes'
 import { criarEspacoDoAgente, resumosDosEspacos } from './dados'
 import { arquivoAcompanhado } from './codigo'
 import { AJUDA } from './manual'
 import { acaoDoKanban, conferirTarefa, PERMISSOES_DO_KANBAN, porNaTarefa, rodarKanban } from './kanban'
 import type { Tarefa } from '../shared/kanban'
 import { responderAPagina } from './paginas'
+import { servicoDeFluxos } from './fluxos'
+import { rodarFluxo } from './fluxos/verbos'
 import { conferirModelo, lerModelos, modeloDasOpcoes, textoDoModelo, textoDosModelos } from './modelos'
-import { type NomeDeVerbo } from './verbos'
-import { encerrarAgora, marcarFechamento, escreverNoProcesso, esperarSessao, sessoesCriadasPor, telaDe, type Sessao } from './terminais'
+import { verboPorNome, type NomeDeVerbo } from './verbos'
+import { cordasDoEspaco, encerrarAgora, marcarFechamento, escreverNoProcesso, esperarSessao, sessoesCriadasPor, telaDe, type Sessao } from './terminais'
 import { esperar, janelaDoEspaco, abrirJanelaPronta, pedirAJanela } from './quadroDoAgente'
-import { situacao, contextoRestante, textoDoContexto, aguardarFim, aguardarPronto, recusarSeEmPergunta, digitarPedido, avisoDeEnvio, registrar, caixa, porNaCaixa, textoNaFila, quemRecebeDe, ligadosA, acharEntre, tempoDe, resultado, contaSessoes, descendentesDe, transferirSessoes } from './espera'
+import { situacao, contextoRestante, textoDoContexto, aguardarFim, aguardarPronto, recusarSeEmPergunta, digitarPedido, avisoDeEnvio, registrar, caixa, porNaCaixa, textoNaFila, quemRecebeDe, ligadosA, acharEntre, tempoDe, resultado, contaSessoes, descendentesDe, transferirSessoes, passarPapel } from './espera'
 
 /**
  * A pasta que o agente pediu em `--pasta`, resolvida **a partir da pasta dele**.
@@ -152,7 +155,13 @@ async function mexerNoQuadro(eu: Sessao, pedido: Omit<PedidoNoQuadro, 'eu' | 'on
  * entrar em `verbos.ts` e ninguém escrever o corpo dele. Argumentos e opções já chegam validados.
  */
 export const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
-  ajuda: async () => ({ saida: AJUDA }),
+  // `ork ajuda fluxo`: só o bloco daquele comando (F12; antes saía com erro por "argumento a mais")
+  ajuda: async ({ pos }) => {
+    if (!pos[0]) return { saida: AJUDA }
+    const verbo = verboPorNome(pos[0])
+    if (!verbo) throw new Error(`comando desconhecido: ${pos[0]}. Veja \`ork ajuda\`.`)
+    return { saida: verbo.ajuda || AJUDA }
+  },
 
   espacos: async ({ eu }) => {
     const linhas = resumosDosEspacos().map((espaco) => {
@@ -512,6 +521,15 @@ export const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
     return { saida: await rodarKanban(espacoId, { id: eu.id, nome: eu.espec.nome }, pos, opcoes, texto) }
   },
 
+  /**
+   * Os fluxos do espaço. O agente cria e edita, mas só cita quem o `ork` dele alcança (nó a nó, main/fluxos/alcance.ts),
+   * e o fluxo com Código, HTTP ou comando fica desligado: só o usuário liga. As regras ficam em main/fluxos/servico.ts.
+   */
+  fluxo: async ({ eu, pos, opcoes, texto }) => {
+    if (typeof opcoes.espaco === 'string') throw new Error('você só mexe nos fluxos do seu espaço: tire o --espaco (os de outro espaço são do usuário, pela página)')
+    return { saida: await rodarFluxo(servicoDeFluxos, eu.espacoId, { tipo: 'agente', id: eu.id, nome: eu.espec.nome }, pos, opcoes, texto, eu) }
+  },
+
   /** As funções (papéis) que o usuário guardou. Quem sabe quais existem é a janela, dona das preferências. */
   /**
    * Fichas de time (.md) viram funções. O time costuma ser escrito fora do app — à mão, por outra sessão
@@ -635,10 +653,30 @@ export const HANDLERS: Record<NomeDeVerbo, HandlerDoVerbo> = {
     if (sucessor.id === eu.id) throw new Error('você não pode passar sessões para si mesmo')
     if (!sucessor.processo) throw new Error(`"${sucessor.espec.nome}" está encerrado; escolha uma sessão viva`)
     const transferidas = sessoesCriadasPor(eu.id).filter((s) => s.id !== sucessor.id)
-    if (!transferidas.length) return { saida: `Não havia outras sessões para passar a "${sucessor.espec.nome}".` }
-    await transferirSessoes(eu, sucessor, transferidas)
-    registrar(eu, sucessor, 'passar', contaSessoes(transferidas.length))
-    return { saida: `Passei ${contaSessoes(transferidas.length)} para "${sucessor.espec.nome}".` }
+    // 1.9.6: passa o papel inteiro, mesmo sem filhos: cordas (de todos, não só dos filhos), fila e quem espera entrega.
+    // Só dentro de um espaço: recusa antes de mudar qualquer coisa (sucessor ou filho em outro espaço).
+    const nomeDoEspaco = (id: string): string => resumosDosEspacos().find((e) => e.id === id)?.nome ?? id
+    const pessoa = (s: Sessao) => ({ nome: s.espec.nome, espacoId: s.espacoId })
+    const recusa = recusaDaPassagem(eu, pessoa(sucessor), transferidas.map(pessoa), nomeDoEspaco)
+    if (recusa) throw new Error(recusa)
+    // cordas com quem não é filho (as dos filhos já contam como sessão)
+    const filhos = new Set(transferidas.map((s) => s.id))
+    const cordas = new Set(
+      cordasDoEspaco(eu.espacoId)
+        .flatMap(([a, b]) => (a === eu.id ? [b] : b === eu.id ? [a] : []))
+        .filter((id) => id !== eu.id && id !== sucessor.id && !filhos.has(id))
+    ).size
+    const caixaPassada = await passarPapel(eu, sucessor, transferidas)
+    const extras = [
+      cordas ? `${cordas} ${cordas === 1 ? 'corda' : 'cordas'} com quem não era seu filho` : '',
+      caixaPassada?.recados ? `${caixaPassada.recados} ${caixaPassada.recados === 1 ? 'recado parado' : 'recados parados'} na sua caixa` : '',
+      caixaPassada?.pendencias ? `${caixaPassada.pendencias} ${caixaPassada.pendencias === 1 ? 'entrega esperada' : 'entregas esperadas'}` : ''
+    ].filter(Boolean)
+    const principal = transferidas.length ? `Passei ${contaSessoes(transferidas.length)} para "${sucessor.espec.nome}"` : `Passei o papel a "${sucessor.espec.nome}"`
+    registrar(eu, sucessor, 'passar', [transferidas.length ? contaSessoes(transferidas.length) : '', ...extras].filter(Boolean).join(', ') || 'só o papel')
+    return {
+      saida: `${principal}${extras.length ? `, com ${extras.join(', ')}` : ''}. Quem te devia uma entrega agora entrega a "${sucessor.espec.nome}".`
+    }
   },
 
   sair: async ({ eu, opcoes }) => {

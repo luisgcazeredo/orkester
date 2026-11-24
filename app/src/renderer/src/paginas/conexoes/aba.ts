@@ -1,7 +1,7 @@
 // Abas da página Conexões e o pedido "abra Conexões nesta aba" vindo de fora (o painel do "+" manda para Páginas).
 // Módulo pequeno e sem React: quem pede não puxa a página Conexões.
 
-export type AbaDeConexoes = 'chaves' | 'mcp' | 'paginas' | 'portais'
+export type AbaDeConexoes = 'chaves' | 'mcp' | 'paginas' | 'credenciais' | 'portais'
 
 let pedida: AbaDeConexoes | null = null
 const ouvintes = new Set<() => void>()

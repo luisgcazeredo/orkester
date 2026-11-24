@@ -1,69 +1,208 @@
-# Own pages ("+")
+# Own pages ("+"): the builder's guide
 
 English · [Português](paginas.pt-BR.md)
 
-An **own page** is a small web page you (or your team) write — plain HTML, CSS and JavaScript — that runs
-**inside** Orkester, in the page bar on the left, next to the built-in pages. It can show the agents of the
-current space, send a note to an agent you linked to it, and keep a little data of its own. It cannot touch your
-files, run programs or open windows. This guide is the whole contract: what a page folder looks like, what it can
-ask for, what it can call, and what the app does to keep it boxed in.
+[//]: # (Sources: app/src/shared/paginas.ts, app/src/main/paginas.ts, app/src/preload/pagina.ts, app/src/preload/conferirDaPagina.ts, app/src/renderer/src/paginas/extra/*, app/exemplos/paginas/resumo-do-espaco/. This file shows up inside the app at "+" → "Guia completo", through the Reader's Markdown, which shows raw HTML as text: no HTML comments here, use this form.)
 
-Everything here is experimental in this version, and the switch is **off** by default.
+An **own page** is a folder with a web screen (HTML, CSS and JavaScript) that enters Orkester's page bar on the left
+through the **+** button and opens right there, next to the app's pages. It can show the space's agents live, send
+notes to agents you linked to it, keep data of its own, talk to sites it declares or read a service on your own PC,
+always only with what you allowed. It runs isolated: it does not read your files, does not open programs, does not
+see the terminals' screens.
 
-A working page to copy from lives in [`app/exemplos/paginas/resumo-do-espaco/`](../app/exemplos/paginas/resumo-do-espaco/)
-("Resumo do espaço": the space's agents live, a note to the linked agent, and a saved text note — no network).
+This guide is the whole contract: the language, the folder, the manifest, the `window.orkPagina` API, the
+permissions, the limits and the reasons for them, ready-made recipes, how to debug and how to ask an agent to build
+one.
 
-## Turn it on and add a page
+> **Experimental.** The master switch **Páginas próprias** (own pages) is off by default.
 
-1. Open **Conexões** (the gear in the page bar) and turn on **Páginas próprias (experimental)**. The app warns
-   that these pages run code from outside, isolated from your PC, and that you should add only pages you or your
-   team wrote. Turning it off again makes the app refuse every page at once (calls fail, nothing new loads) and
-   takes the **+** and the page icons off the bar.
-2. The **+** stays in the page bar. Clicking it opens a panel with a short guide (what a page is, 3 steps, what it
-   can and cannot do, where to revoke) and three ways to start:
-   - **Resumo do espaço**: a ready example. One click, and it goes through the same accept dialog as any page.
-   - **Escolher pasta…**: pick a page folder you or your team wrote (Conexões also has **Adicionar página…**).
-   - **Pedir a um agente**: describe the page. It becomes a card in the space's Kanban, delegated to the Maestro
-     (moved to "Com o Maestro"). The Maestro does not add the page for you; you add it when it is ready.
-3. With pages turned off, the panel says so and offers **Ligar páginas**, with the same warning as Conexões. After
-   you accept it, the panel shows the options above.
-4. The app reads the chosen folder **without running anything**, and shows an accept dialog: icon, name, version,
-   description, origin folder, number of files and size, and each permission in plain words. Permissions are
-   all-or-nothing at this point; **Adicionar e permitir** or **Cancelar**. The example goes through this same dialog.
-5. On accept, the app **copies** the folder to `~/.orkester/paginas/<id>/` (a different data folder if
-   `ORK_DADOS` is set) and the page appears in the bar. The proposal expires after 10 minutes, and the folder is
-   read again on accept: if it changed in between, the app refuses and asks you to pick it again.
+## Contents
 
-Only you can add or accept a page, through that native dialog. An agent cannot.
+1. [What you can do](#what-you-can-do)
+2. [The language: plain HTML, CSS and JavaScript](#the-language-plain-html-css-and-javascript)
+3. [From zero to the page bar](#from-zero-to-the-page-bar)
+4. [The page folder](#the-page-folder)
+5. [The manifest, key by key](#the-manifest-key-by-key)
+6. [Permissions](#permissions)
+7. [The `window.orkPagina` API](#the-windoworkpagina-api)
+8. [Events](#events)
+9. [Following the app's theme](#following-the-apps-theme)
+10. [Saving data](#saving-data)
+11. [Network, CORS and the `null` origin](#network-cors-and-the-null-origin)
+12. [Reading a service on your PC (`local`)](#reading-a-service-on-your-pc-local)
+13. [Talking to an agent](#talking-to-an-agent)
+14. [All the limits in one table](#all-the-limits-in-one-table)
+15. [What you cannot do, and why](#what-you-cannot-do-and-why)
+16. [Recipes](#recipes)
+17. [Debugging](#debugging)
+18. [Updating, switching off and removing](#updating-switching-off-and-removing)
+19. [Asking an agent to build one](#asking-an-agent-to-build-one)
+20. [How the app isolates the page](#how-the-app-isolates-the-page)
+
+## What you can do
+
+Ideas that fit the contract:
+
+- **Team panel**: who is free, working or stuck on a question, how many notes wait in each one's queue, who is linked
+  to whom (`quadro` permission).
+- **Buttons that send ready-made requests** to an agent ("run the suite", "sum up the day") and show its answer
+  (`recado` permission).
+- **Checklists, notes, weekly goals, counters**, kept with the page (no permission at all: every page has 1 MB of
+  data).
+- **Showing data from a public API or your own** (deploy status, open issues, exchange rates, weather), as long as
+  the server accepts CORS (`rede` permission).
+- **Reading a service that runs on your PC** (a dev server, a metrics collector), read-only (`local` permission).
+- **Combining the above**: a panel that shows the team and sends a request to the right agent.
+
+What you **cannot** do (read files, run commands, see the terminals' screens, open windows, download) is in
+[What you cannot do, and why](#what-you-cannot-do-and-why). For those things, the page asks an agent with `recado`,
+and the agent does it with its own tools.
+
+## The language: plain HTML, CSS and JavaScript
+
+- **No build and no server.** Orkester serves the folder's files as they are: `index.html` is the entry point, and
+  you load the rest by relative path (`<script src="app.js">`, `<link rel="stylesheet" href="estilo.css">`,
+  `<img src="img/logo.png">`).
+- **Modern JavaScript from Electron's Chromium**: `async/await`, `fetch`, `class`, ES modules
+  (`<script type="module" src="app.js">` and `import './outro.js'` work, and `.mjs` is accepted), `<canvas>`, SVG,
+  `<dialog>`, modern CSS (grid, variables, `:has()`).
+- **No inline script.** `<script>…</script>` inside the HTML, `onclick="…"` and `javascript:` do not run. All
+  JavaScript goes in its own file, and events are wired with `addEventListener`. Inline `style="…"` is fine.
+- **No `eval`**, `new Function` or `setTimeout("text")`: the policy has no `unsafe-eval`. That also blocks
+  WebAssembly.
+- **Libraries: only if the file comes in the folder.** You cannot load from a CDN (`script-src` accepts only the page
+  itself). Download the ready file (the `.min.js` or the ES module), put it in a subfolder (`vendor/`) and load it by
+  relative path. First check three things: (1) the library does not use `eval`/`new Function` (look for "CSP" in its
+  docs; some have a "CSP-safe" build), (2) it does not use `localStorage`, cookies or IndexedDB (they throw here, see
+  [Saving data](#saving-data)), (3) it does not use Web Workers (blocked). Chart libraries that draw on `<canvas>` or
+  SVG, date utilities and small frameworks without a runtime template compiler usually work.
+- **TypeScript, JSX, Svelte, Vue with templates**: compile first, outside Orkester, and put only the output (`.js`,
+  `.css`) in the folder. Remove the `.map` files: that extension is not accepted and refuses the whole folder.
+- **Fonts**: only `.woff2` from the folder or `data:`. No Google Fonts by link. Use `var(--fonte-interface)` to follow
+  the app's font.
+- **Several screens**: links to other `.html` files in the same folder work (`<a href="config.html">`) and the API
+  stays available. A link outside the folder does not navigate.
+
+## From zero to the page bar
+
+1. **Turn pages on.** Under the gear (**Configurações**, settings) › **Conexões** (connections) › **Páginas** (pages) tab, turn on **Ligar páginas próprias
+   (experimental)** (turn on own pages). The app warns: "Páginas próprias rodam código de fora dentro do Orkester,
+   isoladas do seu PC. Só adicione páginas que você ou seu time escreveram." (own pages run outside code inside
+   Orkester, isolated from your PC; only add pages you or your team wrote). (Clicking **+** with the switch off also
+   offers **Ligar páginas**, with the same warning.)
+
+2. **Create the folder** anywhere on your disk, for example `minhas-paginas/ola/`, with two files:
+
+   `manifesto.json`
+
+   ```json
+   {
+     "formato": 1,
+     "id": "ola",
+     "nome": "Hello",
+     "versao": "1.0.0",
+     "descricao": "My first page.",
+     "icone": "lucide:Sparkles",
+     "permissoes": { "quadro": true }
+   }
+   ```
+
+   `index.html`
+
+   ```html
+   <!doctype html>
+   <html lang="en">
+   <head>
+     <meta charset="utf-8">
+     <link rel="stylesheet" href="estilo.css">
+   </head>
+   <body>
+     <h1 id="titulo">Hello</h1>
+     <ul id="agentes"></ul>
+     <p id="situacao"></p>
+     <script src="app.js"></script>
+   </body>
+   </html>
+   ```
+
+   `estilo.css`
+
+   ```css
+   body { margin: 0; padding: 16px; font-family: var(--fonte-interface, system-ui);
+          background: var(--painel, #1b1d23); color: var(--texto, #e8e8ea); }
+   ```
+
+   `app.js`
+
+   ```js
+   const $ = (id) => document.getElementById(id)
+
+   orkPagina.ao('tema', ({ tokens }) => {
+     for (const [k, v] of Object.entries(tokens)) document.documentElement.style.setProperty(k, v)
+   })
+
+   function mostrar(resumo) {
+     $('agentes').replaceChildren(...resumo.agentes.map((a) => {
+       const li = document.createElement('li')
+       li.textContent = `${a.nome} — ${a.situacao}`
+       return li
+     }))
+   }
+
+   async function iniciar() {
+     const eu = await orkPagina.eu()
+     $('titulo').textContent = `${eu.nome} · ${eu.espaco?.nome ?? 'no space'}`
+     mostrar(await orkPagina.quadro.resumo())
+     orkPagina.ao('quadro', mostrar)
+   }
+
+   iniciar().catch((e) => { $('situacao').textContent = e.message })
+   ```
+
+3. **Add it.** Click **+** in the page bar on the left → **Escolher pasta…** (choose folder) → pick `ola/`. The app
+   reads the folder **without running anything** and shows the accept dialog: icon, name, version, description,
+   origin folder, how many files and how much they weigh, and each permission in plain words. Click **Adicionar e
+   permitir** (add and allow).
+4. **Done.** The icon appears in the page bar on the left. Click it: the page opens inside an app frame with the
+   name, the version, **Ligar a agente…** (link to agent), reload and the shortcut to the permissions.
+5. **Changed the code?** Edit the original folder and use **Atualizar da pasta** (update from folder; in Configurações ›
+   Conexões › Páginas, on the page's card). See [Updating, switching off and removing](#updating-switching-off-and-removing).
+
+If the app refuses the folder, the notice says which file and which rule. The rules are right below.
 
 ## The page folder
 
 ```text
-my-page/
+minha-pagina/
   manifesto.json      required, at the root
-  index.html          required, at the root — the entry point
-  app.js  estilo.css  icone.svg  …
+  index.html          required, at the root: the entry point
+  app.js  estilo.css  icone.svg  vendor/…  img/…
 ```
 
-Limits, checked before anything is copied or loaded (the first problem refuses the whole folder and names the file):
+The app checks the whole folder before copying or loading anything. The first problem refuses everything and names
+the file.
 
-| What | Limit |
+| What | Rule |
 |---|---|
 | Files | at most 200 |
 | Total size | at most 5 MB |
-| One file | at most 2 MB (`manifesto.json`: 64 KB) |
-| Depth | at most 4 folders above a file (`a/b/c/d/x.js`) |
+| One file | at most 2 MB (`manifesto.json`: 64 KB; icon: 32 KB) |
+| Depth | at most 4 folders above a file (`a/b/c/d/x.js` is fine; `a/b/c/d/e/x.js` is not) |
+| Shortcuts | none: a symlink or junction anywhere refuses the folder |
+| Names | each path segment with `A–Z a–z 0–9 . _ -`, up to 64 characters, starting with a letter or digit, not ending in `.`. No spaces, accents, `~` or `%`. Windows reserved names (`CON`, `NUL`, `COM1`…, with any extension) are refused. A file starting with a dot (`.gitignore`, `.DS_Store`) also refuses the folder |
+| Extensions | `.html` `.js` `.mjs` `.css` `.json` `.svg` `.png` `.jpg` `.jpeg` `.webp` `.gif` `.woff2` `.txt` `.md`. Any other (`.map`, `.ts`, `.ttf`, `.ico`, `.wasm`, `.mp3`…) refuses the folder |
 | Installed pages | at most 20 |
-| Links | none — a symlink or junction anywhere refuses the folder |
-| File names | each segment `A–Z a–z 0–9 . _ -`, up to 64 characters, starting with a letter or digit, not ending in `.`; Windows reserved names (`CON`, `NUL`, `COM1`…, with any extension) are refused |
-| Extensions | `.html` `.js` `.mjs` `.css` `.json` `.svg` `.png` `.jpg` `.jpeg` `.webp` `.gif` `.woff2` `.txt` `.md` — anything else refuses the folder |
 
-Pages are served from memory by an `ork-pagina://<id>/` address. Use relative paths (`app.js`, `img/logo.png`);
-there is no server and no way to reach a file outside the folder.
+On accept, the app **copies** the folder to `~/.orkester/paginas/<id>/` (or to the `ORK_DADOS` data folder, if it is
+set) and serves the page from that copy, from memory, at the address `ork-pagina://<id>/`. Always use relative paths.
+There is no way to reach a file outside the folder.
 
-## The manifest
+Tip: keep the **working** folder (with `.git`, TypeScript sources, tests) separate from the **page** folder (only what
+will be served). A `dist/` or `pagina/` folder inside the project does the job.
 
-`manifesto.json` is strict: an unknown key, a wrong type or a value over its limit refuses the folder, saying why.
+## The manifest, key by key
+
+`manifesto.json` is strict: an unknown key, a wrong type or a value outside the rule refuses the folder, saying why.
 
 ```json
 {
@@ -77,101 +216,331 @@ there is no server and no way to reach a file outside the folder.
 }
 ```
 
-| Key | Rule |
-|---|---|
-| `formato` | `1` |
-| `id` | 2–32 characters, `a–z`, `0–9` and `-`, starting with a letter. Identifies the page; the update flow depends on it |
-| `nome` | 1–30 characters, no quotes, brackets, `<` `>`, control or invisible characters (zero-width, direction marks…), and no space other than the plain one. Shown in the bar and in the header of the notes the page sends |
-| `versao` | `N.N.N` (digits) |
-| `descricao` | up to 200 characters (optional) |
-| `icone` | `lucide:<Name>` from the list below, or a `.svg`/`.png` file in the folder up to 32 KB; empty = the initial of the name. An SVG icon is shown as an image, so scripts in it never run |
-| `permissoes` | see below (optional) |
+| Key | Required | Rule |
+|---|---|---|
+| `formato` | yes | always `1` |
+| `id` | yes | 2 to 32 characters: `a–z`, `0–9` and `-`, starting with a letter. It is the page's identity: updates, saved data and links depend on it. Do not change it after publishing |
+| `nome` | yes | 1 to 30 characters, no space at the start or end, no quotes, backticks, brackets, `<` `>`, `\`, control or invisible characters (zero-width, direction marks…) and no space other than the plain one. Shown in the bar, in the frame and in the header of the notes |
+| `versao` | yes | `N.N.N`, digits only (`1.0.0`, `2.13.4`) |
+| `descricao` | no | up to 200 characters. Shown in the accept dialog and in Configurações › Conexões |
+| `icone` | no | `lucide:<Name>` from the list below, or a `.svg`/`.png` from the folder up to 32 KB. Empty: the initial of the name. An SVG is shown as an image, so a script inside it never runs |
+| `permissoes` | no | object with `quadro`, `recado`, `rede`, `local` (see [Permissions](#permissions)). Without it, the page asks for nothing |
 
-Lucide names accepted: `LayoutDashboard` `Gauge` `ListChecks` `ListTodo` `Kanban` `Calendar` `CalendarDays` `Clock`
-`Timer` `Bell` `Inbox` `Mail` `MessageSquare` `MessagesSquare` `Notebook` `NotebookPen` `BookOpen` `FileText` `Folder`
-`Database` `Server` `Globe` `ChartBar` `ChartLine` `ChartPie` `Activity` `Star` `Sparkles` `Rocket` `Zap` `Wrench`
-`Users` `Bot` `Terminal` `Code` `Package` `Target` `Flag` `Compass` `Lightbulb` `Puzzle` `Palette` `Newspaper` `House`.
+Accepted `lucide:` icons: `LayoutDashboard` `Gauge` `ListChecks` `ListTodo` `Kanban` `Calendar` `CalendarDays`
+`Clock` `Timer` `Bell` `Inbox` `Mail` `MessageSquare` `MessagesSquare` `Notebook` `NotebookPen` `BookOpen` `FileText`
+`Folder` `Database` `Server` `Globe` `ChartBar` `ChartLine` `ChartPie` `Activity` `Star` `Sparkles` `Rocket` `Zap`
+`Wrench` `Users` `Bot` `Terminal` `Code` `Package` `Target` `Flag` `Compass` `Lightbulb` `Puzzle` `Palette`
+`Newspaper` `House`.
 
 ## Permissions
 
-A page starts with nothing. The manifest **asks**; you accept in the dialog; each one can be revoked later.
+A page starts with nothing. The manifest **asks**; you accept in the dialog (all or nothing: **Adicionar e permitir**
+or **Cancelar**); each one can be revoked later.
 
-| Manifest | Lets the page | Plain words in the dialog |
+| In the manifest | The page may | How it shows in the accept dialog |
 |---|---|---|
-| `"quadro": true` | read the names, engine, role, state and queue size of the agents **in the current space**, and the links between them. Never their screen, paths or notes | see names and state of this space's agents |
-| `"recado": true` | send notes to agents **you** linked to this page, and receive their answers. The agents may act on what they read | send notes to the agents you link to it |
-| `"rede": ["api.x.com"]` | talk to those hosts over `https`/`wss` (up to 5). What the page shows may come from there and what it saves may go there | talk to `api.x.com` |
-| `"local": {"porta": 7788, "caminhos": ["/api/dados"]}` | read-only `GET` on `127.0.0.1:<porta>` for those paths (1–5), made by the app. **Shown in red.** Cannot be combined with `rede` | read `127.0.0.1:7788/api/dados…` on this PC, read-only |
+| `"quadro": true` | read name, engine, role, state and queue size of the agents **in the window's space**, and the links between them. Never their screen, paths, notes or files | ver nomes e situação dos agentes deste espaço (nada da tela deles, nada dos seus arquivos) |
+| `"recado": true` | see the agents **you** linked to it, send them notes and receive the answers. The agents may act on what they read | mandar recados aos agentes que você ligar a ela — eles podem trabalhar a partir disso |
+| `"rede": ["api.exemplo.com"]` | talk to those hosts over `https` and `wss` (up to 5) | falar com api.exemplo.com: o que ela mostra pode vir de lá e o que ela guarda pode ir para lá |
+| `"local": { "porta": 7788, "caminhos": ["/api/dados"] }` | make a read-only `GET` on `http://127.0.0.1:<porta>` at those paths (1 to 5), through the app. **Shown in red** | ler 127.0.0.1:7788/api/dados… deste PC, só leitura |
 
-Always, whatever is asked: **1 MB of its own data** (`orkPagina.dados`). Never: read files, open programs, camera,
-microphone, location, notifications, clipboard, USB, screen capture, downloads, new windows.
+Always, whatever it asks: **1 MB of its own data**. Never: read files, open programs, camera, microphone, location,
+notifications, clipboard, USB, screen capture, downloads, new windows.
 
-Rules for `rede` hosts: exact lowercase DNS names (no wildcard, no implicit subdomain, no port, no IP, no
-`localhost`, nothing ending in `.local` `.lan` `.internal` `.home` `.corp` `.test` `.invalid` `.example` and similar),
-no repeats. Each host is its own permission. Rules for `local.caminhos`: start with `/`, no `..`, no `//`; either
-an exact path (`/api/dados`) or a prefix ending in `/` (`/api/`). Point it only at routes that change nothing.
+**Rules for `rede`.** Exact DNS names, lowercase, with at least one dot: no `https://`, no path, no port, no wildcard
+(`*.x.com`), no IP, no `localhost`, and nothing ending in `.local` `.lan` `.internal` `.intranet` `.home` `.corp`
+`.arpa` `.test` `.invalid` `.example`. No repeats. Subdomains do not come along: `api.x.com` does not allow `x.com`.
+Each host is its own permission (you can revoke just one).
 
-### Changing permissions later
+**Rules for `local`.** A single port (1 to 65535). Paths start with `/`, only with `A–Z a–z 0–9 . _ ~ -` and `/`, up
+to 128 characters, no `..` and no `//`. Either exact (`/api/dados`) or a prefix ending in `/` (`/api/` allows
+everything below it). Point it only at routes that **change nothing**.
 
-In **Conexões**, each page lists its permissions, each with **Revogar** (a revoked permission is not asked again) and
-**Permitir de novo**. Either change takes effect on the next call (for `rede`, the network is cut at once), and
-the open page is reloaded so the new policy applies.
+**`local` and `rede` do not go together.** A page that reads something from your PC must have no way to send it to
+the internet. A manifest with both is refused.
 
-On every load, the app compares the manifest of the copy with what you accepted:
+### When the manifest changes
 
-- **A new permission or host** (not accepted, not revoked) → the page does not load. Its header says
-  "Pede permissão nova: …" with **Rever**, and the dialog shows only the difference.
-- **The files differ from what you accepted** (someone edited the copy outside the app, an agent included) →
-  the page does not load: "A página mudou fora do Orkester", **Rever** to accept again.
-- It asks for **less** than before → it loads, and the accepted list shrinks.
+On every load, the app compares the copy with what you accepted:
 
-## The API: `window.orkPagina`
+- **A new permission or host** (neither accepted nor revoked) → the page does not load. The frame says "Pede
+  permissão nova: …" (asks for a new permission) with **Rever** (review), and the dialog shows only the difference.
+- **The copy's files differ from what was accepted** (someone edited `~/.orkester/paginas/<id>/` from outside, an
+  agent included) → the page does not load: "A página mudou fora do Orkester" (the page changed outside Orkester),
+  with **Rever**.
+- **It asks for less** than before → it loads, and the accepted list shrinks.
+- **A revoked permission** stays revoked: the page does not ask for it again on every load. It comes back only with
+  **Permitir de novo** (allow again) in Configurações › Conexões.
 
-Every call goes to the app, which checks the master switch, that the page is installed and on, and the permission
-**on every call**; nothing is cached in the page. A failure is a rejected promise with a short `Error` message
-(no stack). Together, a page may make 20 calls per second.
+In Configurações › Conexões › Páginas, each page lists its permissions with **Revogar** (revoke) and **Permitir de novo**. It takes effect on
+the next call (for `rede`, the connection is cut at once), and the open page is reloaded.
+
+## The `window.orkPagina` API
+
+It is the only bridge between the page and the app. It exists only in the main frame (an `<iframe>` of the page does
+not get it).
+
+Every call goes to the app, which checks **on every call**: the master switch, whether the page is installed, on and
+checked, and the permission. Every call returns a `Promise`. Failure = a rejected promise with an `Error` with a
+short message, in Portuguese, with no stack (show `erro.message` on screen). At most **20 calls per second** all
+together, and at most **8 waiting for an answer at the same time** (the ninth is refused at once: "chamadas demais
+esperando resposta").
+
+### `eu()` — who am I
+
+Needs no permission.
 
 ```js
 const eu = await orkPagina.eu()
-// { id, nome, versao, permissoes: ['quadro', 'recado', …], espaco: { id, nome } | null }
+// {
+//   id: 'resumo-do-espaco', nome: 'Resumo do espaço', versao: '1.0.0',
+//   permissoes: ['quadro', 'recado'],          // what is in force NOW (asked, accepted and not revoked)
+//   espaco: { id: '…', nome: 'My project' }    // the window's space, or null
+// }
+if (!eu.permissoes.includes('quadro')) mostrarAviso('Missing the "quadro" permission.')
 ```
 
-| Call | Needs | Returns / limits |
-|---|---|---|
-| `eu()` | — | the object above; `permissoes` is what is in force now |
-| `quadro.resumo()` | `quadro` | `{ espaco, agentes: [{ id, nome, motor, funcao?, situacao, fila }], cordas: [[deId, paraId], …] }` for the space of the window the page is in. `situacao` is `livre`, `trabalhando`, `pergunta` or `encerrado`. 2 per second |
-| `agentes()` | `recado` | only the agents linked to **this page in this space** that are alive, same shape as above. 2 per second |
-| `recado(agenteId, texto)` | `recado` + a link | `{ posicao }` (place in the agent's inbox). Text up to 4 KB, not empty; only Claude or Codex agents; the agent must be running. 1 per agent every 10 s, 30 per hour per page |
-| `dados.ler(chave)` | — | the saved JSON value, or `null` |
-| `dados.gravar(chave, valor)` | — | nothing. Key `^[a-z0-9][a-z0-9._-]{0,63}$`; value is JSON up to 256 KB; the page's total up to 1 MB and 200 keys. 10 writes (or erases) per second |
-| `dados.apagar(chave)` | — | nothing |
-| `dados.chaves()` | — | the list of keys |
-| `local.ler(caminho)` | `local` | `{ status, tipo, texto }`. The app does `GET http://127.0.0.1:<porta><caminho>` (path inside an accepted one, 5 s, answer up to 1 MB as text); redirects are not followed and event streams are refused. 2 per second |
-| `ao(evento, fn)` | see below | subscribes; returns a function that unsubscribes. An unknown event throws |
+The tokens in `permissoes` are `quadro`, `recado`, `rede:<host>` and `local:<porta><caminho>`. Use them to hide what
+the page cannot do, instead of waiting for the error.
 
-Data lives in `~/.orkester/paginas-dados/<id>.json`, outside the folder the page is served from. Writes are atomic.
+### `quadro.resumo()` — the space's agents
 
-### Events (`ao`)
+Needs `quadro`. At most 2 per second (to follow live, use the [`quadro` event](#events)).
 
-| Event | When | `fn` receives |
-|---|---|---|
-| `'quadro'` | the summary changed (checked every second, sent only if different; includes switching space). Needs `quadro` | the same object as `quadro.resumo()` |
-| `'recado'` | an agent answered with `ork pagina responder` (see below). Needs `recado` | `{ de: { id, nome }, texto, em }` (`em` = ms since epoch) |
-| `'tema'` | on subscribing (once the window has sent its colors) and whenever they change | `{ tokens: { '--texto': '…', … } }` |
+```js
+const r = await orkPagina.quadro.resumo()
+// {
+//   espaco: { id, nome } | null,
+//   agentes: [ { id, nome, motor, funcao?, situacao, fila }, … ],
+//   cordas: [ [deId, paraId], … ]
+// }
+for (const a of r.agentes) console.log(a.nome, a.situacao, a.fila)
+```
 
-`tema` tokens are these 20 CSS custom properties: `--texto` `--texto-suave` `--texto-sobre-destaque` `--painel`
-`--painel-alto` `--quadro-fundo` `--borda` `--borda-suave` `--hover` `--destaque` `--destaque-forte` `--destaque-claro`
-`--perigo` `--atencao` `--vivo` `--fonte-interface` `--fonte-mono` `--raio` `--raio-pequeno` `--raio-grande`. To follow
-Escuro, Claro or OLED, apply them to `document.documentElement.style` and write the CSS as `var(--painel, #1b1d23)` —
-the second value shows until the first event arrives. The example page does exactly this.
+| Field | What |
+|---|---|
+| `id` | the card's id (the same one `recado` expects) |
+| `nome` | the card's name |
+| `motor` | `claude`, `codex` or `shell` |
+| `funcao` | the name of the agent's role, if it has one (e.g. `Maestro`) |
+| `situacao` | `livre` (free), `trabalhando` (working), `pergunta` (stopped at a menu or question) or `encerrado` (closed) |
+| `fila` | how many notes wait in its inbox |
 
-### Talking to an agent
+`cordas` are the pairs of agents linked to each other, only between agents in the list. The space is **the one of the
+window the page is open in**: switching space in the window switches the summary.
 
-1. In the page's header, **Ligar a agente…** lists the Claude and Codex agents of the current space; link the ones
-   the page may talk to (up to 10 links per page; **Desligar** undoes it, here or in Conexões). A link is per
-   agent card and per space.
-2. `recado(agenteId, texto)` puts the note in that agent's inbox as a notice: it waits behind pending requests,
-   and arrives only when the agent is free. The agent reads:
+### `agentes()` — the agents linked to this page
+
+Needs `recado`. At most 2 per second. Returns, in the same shape as above, only the agents **you linked to this page
+in this space** that are alive. It is the list of possible targets for `recado`.
+
+```js
+const ligados = await orkPagina.agentes()
+if (!ligados.length) mostrarAviso('Link an agent with the "Ligar a agente…" button at the top of the page.')
+```
+
+Linking and unlinking an agent in the frame fires no event: if the page needs to keep up, check from time to time
+(the example checks every 5 s).
+
+### `recado(agenteId, texto)` — sending a request to an agent
+
+Needs `recado` **and** a link to that agent in this space.
+
+```js
+try {
+  const { posicao } = await orkPagina.recado(ligados[0].id, 'Run the tests and tell me how many failed.')
+  mostrarAviso(`In the agent's inbox (position ${posicao}).`)
+} catch (e) {
+  mostrarAviso(e.message) // e.g. "um recado por agente a cada 10 segundos"
+}
+```
+
+- Text up to 4 KB, not empty.
+- Only a **Claude or Codex** agent, and it must be running.
+- At most **1 note per agent every 10 s** and **30 per hour** per page.
+- Returns `{ posicao }`: the place in the agent's inbox. The note waits behind pending requests and only arrives when
+  the agent is free.
+- The answer does not come back through the promise: it arrives later, through the `recado` event. See
+  [Talking to an agent](#talking-to-an-agent).
+
+### `dados.ler / gravar / apagar / chaves` — saving things
+
+They need no permission. Details in [Saving data](#saving-data).
+
+```js
+await orkPagina.dados.gravar('tarefas', [{ texto: 'Review PR', feito: false }])
+const tarefas = (await orkPagina.dados.ler('tarefas')) ?? []   // null if it does not exist
+const chaves = await orkPagina.dados.chaves()                   // ['tarefas', …]
+await orkPagina.dados.apagar('tarefas')
+```
+
+### `local.ler(caminho)` — reading a service on your PC
+
+Needs `local`. At most 2 per second. Details in [Reading a service on your PC](#reading-a-service-on-your-pc-local).
+
+```js
+const r = await orkPagina.local.ler('/api/dados?janela=24h')
+// { status: 200, tipo: 'application/json', texto: '{"ok":true,…}' }
+if (r.status === 200) mostrar(JSON.parse(r.texto))
+```
+
+### `ao(evento, fn)` — listening
+
+Subscribes to an event and returns the function that cancels it. An unknown event **throws at once** (it is not a
+promise).
+
+```js
+const parar = orkPagina.ao('quadro', (resumo) => mostrar(resumo))
+// …
+parar()
+```
+
+### Error messages you will see
+
+| Message | What to do |
+|---|---|
+| `a página não tem a permissão "quadro"` (or `recado`, `local`) | ask for it in the manifest, or the permission was revoked in Configurações › Conexões |
+| `chamadas demais: espere um pouco` | over 20 per second; space out the calls |
+| `quadro.resumo: no máximo 2 por segundo` (and similar) | use the event instead of polling in a loop |
+| `chamadas demais esperando resposta: espere as anteriores` | more than 8 in flight; wait with `await` |
+| `este agente não está ligado à página` | link it with **Ligar a agente…** in the frame, in this space |
+| `o agente não está rodando` | the card was closed; open it again |
+| `recado só vai para agente Claude ou Codex` | a shell terminal does not receive notes |
+| `um recado por agente a cada 10 segundos` / `no máximo 30 recados por hora` | rate limit |
+| `o recado está vazio` / `o recado passa de 4 KB` | adjust the text |
+| `chave inválida: …` / `o valor passa de 256 KB` / `os dados da página passariam de 1 MB` | see Saving data |
+| `o caminho "…" não está entre os aceitos` | the `local.ler` path is not in the manifest |
+| `o serviço local não respondeu em 5 s` | the service is stopped or slow |
+| `a página precisa ser revista` / `a página está desligada` | sort it out in Configurações › Conexões (Rever, Religar) |
+
+## Events
+
+| Event | When it arrives | `fn` receives | Needs |
+|---|---|---|---|
+| `'quadro'` | when the summary changes (the app checks every second and sends only if it changed, including when switching space) | the same object as `quadro.resumo()` | `quadro` |
+| `'recado'` | an agent answered with `ork pagina responder` | `{ de: { id, nome }, texto, em }` (`em` = milliseconds since 1970) | `recado` |
+| `'tema'` | on subscribing (as soon as the window has sent the colors) and on every theme change | `{ tokens: { '--texto': '…', … } }` | nothing |
+
+Subscribing to `'quadro'` does not send the current state at once: call `quadro.resumo()` once at the start and then
+listen. Subscribing to `'recado'` delivers the answers that arrived while the page was closed.
+
+## Following the app's theme
+
+The `tema` event brings 20 CSS variables from the theme in use (Escuro, Claro, OLED, the accent color and the user's
+themes):
+
+| Token | What for |
+|---|---|
+| `--texto` `--texto-suave` `--texto-sobre-destaque` | normal text color, secondary, and on top of the accent color |
+| `--painel` `--painel-alto` `--quadro-fundo` | backgrounds (panel, raised panel, canvas background) |
+| `--borda` `--borda-suave` `--hover` | borders and mouse-over highlight |
+| `--destaque` `--destaque-forte` `--destaque-claro` | the accent color and variations |
+| `--perigo` `--atencao` `--vivo` | red, yellow, green for states |
+| `--fonte-interface` `--fonte-mono` | fonts |
+| `--raio` `--raio-pequeno` `--raio-grande` | corner rounding |
+
+Apply them on `:root` and write the CSS with a fallback value, which shows until the first event arrives (and in a
+regular browser, outside the app):
+
+```js
+orkPagina.ao('tema', ({ tokens }) => {
+  for (const [nome, valor] of Object.entries(tokens)) {
+    if (nome.startsWith('--')) document.documentElement.style.setProperty(nome, valor)
+  }
+})
+```
+
+```css
+body   { background: var(--painel, #1b1d23); color: var(--texto, #e8e8ea);
+         font-family: var(--fonte-interface, system-ui, sans-serif); }
+button { background: var(--destaque, #4060e8); color: var(--texto-sobre-destaque, #fff);
+         border: 0; border-radius: var(--raio, 8px); }
+.suave { color: var(--texto-suave, #9a9ca5); }
+```
+
+## Saving data
+
+`orkPagina.dados` is the page's storage. It needs no permission.
+
+- **Key**: 1 to 64 characters, `a–z 0–9 . _ -`, starting with a letter or digit. **Lowercase only**: `minhaNota` is
+  refused; use `minha-nota`.
+- **Value**: anything JSON can represent (text, number, boolean, `null`, list, object), up to 256 KB per key. The
+  value goes through a JSON round trip: a `Date` becomes text, `Map`/`Set`/functions disappear. `undefined` is
+  refused.
+- **Total**: up to 1 MB and 200 keys per page.
+- **Rate**: up to 10 writes or deletes per second.
+- `ler` on a key that does not exist returns `null`.
+- **Where it lives**: `~/.orkester/paginas-dados/<id>.json`, outside the served folder. A write counts at once for
+  `ler` and goes to disk later, in the background (at least 2 s between two writes, the last value wins); on closing
+  the page and on quitting the app it goes at once. If the app crashes, it loses at most what was waiting its turn.
+- **Per page, not per space.** If you want to separate by space, put the space id in the key:
+  `` `notas.${eu.espaco.id}` `` (the id has only letters, digits and hyphens).
+- `localStorage`, `sessionStorage`, IndexedDB and cookies **do not work** (they throw `SecurityError`): the page runs
+  with an opaque origin. See [How the app isolates the page](#how-the-app-isolates-the-page).
+- **Removing** the page deletes its data. Updating does not.
+
+To save while the person types, wait for them to stop (the example waits 600 ms):
+
+```js
+let espera
+campo.addEventListener('input', () => {
+  clearTimeout(espera)
+  espera = setTimeout(() => orkPagina.dados.gravar('nota', campo.value).catch(mostrarErro), 600)
+})
+```
+
+## Network, CORS and the `null` origin
+
+With `rede`, the page uses `fetch`, `WebSocket` (`wss://`) and `<img src="https://…">` for the accepted hosts, like
+one site calls another. Three things to know:
+
+1. **Only `https` and `wss`, on the default port, with no user and password in the URL.** `http:`, IPs, another port
+   and any host outside the list are cancelled before leaving (the error is generic: `TypeError: Failed to fetch`).
+2. **The page's origin is `null`.** The request goes out with `Origin: null`. The server must answer with CORS that
+   accepts this: `Access-Control-Allow-Origin: *` (or `null`) and, for requests with custom headers or methods other
+   than simple `GET`/`POST`, answer the `OPTIONS` preflight. Sending back `ork-pagina://<id>` does **not** work. Many
+   public APIs already send `*`; yours, you configure.
+3. **The app does not proxy** nor relax this. If the call fails with a network error in a page that has the
+   permission, look first at the server's CORS (open the same URL in the browser with DevTools and check the
+   headers).
+
+**API keys.** Everything in the folder is readable by whoever has the folder. Do not put secrets in the files. If the
+API needs a key, ask for it on screen and keep it in `orkPagina.dados` (it stays only on this PC, in
+`~/.orkester/paginas-dados/<id>.json`, as plain text), or use a service of yours that keeps the key on its side.
+
+Cookies are not kept (opaque origin, storage in memory only), so cookie login to another site does not work: use a
+token in the `Authorization` header.
+
+## Reading a service on your PC (`local`)
+
+For what runs on your machine (a dev server, a metrics collector, a script of yours), the page does not talk
+directly: it asks the app, which makes a `GET http://127.0.0.1:<porta><caminho>` and returns the text.
+
+```json
+"permissoes": { "local": { "porta": 7788, "caminhos": ["/api/status", "/api/metricas/"] } }
+```
+
+```js
+const r = await orkPagina.local.ler('/api/metricas/cpu?ultimos=60')
+// { status, tipo, texto }
+```
+
+- The path must be **exactly** an accepted one, or be **inside** a prefix ending in `/`. The query (`?ultimos=60`)
+  is free; `#`, `..`, `//`, `\` and `%2e`/`%2f` are refused.
+- Only `GET`, no body, with `Accept: application/json, text/plain`. A **5 s** deadline; answer up to **1 MB**, read
+  as UTF-8 text (do the `JSON.parse` yourself).
+- Redirects are **not followed**: you get the 3xx `status`. HTTP errors (404, 500) arrive as `status`, without
+  rejecting. It rejects only when there is no answer, or the deadline or the size is exceeded.
+- Event streams (`text/event-stream`) are refused. To keep up, check from time to time (up to 2 per second).
+- No CORS needed: the one asking is the app.
+- The permission shows **in red** in the accept dialog, and cannot come together with `rede`.
+
+## Talking to an agent
+
+1. **Link.** In the page's header, **Ligar a agente…** lists the Claude and Codex agents running in the current
+   space. Click the ones the page may reach (up to 10 links per page, adding up all spaces). Clicking again unlinks.
+   In Configurações › Conexões › Páginas, the page's card shows **Ligada a** (linked to) with each link. A link is per card and per space.
+2. **Send.** `orkPagina.recado(agenteId, texto)`. The agent receives, on its turn:
 
    ```text
    [ork · recado da página "Resumo do espaço"]
@@ -180,28 +549,515 @@ the second value shows until the first event arrives. The example page does exac
    | second line
    ```
 
-   The text is cleaned first: it is normalized (NFKC); control and invisible characters (zero-width, BOM,
-   direction marks), the paste markers and unusual spaces are removed or made plain; `[ork` becomes `(ork` anywhere;
-   and **every line is quoted with `| `**, so no line of a page's note can look like an Orkester header. A note that
-   is only blanks is refused. The agent is told to treat
-   it as a request from a third party: do what is in its scope, nothing destructive, external or in production
-   without your OK.
-3. The agent answers with `ork pagina responder "<name or id>" "text"` (or `--arquivo answer.md`, up to 64 KB),
-   which only works if that agent is linked to that page in that space. If the page is open and listening to
-   `'recado'`, it arrives at once as the event; if it is closed, the app keeps up to 20 answers (256 KB) in memory,
-   delivers them the next time the page opens and subscribes, and loses them if Orkester quits.
+   Before that, the text is cleaned: normalized (NFKC); control and invisible characters are removed; unusual
+   spaces become plain spaces; `[ork` becomes `(ork` anywhere; and **every line gets `| ` in front**, so nothing in
+   the note can look like an Orkester header. The agent is told to treat it as a request from a third party: do what
+   is in its scope and nothing destructive, external or in production without the user's OK.
+3. **Receive.** The agent answers with:
 
-## What the app does to keep a page boxed in
+   ```text
+   ork pagina responder "Resumo do espaço" "Ran it: 3 failed, details in .contexto/falhas.md"
+   ork pagina responder resumo-do-espaco --arquivo answer.md
+   ```
 
-- **Own process, opaque origin, nothing kept in the browser.** Each page runs in its own `<webview>` with its own
-  partition. In the page, `sandbox` and `contextIsolation` are on, Node is off, and the only bridge is
-  `window.orkPagina`. The page runs with an **opaque origin** (`self.origin` is `"null"`, from the `sandbox` in the
-  policy below), so local storage, IndexedDB and cookies do not open (reading them throws `SecurityError`). What must
-  last goes in `orkPagina.dados`. The cache lives in memory and is erased when you leave the page.
-- **Served from memory, not from disk.** On load, the app reads the folder once, checks it against the hash you
-  accepted, and serves from that copy. Path tricks (`..`, `%2f`, `\`, `//`, `:`) get a 404. Only `GET`.
-- **A fixed policy on every response** (a `<meta>` CSP in your HTML can only tighten it, never loosen it). With
-  `ORIGEM` = `ork-pagina://<id>` and the hosts you accepted as `R`:
+   (by name, case-insensitive, or by `id`; up to 64 KB). It only works if that agent is linked to that page in that
+   space. With the page open and listening to `'recado'`, it arrives at once. Closed, the app keeps up to 20 answers
+   (256 KB) in memory and delivers them when the page opens and subscribes to `'recado'`; if Orkester quits, they are
+   lost.
+
+```js
+orkPagina.ao('recado', ({ de, texto, em }) => {
+  anotar(`${de.nome} (${new Date(em).toLocaleTimeString()})`, texto)
+})
+```
+
+Write the request so the agent knows how to answer: say in the text itself "answer with
+`ork pagina responder \"<page name>\" \"…\"`" if its role does not know that.
+
+## All the limits in one table
+
+| Limit | Value |
+|---|---|
+| Installed pages | 20 |
+| Files / total / one file | 200 / 5 MB / 2 MB |
+| `manifesto.json` / icon | 64 KB / 32 KB |
+| Folder depth | 4 |
+| Hosts in `rede` | 5 |
+| Paths in `local` | 1 to 5, one port |
+| Links to agents | 10 per page |
+| API calls | 20 per second in total; 8 waiting for an answer at the same time |
+| `quadro.resumo()`, `agentes()`, `local.ler()` | 2 per second each |
+| `dados.gravar` + `dados.apagar` | 10 per second |
+| `recado` | 4 KB; 1 per agent every 10 s; 30 per hour |
+| Agent answer | 64 KB; up to 20 kept (256 KB) while the page is closed |
+| Data | 256 KB per key; 1 MB and 200 keys in total |
+| `local.ler` | 5 s; 1 MB answer |
+| Page memory | 400 MB (above that, it is closed) |
+| CPU | above 90% for 30 s, it is closed |
+| Frozen | not answering for 5 s, it is closed |
+| Crashes | 3 within 10 minutes switch the page off until you turn it back on |
+| Accept proposal | valid for 10 minutes |
+
+## What you cannot do, and why
+
+| You cannot | Why |
+|---|---|
+| Read or write files on the PC, run commands | the page is outside code; the PC stays out of reach. Ask an agent with `recado` |
+| See the terminals' screen or history | it may hold secrets, paths and code. The canvas summary gives only name and state |
+| Inline `<script>`, `onclick=""`, `eval`, `new Function` | that is what code injection uses; the policy accepts only the folder's files |
+| Load a script or font from a CDN | what runs is what you accepted in the dialog, checked by hash; an outside script would change without you seeing it |
+| `localStorage`, IndexedDB, cookies | the page runs with an opaque origin (this closes the way to WebRTC and to iframes). Storage is `orkPagina.dados` |
+| Web Worker, Service Worker, WebAssembly | `worker-src 'none'` and no `unsafe-eval` |
+| `<iframe>` with content, `window.open`, `target="_blank"`, navigating outside the folder | a page cannot load something else in its place nor open windows |
+| Downloads, `alert`/`confirm`/`prompt` | downloads are cancelled and browser dialogs are off. Use `<dialog>` |
+| Submitting a form | `submit` fires for your script (call `preventDefault()`), but never sends |
+| Camera, microphone, location, notifications, clipboard, USB, Bluetooth, fullscreen | every browser permission request is denied |
+| WebRTC | it would go around the network rules; the `RTC…` interfaces are removed before your script runs |
+| `http:`, IP, `localhost` directly | only `https`/`wss` to declared hosts; for your PC use `local`, which goes through the app |
+| `rede` and `local` together | what the page reads from your PC must have no way out |
+| An agent installing or accepting the page | only you add and accept, through the app's native dialog |
+
+## Recipes
+
+Each recipe is a complete folder: `manifesto.json`, `index.html` (structure only, loading `estilo.css` and `app.js`)
+and `app.js`. The `estilo.css` can be the one from the walkthrough above. In all of them, what comes from the app
+goes on screen through `textContent`, never through `innerHTML`.
+
+### 1. Team panel (`quadro` permission)
+
+Shows each agent with its state, its queue and counters per state, live.
+
+```json
+{ "formato": 1, "id": "painel-do-time", "nome": "Team panel", "versao": "1.0.0",
+  "icone": "lucide:Users", "permissoes": { "quadro": true } }
+```
+
+```html
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="estilo.css"></head>
+<body>
+  <h1 id="espaco">…</h1>
+  <p id="contagem" class="suave"></p>
+  <table><thead><tr><th>Agent</th><th>Engine</th><th>Role</th><th>State</th><th>Queue</th></tr></thead>
+    <tbody id="linhas"></tbody></table>
+  <p id="erro"></p>
+  <script src="app.js"></script>
+</body></html>
+```
+
+```js
+const $ = (id) => document.getElementById(id)
+const NOMES = { livre: 'free', trabalhando: 'working', pergunta: 'waiting for an answer', encerrado: 'closed' }
+
+function celula(texto) { const td = document.createElement('td'); td.textContent = texto; return td }
+
+function mostrar({ espaco, agentes }) {
+  $('espaco').textContent = espaco ? espaco.nome : 'No space open'
+  const conta = {}
+  for (const a of agentes) conta[a.situacao] = (conta[a.situacao] ?? 0) + 1
+  $('contagem').textContent = Object.entries(conta).map(([s, n]) => `${n} ${NOMES[s] ?? s}`).join(' · ') || 'No agents'
+  $('linhas').replaceChildren(...agentes.map((a) => {
+    const tr = document.createElement('tr')
+    tr.dataset.situacao = a.situacao
+    tr.append(celula(a.nome), celula(a.motor), celula(a.funcao ?? '—'), celula(NOMES[a.situacao] ?? a.situacao), celula(String(a.fila)))
+    return tr
+  }))
+}
+
+orkPagina.ao('tema', ({ tokens }) => Object.entries(tokens).forEach(([k, v]) => document.documentElement.style.setProperty(k, v)))
+orkPagina.quadro.resumo().then(mostrar).catch((e) => { $('erro').textContent = e.message })
+orkPagina.ao('quadro', mostrar)
+```
+
+```css
+tr[data-situacao="trabalhando"] td:nth-child(4) { color: var(--vivo, #3fb950); }
+tr[data-situacao="pergunta"]    td:nth-child(4) { color: var(--atencao, #d29922); }
+tr[data-situacao="encerrado"]   td:nth-child(4) { color: var(--texto-suave, #9a9ca5); }
+```
+
+### 2. Checklist with data (no permission)
+
+```json
+{ "formato": 1, "id": "checklist", "nome": "Checklist", "versao": "1.0.0", "icone": "lucide:ListChecks" }
+```
+
+```html
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="estilo.css"></head>
+<body>
+  <form id="nova"><input id="texto" placeholder="New task" maxlength="200"><button>Add</button></form>
+  <ul id="lista"></ul>
+  <p id="erro"></p>
+  <script src="app.js"></script>
+</body></html>
+```
+
+```js
+const $ = (id) => document.getElementById(id)
+let itens = []
+
+async function salvar() {
+  try { await orkPagina.dados.gravar('itens', itens) } catch (e) { $('erro').textContent = e.message }
+}
+
+function desenhar() {
+  $('lista').replaceChildren(...itens.map((item, i) => {
+    const li = document.createElement('li')
+    const caixa = document.createElement('input')
+    caixa.type = 'checkbox'
+    caixa.checked = item.feito
+    caixa.addEventListener('change', () => { item.feito = caixa.checked; salvar() })
+    const texto = document.createElement('span')
+    texto.textContent = item.texto
+    const apagar = document.createElement('button')
+    apagar.textContent = '×'
+    apagar.addEventListener('click', () => { itens.splice(i, 1); desenhar(); salvar() })
+    li.append(caixa, texto, apagar)
+    return li
+  }))
+}
+
+$('nova').addEventListener('submit', (ev) => {
+  ev.preventDefault() // the form never sends; without this, nothing happens
+  const texto = $('texto').value.trim()
+  if (!texto) return
+  itens.push({ texto, feito: false })
+  $('texto').value = ''
+  desenhar()
+  salvar()
+})
+
+orkPagina.dados.ler('itens').then((v) => { itens = Array.isArray(v) ? v : []; desenhar() })
+```
+
+### 3. A page that reads an API (`rede` permission)
+
+The latest releases of a public GitHub repository. The GitHub API answers with `Access-Control-Allow-Origin: *`, so
+it accepts the `null` origin. Without a key, GitHub limits you to 60 requests per hour per IP: fetch on opening, not
+in a loop.
+
+```json
+{ "formato": 1, "id": "versoes", "nome": "Releases", "versao": "1.0.0", "icone": "lucide:Package",
+  "permissoes": { "rede": ["api.github.com"] } }
+```
+
+```html
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="estilo.css"></head>
+<body>
+  <form id="busca"><input id="repo" placeholder="owner/repo"><button>Show</button></form>
+  <ol id="versoes"></ol>
+  <p id="erro"></p>
+  <script src="app.js"></script>
+</body></html>
+```
+
+```js
+const $ = (id) => document.getElementById(id)
+
+async function carregar(repo) {
+  $('erro').textContent = ''
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return void ($('erro').textContent = 'Use owner/repo')
+  try {
+    const r = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=5`, { headers: { Accept: 'application/vnd.github+json' } })
+    if (!r.ok) throw new Error(`GitHub answered ${r.status}`)
+    const versoes = await r.json()
+    $('versoes').replaceChildren(...versoes.map((v) => {
+      const li = document.createElement('li')
+      li.textContent = `${v.tag_name} — ${new Date(v.published_at).toLocaleDateString('pt-BR')}`
+      return li
+    }))
+    await orkPagina.dados.gravar('repo', repo)
+  } catch (e) {
+    $('erro').textContent = e.message // "Failed to fetch" = host not in "rede", or the server's CORS
+  }
+}
+
+$('busca').addEventListener('submit', (ev) => { ev.preventDefault(); carregar($('repo').value.trim()) })
+orkPagina.dados.ler('repo').then((repo) => { if (repo) { $('repo').value = repo; carregar(repo) } })
+```
+
+### 4. A page that talks to an agent (`recado` permission)
+
+Buttons with ready-made requests and the conversation below. Before using it, link an agent with **Ligar a
+agente…**.
+
+```json
+{ "formato": 1, "id": "pedidos-prontos", "nome": "Ready requests", "versao": "1.0.0",
+  "icone": "lucide:MessagesSquare", "permissoes": { "recado": true } }
+```
+
+```html
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="estilo.css"></head>
+<body>
+  <label>Agent <select id="destino"></select></label>
+  <div id="botoes">
+    <button data-pedido="Run the test suite and answer only how many passed and how many failed.">Run tests</button>
+    <button data-pedido="Sum up in 5 lines what you did today.">Day summary</button>
+  </div>
+  <ol id="conversa"></ol>
+  <p id="aviso"></p>
+  <script src="app.js"></script>
+</body></html>
+```
+
+```js
+const $ = (id) => document.getElementById(id)
+const COMO_RESPONDER = '\n\nAnswer with: ork pagina responder "Ready requests" "<your answer>"'
+
+function anotar(quem, texto) {
+  const li = document.createElement('li')
+  const b = document.createElement('strong')
+  b.textContent = quem
+  const p = document.createElement('p')
+  p.textContent = texto
+  li.append(b, p)
+  $('conversa').append(li)
+}
+
+async function atualizarDestinos() {
+  try {
+    const ligados = await orkPagina.agentes()
+    const atual = $('destino').value
+    $('destino').replaceChildren(...ligados.map((a) => Object.assign(document.createElement('option'), { value: a.id, textContent: `${a.nome} (${a.situacao})` })))
+    if (ligados.some((a) => a.id === atual)) $('destino').value = atual
+    $('aviso').textContent = ligados.length ? '' : 'Link an agent with the "Ligar a agente…" button at the top.'
+  } catch (e) {
+    $('aviso').textContent = e.message
+  }
+}
+
+$('botoes').addEventListener('click', async (ev) => {
+  const pedido = ev.target.closest('button')?.dataset.pedido
+  const para = $('destino').value
+  if (!pedido || !para) return
+  try {
+    const { posicao } = await orkPagina.recado(para, pedido + COMO_RESPONDER)
+    anotar('You', pedido)
+    $('aviso').textContent = `In the agent's inbox, position ${posicao}.`
+  } catch (e) {
+    $('aviso').textContent = e.message
+  }
+})
+
+orkPagina.ao('recado', ({ de, texto }) => anotar(de.nome, texto))
+atualizarDestinos()
+setInterval(atualizarDestinos, 5000) // linking/unlinking in the frame fires no event
+```
+
+### 5. A page that reads a local server, read-only (`local` permission)
+
+A service of yours at `127.0.0.1:7788` that answers `GET /api/status` with JSON
+(`{ "fila": 3, "ultimoErro": null }`). The page checks every 5 s.
+
+```json
+{ "formato": 1, "id": "status-local", "nome": "Local status", "versao": "1.0.0", "icone": "lucide:Server",
+  "permissoes": { "local": { "porta": 7788, "caminhos": ["/api/status"] } } }
+```
+
+```html
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="estilo.css"></head>
+<body>
+  <h1>Local status</h1>
+  <dl><dt>Queue</dt><dd id="fila">—</dd><dt>Last error</dt><dd id="ultimo-erro">—</dd></dl>
+  <p id="aviso" class="suave"></p>
+  <script src="app.js"></script>
+</body></html>
+```
+
+```js
+const $ = (id) => document.getElementById(id)
+
+async function consultar() {
+  try {
+    const r = await orkPagina.local.ler('/api/status')
+    if (r.status !== 200) throw new Error(`the service answered ${r.status}`)
+    const dados = JSON.parse(r.texto)
+    $('fila').textContent = String(dados.fila)
+    $('ultimo-erro').textContent = dados.ultimoErro ?? 'none'
+    $('aviso').textContent = `Updated at ${new Date().toLocaleTimeString('pt-BR')}`
+  } catch (e) {
+    $('aviso').textContent = e.message // "o serviço local não respondeu" = it is stopped
+  }
+}
+
+consultar()
+setInterval(consultar, 5000)
+```
+
+On the service side, no CORS is needed (the one asking is the app). Make the route read-only: the permission promises
+"read-only" to whoever accepts it.
+
+### 6. A panel that delegates to the right agent (`quadro` and `recado` permissions)
+
+Combines recipes 1 and 4: shows the team and, on clicking a **linked**, free agent, sends a request.
+
+```json
+{ "formato": 1, "id": "delegar", "nome": "Delegate", "versao": "1.0.0", "icone": "lucide:Target",
+  "permissoes": { "quadro": true, "recado": true } }
+```
+
+```html
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="estilo.css"></head>
+<body>
+  <textarea id="pedido" rows="3" maxlength="2000" placeholder="What to do?"></textarea>
+  <ul id="agentes"></ul>
+  <p id="aviso"></p>
+  <script src="app.js"></script>
+</body></html>
+```
+
+```js
+const $ = (id) => document.getElementById(id)
+let ligados = new Set()
+
+async function lerLigados() {
+  try { ligados = new Set((await orkPagina.agentes()).map((a) => a.id)) } catch { ligados = new Set() }
+}
+
+function mostrar({ agentes }) {
+  $('agentes').replaceChildren(...agentes.map((a) => {
+    const li = document.createElement('li')
+    const botao = document.createElement('button')
+    botao.textContent = `${a.nome} · ${a.situacao}${a.fila ? ` · ${a.fila} queued` : ''}`
+    botao.disabled = !ligados.has(a.id) || a.situacao === 'encerrado'
+    botao.title = ligados.has(a.id) ? 'Send the request' : 'Not linked to this page'
+    botao.addEventListener('click', async () => {
+      const texto = $('pedido').value.trim()
+      if (!texto) return
+      try {
+        const { posicao } = await orkPagina.recado(a.id, texto)
+        $('aviso').textContent = `Sent to ${a.nome} (position ${posicao}).`
+        $('pedido').value = ''
+      } catch (e) {
+        $('aviso').textContent = e.message
+      }
+    })
+    li.append(botao)
+    return li
+  }))
+}
+
+async function iniciar() {
+  await lerLigados()
+  let ultimo = await orkPagina.quadro.resumo()
+  mostrar(ultimo)
+  orkPagina.ao('quadro', (r) => { ultimo = r; mostrar(r) })
+  setInterval(async () => { await lerLigados(); mostrar(ultimo) }, 5000)
+}
+
+iniciar().catch((e) => { $('aviso').textContent = e.message })
+```
+
+## Debugging
+
+There are no DevTools for pages: the app has no menu or shortcut that opens them, and `console.log` shows up nowhere.
+What works:
+
+- **Show the errors on the page itself.** Every failed call rejects with a readable message. Have a status line
+  (`<p id="situacao" role="status">`) and write `erro.message` in it, as the example does. To catch what slips
+  through:
+
+  ```js
+  window.addEventListener('error', (e) => { $('situacao').textContent = `Error: ${e.message}` })
+  window.addEventListener('unhandledrejection', (e) => { $('situacao').textContent = `Error: ${e.reason?.message ?? e.reason}` })
+  ```
+
+- **Build the layout in a regular browser** with a fake `orkPagina`, and only then test in Orkester, where the real
+  permissions and policy apply. Put this in a `falso-ork.js` loaded before `app.js` (in Orkester it replaces nothing,
+  because `orkPagina` already exists; even so, remove it before delivering):
+
+  ```js
+  // falso-ork.js: only for a regular browser
+  if (!window.orkPagina) {
+    const dados = new Map()
+    window.orkPagina = {
+      eu: async () => ({ id: 'teste', nome: 'Test', versao: '0.0.0', permissoes: ['quadro', 'recado'], espaco: { id: 'e1', nome: 'Test space' } }),
+      quadro: { resumo: async () => ({ espaco: { id: 'e1', nome: 'Test space' }, cordas: [],
+        agentes: [{ id: 'a1', nome: 'Maestro', motor: 'claude', funcao: 'Maestro', situacao: 'livre', fila: 0 },
+                  { id: 'a2', nome: 'Reviewer', motor: 'codex', situacao: 'trabalhando', fila: 2 }] }) },
+      agentes: async () => [{ id: 'a1', nome: 'Maestro', motor: 'claude', situacao: 'livre', fila: 0 }],
+      recado: async () => ({ posicao: 1 }),
+      dados: { ler: async (k) => dados.get(k) ?? null, gravar: async (k, v) => void dados.set(k, v),
+               apagar: async (k) => void dados.delete(k), chaves: async () => [...dados.keys()] },
+      local: { ler: async () => ({ status: 200, tipo: 'application/json', texto: '{}' }) },
+      ao: () => () => {}
+    }
+  }
+  ```
+
+  A regular browser does not have Orkester's policy: an inline `<script>` that works there does **not** run in the
+  app. If you use ES modules, open the folder through any static server (modules do not load over `file://`).
+- **When nothing happens**, check in this order: inline script (does not run), host outside `rede` or the server's
+  CORS (generic network error), a permission revoked in Configurações › Conexões, a data key with an uppercase letter, a form without
+  `preventDefault()`.
+- **Page closed by the app** ("travou", "estourou memória", "usou CPU demais", "caiu sozinha"): look for an infinite
+  loop, a `setInterval` that is too short or a list that only grows. The frame offers **Recarregar** (reload);
+  Configurações › Conexões shows the last crash.
+
+## Updating, switching off and removing
+
+All on the page's card, in **Configurações** › **Conexões** › **Páginas** tab:
+
+- **Atualizar da pasta**: reads again the folder the page came from and shows what changed. If the new version asks
+  for no new permission, it is applied at once and open pages reload; otherwise, the dialog shows only the new ones.
+  The same `id` coming from the same folder is an update; coming from another folder it is refused ("remova-a
+  antes", remove it first). Changing the `id` in the manifest and updating is also refused. Bumping `versao` is not
+  required, but it helps (the dialog shows "Versão 1.0.0 → 1.1.0").
+- **Always edit the original folder.** Touching the copy (`~/.orkester/paginas/<id>/`) makes the page "change outside
+  Orkester", and it only comes back with **Rever**.
+- **Desligar / Religar** (switch off / back on): takes it off the bar and stops loading it, without deleting anything.
+- **Remover** (remove; with confirmation): deletes the copy, the data, the browser state and the links. The original
+  folder is not touched.
+- **Revogar / Permitir de novo**: per permission, in the card's **Permissões** list.
+- Turning off the master switch takes every page off the bar at once; nothing loads until it is turned on again.
+
+The page **unloads when you leave it**: clicking another page in the bar closes yours, and coming back loads it from
+scratch. What needs to last goes in `orkPagina.dados`.
+
+The list of pages and what you accepted are kept in `~/.orkester/paginas.json`. If it was written by a newer version
+of Orkester, it is left untouched and every page stays off until you update the app.
+
+## Asking an agent to build one
+
+**Through +.** Click **+** → **Pedir a um agente para criar** (ask an agent to build it), describe the page and click
+**Pedir ao Maestro** (ask the Maestro). It becomes a "Criar página: …" item in the space's Kanban, with the delivery
+instructions (folder, manifest, this guide, and that the agent installs nothing), moved to **Com o Maestro** (with
+the Maestro). With no Maestro open in the space, it stays in Demandas, and you drag it to **Com o Maestro** when you
+open one. When the agent gives you the folder path, go back to **+** → **Escolher pasta…**.
+
+**Directly in a terminal.** In a Claude or Codex card, ask something like:
+
+```text
+Build an Orkester "+" page in the paginas/metas/ folder of this project, following the guide
+docs/paginas.md in the Orkester repository (the full contract of the window.orkPagina API).
+The page: weekly goals, with checkboxes, saved in orkPagina.dados; ask only for the
+permissions it uses. Rules: manifesto.json and index.html at the root; JS and CSS in their
+own files (inline script does not run); no CDN, eval, localStorage or innerHTML with outside
+data; only accepted extensions. Do not install or accept the page: tell me the folder path.
+```
+
+The agent cannot add or accept the page: that is yours alone, through the app's dialog. If it touches the copy
+already installed, the page stops loading until you **Rever**.
+
+## How the app isolates the page
+
+For those who want to know what happens underneath:
+
+- **Own process, nothing kept.** Each page runs in a `<webview>` with its own in-memory-only partition, `sandbox`
+  and `contextIsolation` on and Node off. The only bridge is `window.orkPagina`. When you leave the page, its browser
+  state is erased.
+- **Opaque origin.** The policy includes `sandbox allow-scripts allow-forms` (without `allow-same-origin`), so
+  `self.origin` is `"null"`, `localStorage`/IndexedDB/cookies throw `SecurityError` and every iframe the page creates
+  gets another origin, out of its reach. The page's own files still load because the app answers with
+  `Access-Control-Allow-Origin: *`.
+- **Served from memory.** On load, the app reads the copy once, checks it against the accepted hash and serves from
+  that read. Path tricks (`..`, `%2f`, `\`, `//`, `:`) get a 404. Only `GET`.
+- **A fixed policy on every response** (a CSP `<meta>` in your HTML can only tighten it, never loosen it). With
+  `ORIGEM` = `ork-pagina://<id>` and the accepted hosts as `R`:
 
   ```text
   default-src 'none'; script-src ORIGEM; style-src ORIGEM 'unsafe-inline';
@@ -211,70 +1067,28 @@ the second value shows until the first event arrives. The example page does exac
   base-uri 'none'; form-action 'none'; sandbox allow-scripts allow-forms
   ```
 
-  In practice: **no inline `<script>`**, no `eval`, no workers, no iframes that load anything, no popups, no
-  downloads; a form fires `submit` for your script (call `preventDefault()`), but never sends; inline `style` is
-  allowed; fonts only from the folder or `data:`. The `sandbox` gives the page an opaque origin, and every iframe it
-  makes gets another one, so the page cannot reach into it. Your own files (fetch, fonts, modules) still load: the
-  app answers them with `Access-Control-Allow-Origin: *`. Also sent: `nosniff`, `no-store`, `no-referrer`, and a
+  Plus `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`, `Referrer-Policy: no-referrer` and a
   `Permissions-Policy` that denies camera, microphone, geolocation, USB, serial, HID, Bluetooth, clipboard, screen
   capture, payment and fullscreen.
-- **The network is also filtered outside the page**, on every request: only the page's own address, `https`/`wss`
-  to the accepted hosts (default port, no credentials in the URL), and `data:`/`blob:`. `file:`, `http:`, other
-  pages and IP addresses are cancelled. Revoking `rede` cuts it at once.
-- **No WebRTC, and no DNS hints.** WebRTC does not go through the policy above, so pages do not get it:
-  `RTCPeerConnection` and every other `RTC…` interface are removed, before any script of yours, in every frame where
-  page code can run, and an empty iframe the page builds is of another origin, out of its reach. UDP (STUN included)
-  is also off for the page. DNS prefetch (`<link rel="dns-prefetch">`, links) is off in the whole app; `preconnect`
-  only notifies the app, and no connection is made.
-- **No Chromium permissions at all** (all requests are denied), downloads are cancelled, `window.open` is denied,
-  navigation is allowed only inside `ork-pagina://<id>/`, and `alert`/`confirm`/`prompt` are disabled.
-- **The app's own channels are closed to pages.** The app refuses any internal call that does not come from one of
-  its own windows.
-- **A page that freezes or eats memory is closed**, and the app keeps running. The app checks every 5 seconds: no
-  answer to a probe for 5 s ("travou"), working set above 400 MB ("memória"), CPU above 90% for 30 s ("cpu"), or
-  a crash. The frame shows "…foi fechada" with **Recarregar**, and Conexões notes the last fall. **Three falls
-  within 10 minutes switch the page off** until you use **Religar** in Conexões.
-
-### CORS and the hosts you accept
-
-The accepted hosts are reached from the page like any website calls another, but the page's origin is opaque: the
-request goes with **`Origin: null`**, so **the server must allow that with CORS** (answer the preflight and send
-`Access-Control-Allow-Origin: *`, or `null`). Sending `ork-pagina://<id>` back does not work. The app does not
-proxy or relax this. If a call fails with a network error in a page that has the permission, look at the server's
-CORS first. For something on your own PC, use `local` instead: the app makes that request for you.
-
-> **Contract: origin and storage.** The page's origin is opaque (`null`), not `ork-pagina://<id>`. A `rede` server
-> that allows only `ork-pagina://<id>` will refuse the page: allow `null` or `*`. Local storage, IndexedDB and
-> cookies throw `SecurityError`; keep data in `orkPagina.dados`.
-
-## Updating and removing
-
-- **Atualizar da pasta** (Conexões): the app reads again the folder the page came from and shows what changed.
-  The same `id` from the **same folder** is an update; the same `id` from another folder is refused ("remove it
-  first"). If the new version asks for nothing new, it is applied at once and open pages reload; otherwise you
-  get the dialog with only the new permissions.
-- **Edit the original folder, then Atualizar da pasta.** Editing `~/.orkester/paginas/<id>/` directly makes the
-  page "mudou fora do Orkester" (see above).
-- **Desligar / Religar** switches one page off or on without deleting it. **Remover** (with confirmation) deletes the
-  copy, its data, its browser state and its links.
-- The list of pages and what you accepted is kept in `~/.orkester/paginas.json`. If it was written by a newer
-  version of Orkester, it is left untouched and every page stays off.
-
-## Debugging
-
-In this version there is no way to open DevTools for a page: the app has no menu and no shortcut for it, so
-there is nothing to press. What helps today:
-
-- Every failed `orkPagina` call rejects with a readable message (permission missing, limit hit, agent not linked…).
-  Show it on the page, as the example does with its status line (`#situacao`).
-- Build the layout in a normal browser by opening `index.html` with a stub of `window.orkPagina`; then test inside
-  Orkester, where the real permissions and the policy above apply.
-- A request the policy blocks (a host you did not list in `rede`, an `http:` address) rejects as a generic network
-  error, and an inline `<script>` simply does not run: check the manifest and the CSP above first.
+- **Network filtered outside the page too**, on every request: only the page's own address, `https`/`wss` to the
+  accepted hosts (default port, no user and password) and `data:`/`blob:`. Revoking `rede` cuts it at once.
+- **No WebRTC and no DNS hints.** The `RTC…` interfaces are removed from every frame before any page script, UDP is
+  off for the page and DNS prefetch is off in the app.
+- **No Chromium permissions**, downloads cancelled, `window.open` denied, navigation only inside
+  `ork-pagina://<id>/`, `alert`/`confirm`/`prompt` off, `beforeunload` ignored.
+- **Internal channels closed.** The app refuses every internal call that does not come from one of its windows, and
+  the page API only serves the main frame.
+- **Watchdog.** Every 5 s the app checks each open page: no answer to a probe for 5 s ("travou"), memory above
+  400 MB, CPU above 90% for 30 s, or a process crash → the page is closed and the app carries on. Three crashes within
+  10 minutes switch the page off until you use **Religar**.
+- **The frame belongs to the app.** The name, the version and the buttons above the page are drawn by the window,
+  outside the `<webview>`: the page cannot imitate them.
 
 ## Try the example
 
-1. Conexões → turn on **Páginas próprias (experimental)**.
-2. **+** → choose `app/exemplos/paginas/resumo-do-espaco/` → **Adicionar e permitir**.
-3. In the page header, **Ligar a agente…** → pick a Claude or Codex agent of the space.
-4. Write a note and send it; have the agent answer with `ork pagina responder "Resumo do espaço" "…"`.
+1. Turn pages on (Configurações › Conexões › **Páginas** tab → **Ligar páginas próprias**).
+2. **+** → **Resumo do espaço** (ready example) → **Adicionar e permitir**. Its code is in
+   [`app/exemplos/paginas/resumo-do-espaco/`](../app/exemplos/paginas/resumo-do-espaco/) in the repository: it is a
+   good starting point to copy.
+3. In the page's frame, **Ligar a agente…** → pick a Claude or Codex agent of the space.
+4. Write a note and send it; ask the agent to answer with `ork pagina responder "Resumo do espaço" "…"`.

@@ -60,7 +60,7 @@ still the permission.
 | `ork teclas <name> <key>…` | answers menus and prompts: `enter`, `esc`, `tab`, `shift-tab`, arrows, `ctrl-c`, `y`, `n`, numbers |
 | `ork limpar <name>` | clears the session's context (`/clear` on Claude, `/new` on Codex) |
 | `ork fechar <name>` | closes a session **you** opened; what it opened is handed to you |
-| `ork passar <name>` | hands the sessions you opened to a living successor |
+| `ork passar <name>` | hands your whole role to a living successor: the sessions you opened, all your strings (not only your children's), the messages waiting in your inbox and the deliveries you were waiting for (an `ork entregar` without `--para` now reaches the successor). Works with no children too. Only inside one space: it is refused, before anything changes, when the successor is in another space or when you have sessions open in another space (close those first with `ork fechar`). A message or delivery aimed at a card that no longer exists goes to the space's Maestro instead, with a line saying so. All or nothing — if anything fails, nothing changes and you should not `ork sair` |
 | `ork sair` | closes your own card; with `--com-as-minhas`, takes the tree you opened with it |
 
 Options for `ork abrir`:
@@ -71,13 +71,16 @@ Options for `ork abrir`:
 --pasta P           the folder the terminal opens in
 --funcao "Role"     born with that role's prompt, in its folder, on its preset (engine + level)
 --preset "Name"     overrides the preset for this one session ("Claude forte")
+--modelo M          the model (see `ork modelos`); overrides the role
+--esforco E         the effort (low … max; ultra is Codex only); overrides the role
+--tarefa N          puts the agent to work on kanban task #N
 --pedido "text"     the first request, already typed
 --arquivo p.md      the first request, read from a file
 --esperar           only return when it has finished
 --tempo S           how many seconds to wait
 ```
 
-`ork pedir` also takes `--arquivo`, `--sem-esperar` and `--tempo`. `ork entregar` takes `--arquivo` and `--para "Name"`.
+`ork pedir` also takes `--arquivo`, `--tarefa`, `--sem-esperar` and `--tempo`. `ork entregar` takes `--arquivo` and `--para "Name"`.
 
 ### The inbox
 
@@ -99,6 +102,8 @@ notices go in as comments (`# `), so PowerShell runs nothing.
 | `ork funcoes` | lists the saved roles, for use with `ork abrir --funcao` |
 | `ork banda` | lists the bands on this floor and who sits inside each |
 | `ork banda criar "Name" <card>…` | draws a frame around those agents: they all start talking to each other |
+| `ork modelos` | the Claude and Codex models, the efforts each one accepts and the defaults |
+| `ork modelo <card> [<model>] [--esforco level]` | changes the model and/or effort of a card you opened, while it is free; the card reopens and the conversation goes on. The answer says which effort stayed when only the model changed |
 | `ork trocar <card> <claude\|codex\|shell>` | swaps the agent on a card you opened; place, name and links stay |
 | `ork partitura` | lists the saved teams |
 | `ork partitura usar "Name"` | raises that team beside you, linked to you |
@@ -164,6 +169,60 @@ own, with the git diff.
 | `ork arvore mostrar <file>…` | opens those files as cards; `--arvore "Name"` picks where |
 | `ork arvore dar "Agent" <file>…` | hands those code cards to another agent on the canvas |
 | `ork arvore desfazer "Name"` | undoes the tree; its files go back to the main one |
+
+## Kanban
+
+The space's kanban (the same one as the Kanban page). An agent only reaches its own space's kanban, and its name
+goes into each task's history.
+
+| Command | What it does |
+|---|---|
+| `ork kanban [ver] [--coluna C] [--para Name\|eu\|ninguem] [--etiqueta e]` | the tasks by column, with who works on each; `ork kanban ver 12` shows #12 in full |
+| `ork kanban criar "Title" [--descricao T \| --arquivo f.md] [--coluna C] [--para Name] [--etiqueta a,b]` | creates a task; without `--coluna`, it starts in Fazendo (Demandas belongs to the user) |
+| `ork kanban pegar <n>` | you join the list of who works on it; from Demandas or Com o Maestro it moves to Fazendo |
+| `ork kanban soltar <n> [Name]` | you leave the list (removing someone else: only the Maestro and the user) |
+| `ork kanban mover <n> "Column" [--posicao topo\|fim\|N]` | moves it to another column; Com o Maestro belongs to the user, the final column to the user and the Maestro |
+| `ork kanban editar <n> [--titulo T] [--descricao T \| --arquivo f.md] [--etiqueta +a,-b]` | changes title, description or labels |
+| `ork kanban atribuir <n> Name\|eu\|ninguem` | puts the agent on the list and tells it in its inbox (`ninguem` empties it) |
+| `ork kanban comentar <n> "text"` | comments (also `--arquivo f.md`) |
+| `ork kanban apagar <n> --confirmar` | sends it to the bin (the page restores it) |
+| `ork kanban coluna criar "Name"` | also `renomear "Old" "New"` and `apagar "Name"` |
+
+`ork abrir --tarefa N` and `ork pedir --tarefa N` put the agent to work on task #N and quote the task in the request.
+
+The `--arquivo` file may carry a UTF-8 BOM (Windows PowerShell's `Set-Content -Encoding utf8` writes one): `ork` strips it when reading, in every command.
+
+## Flows
+
+The space's flows (the same as the Fluxos page): automations as nodes, with a trigger and what to do next. The JSON
+format, each node's settings and the rules are in [`fluxos.md`](fluxos.md). An agent only reaches the flows of its own
+space. A flow is found by its name (case-insensitive) or by the start of it.
+
+| Command | What it does |
+|---|---|
+| `ork fluxo [listar]` | the space's flows: on or off, triggers, folder, the last run and the files that fail to open |
+| `ork fluxo ver "Name" [--json]` | one whole flow: nodes and links; `--json` returns the JSON that `criar` and `editar` take |
+| `ork fluxo criar --arquivo f.json [--pasta "F"]` | creates from the JSON (the name goes inside it); born off; `--pasta` is a folder that already exists |
+| `ork fluxo editar "Name" --arquivo f.json` | replaces the name, nodes and links with the JSON |
+| `ork fluxo ligar "Name"` / `ork fluxo desligar "Name"` | turns it on or off |
+| `ork fluxo rodar "Name"` | runs it now, through the Manual trigger, and shows what each node did |
+| `ork fluxo execucoes "Name" [--n 10]` | the last runs: result, time and the node that failed |
+| `ork fluxo apagar "Name" --confirmar` | deletes the flow and its runs, for good |
+
+Rules for the agent:
+
+- **Code, HTTP or Shell command:** the flow is born (or stays, when edited) off, and `ligar` is refused. Only the user
+  turns it on, on the page, seeing those nodes. `rodar` also refuses while the user has not approved those nodes.
+- **Reach:** the flow only cites cards the agent reaches (link, band or one it opened): the message target, who gets
+  the delivery, who the trigger watches and the command's shell. A message with no `entregaPara` sends the delivery
+  back to the agent itself. At every firing, messages and the trigger are checked again (the command's shell is not:
+  the user saw it when turning the flow on); out of reach, the flow skips that turn, and without the agent's card a
+  flow with a message turns off.
+- **Local network:** the allowed local addresses (`rede.locaisPermitidos`) only change on the page, by the user. A `rede` in an agent's JSON is ignored,
+  the flow stays as it was and the answer carries a warning.
+- **Credential:** the HTTP node cites only the name of a credential the user saved. There is no command to read or
+  create a credential.
+- Creating, editing, turning on, turning off and deleting by an agent show in the corner of the user's window.
 
 ---
 
