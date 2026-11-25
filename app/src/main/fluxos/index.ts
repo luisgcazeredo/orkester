@@ -30,6 +30,8 @@ import { criarCofreDeCredenciais } from './credenciais'
 import { criarDiscoDeFluxos } from './disco'
 import { criarAcaoCodigo } from './codigo'
 import { criarAcaoHttp } from './http'
+import { criarAcaoMcp } from './mcp'
+import { registroMcpFora } from '../mcpFora'
 import { registrarIpcDosFluxos } from './ipc'
 import { criarSelo } from './selo'
 import { criarServicoDeFluxos } from './servico'
@@ -156,6 +158,9 @@ function acoesDoFluxo(espacoId: string, fluxo: FluxoGravado, cadeia: string[]): 
     codigo: motorDoCodigo.acao,
     // S5: por execução, só com os endereços locais que o usuário permitiu neste fluxo (veredito 196)
     http: criarAcaoHttp({ cofre: cofreDeCredenciais, locaisPermitidos: fluxo.rede?.locaisPermitidos ?? [] }),
+    // 1.9.7 (C3a): ferramenta MCP de fora, só a aprovada (o registro bloqueia a que mudou); o registro é lido na hora,
+    // e assim o ciclo main/fluxos ↔ main/mcpFora não usa nada antes de os dois módulos carregarem
+    mcp: criarAcaoMcp({ registro: () => registroMcpFora }),
     // só leitura, e só deste espaço
     consultar: (a) => consultar(fontesDaConsulta, espacoId, fluxo, a),
     recado(a, item) {
@@ -252,8 +257,30 @@ function fluxosQueUsam(nome: string): string[] {
   return achados
 }
 
+/**
+ * (1.9.7) Outros donos que citam credencial por id (servidores MCP de fora, páginas "+"): cada um se registra aqui, em
+ * main/index.ts, sem este arquivo depender deles. Devolvem linhas prontas para o aviso ("Servidor MCP n8n-mcp").
+ */
+const outrosUsos: ((id: string) => string[])[] = []
+export function acrescentarUsoDeCredencial(quemUsa: (id: string) => string[]): void {
+  outrosUsos.push(quemUsa)
+}
+
+/** O aviso ao apagar: os fluxos (pelo nome) e os outros donos (pelo id). Um dono que falha não impede os outros. */
+function quemUsaCredencial(nome: string, id: string): string[] {
+  const achados = fluxosQueUsam(nome)
+  for (const quemUsa of outrosUsos) {
+    try {
+      achados.push(...quemUsa(id))
+    } catch {
+      /* não saber quem usa não impede apagar */
+    }
+  }
+  return achados
+}
+
 /** As credenciais globais (S6): o IPC é registrado em main/index.ts; a ação HTTP (S5) usa o mesmo cofre. */
-export const cofreDeCredenciais = criarCofreDeCredenciais({ pasta: PASTA_DADOS, cifra: safeStorage, gravarJsonAtomico, usadaEm: fluxosQueUsam })
+export const cofreDeCredenciais = criarCofreDeCredenciais({ pasta: PASTA_DADOS, cifra: safeStorage, gravarJsonAtomico, usadaEm: quemUsaCredencial })
 
 const listaDoMotor = (espacoId: string): FluxoGravado[] => {
   try {

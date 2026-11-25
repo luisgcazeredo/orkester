@@ -142,9 +142,155 @@ function lerResposta(res: IncomingMessage, max: number): Promise<Buffer> {
   })
 }
 
+/** Um pedido HTTP com os saltos, já com URL, cabeçalhos e corpo prontos. É o núcleo do nó e da `api` das páginas. */
+export interface PedidoDoNucleo {
+  url: URL
+  metodo: string
+  /** Os cabeçalhos escritos (nome em minúsculas), sem a credencial. */
+  cabecalhos: Record<string, string>
+  envio?: string
+  tipoDoEnvio?: string
+  /**
+   * Abre a credencial para a URL: no 1º salto (erro = o pedido não sai) e em cada salto na MESMA origem (erro = segue
+   * sem ela). Na troca de origem ela sai para sempre. Ausente: sem credencial. (1.9.7) Recebe também o método do salto,
+   * para uma API "só lê" recusar escrita.
+   */
+  credencial?: (url: string, metodo: string) => CredencialParaPedido | { erro: string }
+  /** Os `host:porta` locais permitidos (o nó com host fixo); a `api` das páginas passa []. */
+  locais: readonly string[]
+  /** Corta o pedido de fora (o fim da execução, a página que fechou). */
+  sinal: AbortSignal
+  /** O erro quando `sinal` corta. */
+  aoCortar: string
+  prazoMs: number
+  maxBytes: number
+  userAgent: string
+  /**
+   * Ausente (o nó): segue todo 3xx para http/https, e o destino que não vale é erro. Presente (`api` das páginas):
+   * segue só se devolver true; senão, e no destino que não vale, o 3xx volta como resposta.
+   */
+  seguir?: (para: URL) => boolean
+  resolvedor?: Resolvedor
+  transporte?: { http: Pedir; https: Pedir }
+}
+
+/** A resposta final, de qualquer status (quem chama decide o que é erro). `texto` já descomprimido e até `maxBytes`. */
+export interface RespostaDoNucleo {
+  status: number
+  mensagem?: string
+  cabecalhos: IncomingMessage['headers']
+  texto: string
+  url: URL
+}
+
+/**
+ * O núcleo (1.9.7, extraído do nó sem mudar nada dele): saltos reconferidos (`conferirDestino` + `lookupConferido`),
+ * credencial que sai na troca de origem junto com o login escrito à mão, prazo para o pedido inteiro, corpo
+ * descomprimido e medido no fim. Os erros são `ErroDoHttp`, com a mensagem que o nó mostra.
+ */
+export async function pedirComSaltos(p: PedidoDoNucleo): Promise<RespostaDoNucleo> {
+  const transporte = p.transporte ?? { http: pedirHttp, https: pedirHttps }
+  let credencial: CredencialParaPedido | null = null
+  if (p.credencial) {
+    const c = p.credencial(p.url.href, p.metodo)
+    if ('erro' in c) throw new ErroDoHttp(c.erro)
+    credencial = c
+  }
+
+  // um prazo para o pedido inteiro, e o sinal de fora também corta
+  const controle = new AbortController()
+  let estourou = false
+  const timer = setTimeout(() => {
+    estourou = true
+    controle.abort()
+  }, p.prazoMs)
+  const aoAbortar = (): void => controle.abort()
+  if (p.sinal.aborted) controle.abort()
+  else p.sinal.addEventListener('abort', aoAbortar, { once: true })
+  const motivo = (e: unknown): Error => {
+    if (estourou) return new ErroDoHttp(`o pedido passou de ${Math.round(p.prazoMs / 1000)} s`)
+    if (controle.signal.aborted) return new ErroDoHttp(p.aoCortar)
+    if (e instanceof ErroDoHttp) return e
+    const codigo = (e as { code?: string })?.code
+    return new ErroDoHttp(`o pedido falhou${codigo ? ` (${codigo})` : ''}: ${e instanceof Error ? e.message.slice(0, 200) : String(e)}`)
+  }
+
+  const pedir = (url: URL, metodo: string, cabecalhos: Record<string, string>, envio: string | undefined): Promise<IncomingMessage> =>
+    new Promise((ok, falha) => {
+      const https = url.protocol === 'https:'
+      const porta = url.port ? Number(url.port) : https ? 443 : 80
+      const req = (https ? transporte.https : transporte.http)(
+        {
+          protocol: url.protocol,
+          hostname: url.hostname.replace(/^\[|\]$/g, ''),
+          port: porta,
+          path: `${url.pathname}${url.search}`,
+          method: metodo,
+          headers: envio === undefined ? cabecalhos : { ...cabecalhos, 'content-length': String(Buffer.byteLength(envio)) },
+          lookup: lookupConferido(p.locais, porta, p.resolvedor),
+          agent: false,
+          signal: controle.signal
+        },
+        ok
+      )
+      req.on('error', falha)
+      req.end(envio)
+    })
+
+  try {
+    let url = p.url
+    let metodo = p.metodo
+    let envio = p.envio
+    let tipoDoEnvio = p.tipoDoEnvio
+    const cabecalhos = { ...p.cabecalhos }
+    for (let saltos = 0; ; saltos++) {
+      // cada salto de novo: host literal, porta efetiva e lista (o nome passa pelo lookup conferido)
+      const bloqueio = conferirDestino(url, p.locais)
+      if (bloqueio) throw new ErroDoHttp(bloqueio)
+      const finais: Record<string, string> = { 'user-agent': p.userAgent, 'accept-encoding': 'gzip, deflate, br', ...cabecalhos }
+      if (envio !== undefined && tipoDoEnvio && !('content-type' in finais)) finais['content-type'] = tipoDoEnvio
+      if (credencial) {
+        const nome = credencial.cabecalho.nome.toLowerCase()
+        finais[nome] = credencial.cabecalho.valor // a credencial manda sobre um cabeçalho de mesmo nome escrito à mão
+      }
+
+      const res = await pedir(url, metodo, finais, envio)
+      const passo = proximoPasso(res.statusCode ?? 0, res.headers.location, url, metodo)
+      if (passo === null || (p.seguir !== undefined && ('erro' in passo || !p.seguir(passo.url)))) {
+        const texto = metodo === 'HEAD' ? (res.resume(), '') : (await lerResposta(res, p.maxBytes)).toString('utf8')
+        return { status: res.statusCode ?? 0, ...(res.statusMessage ? { mensagem: res.statusMessage } : {}), cabecalhos: res.headers, texto, url }
+      }
+      res.resume() // descarta o corpo do 3xx
+      if ('erro' in passo) throw new ErroDoHttp(passo.erro)
+      if (saltos >= MAX_REDIRECIONAMENTOS) throw new ErroDoHttp(`mais de ${MAX_REDIRECIONAMENTOS} redirecionamentos`)
+
+      // trocou de origem (esquema, host ou porta): a credencial sai PARA SEMPRE, mesmo que o host novo esteja nos
+      // domínios dela, junto com o authorization/cookie escritos à mão. Na mesma origem, ela é reaberta e reconferida.
+      if (passo.url.origin !== url.origin) {
+        credencial = null
+        for (const n of CABECALHOS_DE_LOGIN) delete cabecalhos[n]
+      } else if (credencial && p.credencial) {
+        const c = p.credencial(passo.url.href, passo.metodo)
+        credencial = 'erro' in c ? null : c
+      }
+      if (passo.semCorpo) {
+        envio = undefined
+        tipoDoEnvio = undefined
+        delete cabecalhos['content-type']
+      }
+      url = passo.url
+      metodo = passo.metodo
+    }
+  } catch (e) {
+    throw motivo(e)
+  } finally {
+    clearTimeout(timer)
+    p.sinal.removeEventListener('abort', aoAbortar)
+  }
+}
+
 /** O pedido HTTP do nó. Devolve o `json` do item de saída: `{ status, cabecalhos, corpo, url? }`. */
 export function criarAcaoHttp(dep: DependenciasDoHttp): AcoesDoFluxo['http'] {
-  const transporte = dep.transporte ?? { http: pedirHttp, https: pedirHttps }
   const prazoMs = dep.prazoMs ?? PRAZO_HTTP
   const maxBytes = dep.maxBytes ?? MAX_RESPOSTA
 
@@ -164,116 +310,38 @@ export function criarAcaoHttp(dep: DependenciasDoHttp): AcoesDoFluxo['http'] {
     const proprios = cabecalhosDoPedido(ajustes.cabecalhos)
     if ('erro' in proprios) throw new ErroDoHttp(proprios.erro)
 
-    let credencial: CredencialParaPedido | null = null
-    if (ajustes.credencial) {
-      const c = dep.cofre.paraPedido(ajustes.credencial, inicial.href)
-      if ('erro' in c) throw new ErroDoHttp(c.erro)
-      c.ocultar.forEach(ctx.ocultar)
-      credencial = c
+    const nomeDaCredencial = ajustes.credencial
+    const r = await pedirComSaltos({
+      url: inicial,
+      metodo: ajustes.metodo,
+      cabecalhos: proprios,
+      envio: corpo.corpo,
+      tipoDoEnvio: corpo.tipoDeConteudo,
+      // os textos da credencial vão para o `ctx.ocultar` a cada abertura, antes do pedido
+      credencial: nomeDaCredencial
+        ? (url, metodo) => {
+            const c = dep.cofre.paraPedido(nomeDaCredencial, url, metodo)
+            if (!('erro' in c)) c.ocultar.forEach(ctx.ocultar)
+            return c
+          }
+        : undefined,
+      locais,
+      sinal: ctx.sinal,
+      aoCortar: 'a execução acabou antes da resposta',
+      prazoMs,
+      maxBytes,
+      userAgent: 'Orkester-Fluxos',
+      resolvedor: dep.resolvedor,
+      transporte: dep.transporte
+    })
+    if (r.status < 200 || r.status > 299) {
+      throw new ErroDoHttp(`${r.url.hostname} respondeu ${r.status}${r.mensagem ? ` ${r.mensagem}` : ''}${r.texto.trim() ? `: ${r.texto.trim().slice(0, 300)}` : ''}`)
     }
-
-    // um prazo para o pedido inteiro, e o fim da execução (ctx.sinal) também corta
-    const controle = new AbortController()
-    let estourou = false
-    const timer = setTimeout(() => {
-      estourou = true
-      controle.abort()
-    }, prazoMs)
-    const aoAbortar = (): void => controle.abort()
-    if (ctx.sinal.aborted) controle.abort()
-    else ctx.sinal.addEventListener('abort', aoAbortar, { once: true })
-    const motivo = (e: unknown): Error => {
-      if (estourou) return new ErroDoHttp(`o pedido passou de ${Math.round(prazoMs / 1000)} s`)
-      if (controle.signal.aborted) return new ErroDoHttp('a execução acabou antes da resposta')
-      if (e instanceof ErroDoHttp) return e
-      const codigo = (e as { code?: string })?.code
-      return new ErroDoHttp(`o pedido falhou${codigo ? ` (${codigo})` : ''}: ${e instanceof Error ? e.message.slice(0, 200) : String(e)}`)
-    }
-
-    const pedir = (url: URL, metodo: string, cabecalhos: Record<string, string>, envio: string | undefined): Promise<IncomingMessage> =>
-      new Promise((ok, falha) => {
-        const https = url.protocol === 'https:'
-        const porta = url.port ? Number(url.port) : https ? 443 : 80
-        const req = (https ? transporte.https : transporte.http)(
-          {
-            protocol: url.protocol,
-            hostname: url.hostname.replace(/^\[|\]$/g, ''),
-            port: porta,
-            path: `${url.pathname}${url.search}`,
-            method: metodo,
-            headers: envio === undefined ? cabecalhos : { ...cabecalhos, 'content-length': String(Buffer.byteLength(envio)) },
-            lookup: lookupConferido(locais, porta, dep.resolvedor),
-            agent: false,
-            signal: controle.signal
-          },
-          ok
-        )
-        req.on('error', falha)
-        req.end(envio)
-      })
-
-    try {
-      let url = inicial
-      let metodo: string = ajustes.metodo
-      let envio = corpo.corpo
-      let tipoDoEnvio = corpo.tipoDeConteudo
-      const cabecalhos = { ...proprios }
-      for (let saltos = 0; ; saltos++) {
-        // cada salto de novo: host literal, porta efetiva e lista (o nome passa pelo lookup conferido)
-        const bloqueio = conferirDestino(url, locais)
-        if (bloqueio) throw new ErroDoHttp(bloqueio)
-        const finais: Record<string, string> = { 'user-agent': 'Orkester-Fluxos', 'accept-encoding': 'gzip, deflate, br', ...cabecalhos }
-        if (envio !== undefined && tipoDoEnvio && !('content-type' in finais)) finais['content-type'] = tipoDoEnvio
-        if (credencial) {
-          const nome = credencial.cabecalho.nome.toLowerCase()
-          finais[nome] = credencial.cabecalho.valor // a credencial manda sobre um cabeçalho de mesmo nome escrito à mão
-        }
-
-        const res = await pedir(url, metodo, finais, envio)
-        const passo = proximoPasso(res.statusCode ?? 0, res.headers.location, url, metodo)
-        if (passo === null) {
-          const status = res.statusCode ?? 0
-          const texto = metodo === 'HEAD' ? (res.resume(), '') : (await lerResposta(res, maxBytes)).toString('utf8')
-          if (status < 200 || status > 299) {
-            throw new ErroDoHttp(`${url.hostname} respondeu ${status}${res.statusMessage ? ` ${res.statusMessage}` : ''}${texto.trim() ? `: ${texto.trim().slice(0, 300)}` : ''}`)
-          }
-          return {
-            status,
-            cabecalhos: cabecalhosDaResposta(res.headers),
-            corpo: lerCorpo(texto, res.headers['content-type']),
-            ...(url.href !== inicial.href ? { url: url.href } : {})
-          }
-        }
-        res.resume() // descarta o corpo do 3xx
-        if ('erro' in passo) throw new ErroDoHttp(passo.erro)
-        if (saltos >= MAX_REDIRECIONAMENTOS) throw new ErroDoHttp(`mais de ${MAX_REDIRECIONAMENTOS} redirecionamentos`)
-
-        // trocou de origem (esquema, host ou porta): a credencial sai PARA SEMPRE, mesmo que o host novo esteja nos
-        // domínios dela, junto com o authorization/cookie escritos à mão. Na mesma origem, o cofre ainda reconfere.
-        if (passo.url.origin !== url.origin) {
-          credencial = null
-          for (const n of CABECALHOS_DE_LOGIN) delete cabecalhos[n]
-        } else if (credencial && ajustes.credencial) {
-          const c = dep.cofre.paraPedido(ajustes.credencial, passo.url.href)
-          if ('erro' in c) credencial = null
-          else {
-            c.ocultar.forEach(ctx.ocultar)
-            credencial = c
-          }
-        }
-        if (passo.semCorpo) {
-          envio = undefined
-          tipoDoEnvio = undefined
-          delete cabecalhos['content-type']
-        }
-        url = passo.url
-        metodo = passo.metodo
-      }
-    } catch (e) {
-      throw motivo(e)
-    } finally {
-      clearTimeout(timer)
-      ctx.sinal.removeEventListener('abort', aoAbortar)
+    return {
+      status: r.status,
+      cabecalhos: cabecalhosDaResposta(r.cabecalhos),
+      corpo: lerCorpo(r.texto, r.cabecalhos['content-type']),
+      ...(r.url.href !== inicial.href ? { url: r.url.href } : {})
     }
   }
 }

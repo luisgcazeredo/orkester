@@ -24,6 +24,7 @@ export type TipoDeNo =
   | 'logica.definir'
   | 'fora.codigo'
   | 'fora.http'
+  | 'fora.mcp'
 
 export type CategoriaDoNo = 'gatilho' | 'orkester' | 'logica' | 'fora'
 
@@ -135,6 +136,12 @@ export interface AjustesPorTipo {
   'fora.codigo': { codigo: string }
   /** `credencial`: só o NOME da credencial global; o valor nunca entra no fluxo. Sensível. */
   'fora.http': { metodo: MetodoHttp; url: string; consulta: ParNomeValor[]; cabecalhos: ParNomeValor[]; corpo: CorpoHttp; credencial?: string }
+  /**
+   * (1.9.7, C3a) Chama UMA ferramenta de um servidor MCP de fora (Conexões › MCP). `servidor`: o id do cadastro e o nome
+   * (`id: ''` = "a escolher": o agente disse só o nome, e o usuário escolhe no nó). `ferramenta`: fixa. `argumentos`:
+   * um objeto JSON com `{{ }}` (escapadas como no corpo JSON do HTTP). Sensível: só o usuário liga, vendo os três.
+   */
+  'fora.mcp': { servidor: Referencia; ferramenta: string; argumentos: string }
 }
 
 export interface NoDoFluxo {
@@ -227,6 +234,8 @@ export interface NoNaExecucao {
   recado?: string
   /** `console.log` do Código: até 50 linhas e 2 KB. */
   log?: string[]
+  /** (1.9.7, D5) As `{{ }}` que vieram vazias neste nó (até 10, sem repetir). */
+  vazias?: string[]
 }
 
 /** `execucoes/<fluxoId>/<execId>.json`. Nenhuma credencial entra aqui. */

@@ -2,7 +2,7 @@
 
 [English](manual.md) · Português
 
-[//]: # "Manual conferido no código da 1.9.6 (base 0278334 + A2 Configurações + Fluxos), em 23/11/2026. Cada seção cita de onde saiu, num comentário como este, invisível no GitHub e no Leitor do app. Comentário HTML apareceria como texto no Leitor, por isso esta forma. Caminhos relativos a app/src/."
+[//]: # "Manual conferido no código da 1.9.6 (base 0278334 + A2 Configurações + Fluxos), em 23/11/2026, e atualizado com as entregas da 1.9.7 (API e MCP nas páginas, servidores MCP de fora, Kanban em pastas, D1 a D6) em 24/11/2026. Cada seção cita de onde saiu, num comentário como este, invisível no GitHub e no Leitor do app. Comentário HTML apareceria como texto no Leitor, por isso esta forma. Caminhos relativos a app/src/."
 
 Este manual é para quem nunca viu o Orkester. Ele explica cada página, botão, menu e atalho, na ordem em que você
 vai encontrá-los. As referências técnicas ficam em outros arquivos: o comando dos agentes em
@@ -497,7 +497,9 @@ Quatro abas: **Agentes**, **Funções**, **Presets**, **Partituras**.
 
 **Agentes**: todos os agentes vivos de todos os espaços, só para ler ("daqui não se comanda agente nenhum"). Filtros
 por **Espaço**, **Situação** (livre, ocupado, numa pergunta, encerrado) e **Motor**; **Recolher todos / Abrir
-todos**. Cada cartão mostra função, motor, modelo · esforço (`padrão` quando nenhum foi escolhido), caixa ("N recados esperando") e as tarefas do Kanban
+todos**. Cada cartão mostra função, motor, modelo · esforço (`padrão` quando nenhum foi escolhido; desde a 1.9.7, com o
+que o config do motor diz entre parênteses, em tom suave, como "padrão (gpt-5.6-terra · high)", lido só das chaves de
+modelo e esforço de `~/.claude/settings.json` ou `~/.codex/config.toml`; sem leitura, fica só `padrão`), caixa ("N recados esperando") e as tarefas do Kanban
 (clicar abre a tarefa, trocando a janela para o espaço dele). Atualiza a cada 3 s.
 
 **Funções**: cada função tem nome, **modelo**, **esforço**, pasta (vazia = a do espaço) e o prompt ("O que ele é, o
@@ -528,8 +530,9 @@ As tarefas do espaço desta janela, em colunas. "Tarefa" é do Kanban; "cartão"
 Maestro e Revisão podem ser renomeadas mas não apagadas.
 
 **Topo**: a lista de espaços (trocar ali troca o espaço da janela); **+ Demanda**; **⋯** com **Nova coluna…**,
-**Renomear coluna**, **Apagar coluna** (só vazia; se algum fluxo usa a coluna, o app avisa quais, e os ligados
-desligam) e **Lixeira (N)**. Filtros: busca ("título, descrição ou
+**Renomear coluna**, **Apagar coluna** (só vazia; se algum fluxo usa a coluna, o app pede confirmação antes, com a
+lista dos fluxos e **Ver o fluxo**; os ligados desligam ao apagar) e **Lixeira (N)**. Cada coluna tem o seu **⋯** no cabeçalho, com o Organizar
+(veja [Pastas](#pastas-e-organizar) abaixo). Filtros: busca ("título, descrição ou
 #número", tecla **/**), **Quem trabalha**, **Etiqueta**, **Esconder concluídas há mais de 7 dias** (vem marcada) e
 **Limpar filtros**.
 
@@ -541,7 +544,11 @@ próxima. **Com o Maestro** mostra quem é o Maestro e se está livre, ou "sem M
 
 **Tarefa**: número, título, etiquetas, comentários e um chip por agente trabalhando nela (com a situação). Clique
 abre o **painel** à direita: título editável, coluna, **Delegar ao Maestro** (em Demandas), **Trabalhando nela**
-(Ir ao cartão, tirar, **+ pôr um agente**, que avisa a caixa dele), etiquetas (até 8), descrição em Markdown
+(Ir ao cartão, tirar, **+ pôr um agente**, que avisa a caixa dele), etiquetas (até 8, de até 24 letras; dá para
+digitar várias de uma vez separadas por vírgula, `cliente-a, 1.9.7`, e Enter; repetida entra uma vez só, a mais
+longa é cortada em 24 e a que passa de 8 fica de fora, e o aviso diz qual; o campo sugere as etiquetas em uso no
+espaço;
+na criação vai só o título: as etiquetas entram depois, no painel), descrição em Markdown
 (lápis para editar), **Comentários** (Ctrl+Enter envia) e **Apagar (vai para a lixeira)**.
 
 **Arrastar**: leve a tarefa entre colunas (Esc cancela). **Soltar em "Com o Maestro" = delegar**: o Maestro recebe
@@ -557,6 +564,45 @@ cartão do agente mostra a tarefa dele.
 **Lixeira**: **Restaurar** (o que estava com o Maestro volta para Demandas) e **Esvaziar a lixeira**.
 
 Limites: 500 tarefas, título 120 caracteres, descrição 8 KB, 12 colunas, lixeira de 50.
+
+### Pastas e Organizar
+
+[//]: # "paginas/kanban/{Coluna,pastas,PainelDaTarefa,filtros}.ts(x), shared/kanban.ts, shared/kanbanOrganizar.ts, main/kanban.ts (1.9.7, K1, K2 e Organizar simples)"
+
+Desde a 1.9.7 cada coluna agrupa as tarefas em **pastas recolhíveis** (uma por versão, por exemplo), para o Feito não
+virar uma lista sem fim. Serve para qualquer espaço: as pastas vêm das **etiquetas** das tarefas.
+
+- **Na coluna**: as tarefas sem pasta ficam no alto; depois, as pastas, da mais nova para a mais velha. Clique no
+  cabeçalho de uma pasta para abrir ou recolher; o que fica recolhido é guardado nesta máquina, por espaço. No
+  **Feito**, só a pasta da versão atual nasce aberta.
+- **Uma tarefa**: o painel dela tem o campo **Pasta**, com sugestões das pastas que já existem; digite e Enter muda,
+  apague e Enter tira. Arrastar um cartão para dentro de uma pasta também o põe nela. Uma pasta com o mesmo nome sem
+  contar maiúsculas e acentos vira a mesma (não nasce "geral" ao lado de "Geral"). Nome até 40 caracteres.
+- **Filtro e busca**: há um filtro **Pasta**; a busca também acha pelo nome da pasta e abre as pastas que têm
+  resultado.
+- **Etiqueta de versão** é a que tem cara de versão: `1.9.6`, `v2.0` (não valem `2024` nem `fluxos`).
+- **Automático**: a tarefa sem pasta que **chega no Feito** com uma etiqueta de versão entra sozinha na pasta da
+  versão, e o histórico dela diz "Organizar automático". Quem já estava no Feito e teve a pasta tirada por você não
+  volta. Vem ligado; no menu **⋯** da coluna final, o item diz **Organizar sozinho por versão: ligado (desligar)** ou
+  **…: desligado (ligar)**, e só você o muda.
+- **Primeira abertura na 1.9.7**: uma vez por espaço, se o Feito tem tarefas sem pasta com etiqueta de versão, a
+  página as põe nas pastas da versão e avisa "Feito organizado por versão · **Desfazer**". Espaço sem etiqueta de
+  versão: nada acontece, nem aviso.
+- **Organizar uma coluna**: no menu **⋯** do cabeçalho de cada coluna (não há botão no topo):
+  - **Organizar por versão** (só aparece se a coluna tem etiqueta de versão);
+  - **Uma pasta para cada etiqueta** (desligado se nenhuma tarefa sem pasta tem etiqueta): cada tarefa vai para a
+    pasta de uma etiqueta dela. Com várias, vale a de versão; se não há, a mais usada naquela coluna; no empate, a
+    primeira em ordem alfabética. A tarefa fica numa pasta só, e as outras etiquetas continuam nela;
+  - **Juntar numa pasta ▸**: escolha uma das etiquetas da coluna, com quantas tarefas **sem pasta** a têm
+    (`cliente-a (3)`); só essas vão para a pasta de mesmo nome. Uma etiqueta cujas tarefas já estão todas em pastas
+    aparece desligada, "(já em pastas)".
+
+  Aplica na hora, sem prévia, e só nas tarefas **sem pasta** (tarefa com pasta nunca é mexida por nada automático).
+  Depois o aviso diz para onde foram, com **Desfazer**: `2 tarefas → pasta "1.9.7"` ou `5 tarefas → 3 pastas`, e a
+  pasta de destino abre e a coluna rola até ela. Sem nada a mexer, "Nada a organizar em <coluna>: …" e nada é gravado.
+  Se alguém mexeu numa daquelas tarefas depois, o Desfazer a pula. Com o kanban só de leitura, nada disso fica ativo.
+- **Pelos agentes**: `ork kanban pasta` e `--pasta` no criar e no editar (veja [`ork.pt-BR.md`](ork.pt-BR.md#kanban));
+  pelo MCP, `pasta` em `kanban_criar`/`kanban_editar`. Organizar muitas tarefas de uma vez é sempre seu, pela página.
 
 ## Página Fluxos
 
@@ -579,7 +625,7 @@ Código, HTTP, credenciais, limites e receitas) está em [`fluxos.pt-BR.md`](flu
 - **Cada fluxo**: o interruptor (**Ligado: clique para desligar** / **Desligado: clique para ligar**), o nome (clique
   abre o editor), os gatilhos, quantos nós, o teto ("até 6/hora"), a pasta, quem criou e quem editou, e o último
   disparo ("hoje 14:03" com **ok**, **erro**, **barrado: laço**, **barrado: excesso** ou **sem destino**; ou "nunca
-  disparou"). Selos: **Código, HTTP ou comando** (é sensível), **criado por agente**, **editado por agente** e o
+  disparou"). Selos: **Código, HTTP, MCP ou comando** (é sensível), **criado por agente**, **editado por agente** e o
   motivo de um desligamento automático (**desligado por excesso de disparos**, **desligado: um cartão saiu do
   quadro**, **desligado: uma coluna saiu do kanban**, **desligado: mudou sem a sua aprovação**). A lixeira apaga o fluxo e as execuções dele.
 - Um arquivo de fluxo que não abre aparece num aviso com o motivo; ele não roda e não é apagado.
@@ -597,7 +643,9 @@ Código, HTTP, credenciais, limites e receitas) está em [`fluxos.pt-BR.md`](flu
 - **Pôr um nó**: **+ Nó**, **Tab**, **N** ou clique duplo no vazio abrem a busca de nós ("Buscar nó (gatilho, recado,
   Se…)"), com os grupos **Gatilhos**, **Orkester**, **Lógica** e **Fora do Orkester**.
 - **Ligar**: arraste da bolinha de saída de um nó até outro nó. Soltar no vazio abre a busca para o próximo nó ("Que
-  nó vem depois?"), já ligado. O **Se** tem duas saídas, verdadeiro e falso. Gatilho não recebe ligação.
+  nó vem depois?"), já ligado. O **Se** tem duas saídas, verdadeiro e falso. Gatilho não recebe ligação: vinda de uma
+  saída (ou com um nó selecionado), a busca mostra os gatilhos no fim, num grupo à parte com a nota "gatilho entra
+  solto", e o gatilho escolhido nasce sem ligação.
 - **Teclas**: **Del** apaga o que está selecionado (nós ou a ligação clicada); **Ctrl+Z** desfaz, **Ctrl+Y** ou
   **Ctrl+Shift+Z** refaz; **Ctrl+A** seleciona tudo; **F2** renomeia o nó; **Enter** abre o painel do nó; **Esc**
   fecha a busca ou o painel.
@@ -628,11 +676,12 @@ Código, HTTP, credenciais, limites e receitas) está em [`fluxos.pt-BR.md`](flu
 | Lógica | **Se** | separa os itens em verdadeiro e falso, por condições |
 | | **Definir campos** | põe ou troca campos nos itens |
 | Fora do Orkester | **Código** | JavaScript isolado, sem disco e sem rede, 5 segundos. **Sensível** |
-| | **HTTP** | chama uma API na internet, com credencial se precisar. **Sensível** |
+| | **HTTP** | chama uma API na internet, com a chave de uma API de Conexões › APIs se precisar (o campo **API** lista só as que cobrem o host da URL; **Criar API** abre o formulário já com o host). Com uma API "só lê", um método de escrita é avisado na tela e recusado antes de sair. **Sensível** |
+| | **Ferramenta MCP** | chama uma ferramenta de um servidor de Conexões › MCP › Servidores de fora: escolha o servidor e a ferramenta, e os campos saem do esquema dela (1.9.7). Ferramenta que mudou fica bloqueada até você rever. **Sensível** |
 
 **Ligar**. Pelo interruptor da lista ou do editor. Precisa de pelo menos um gatilho e de nenhum cartão ou coluna "a
-escolher". Fluxo com nó **sensível** (Código, HTTP ou Comando no shell) abre antes uma confirmação com cada um desses
-nós inteiro, marcado como **igual ao que você aprovou**, **mudou** ou **novo**, e com o agente que mexeu nele, se foi
+escolher". Fluxo com nó **sensível** (Código, HTTP, Ferramenta MCP ou Comando no shell) abre antes uma confirmação com
+cada um desses nós inteiro (na Ferramenta MCP: o servidor, a ferramenta e os argumentos), marcado como **igual ao que você aprovou**, **mudou** ou **novo**, e com o agente que mexeu nele, se foi
 um. Só você liga um fluxo sensível: um agente não consegue. Mudar um nó sensível depois desliga o fluxo até você
 confirmar de novo. Ligado, o fluxo dispara sozinho, com travas contra laço e excesso (no
 [guia](fluxos.pt-BR.md#travas-e-limites)).
@@ -656,14 +705,16 @@ desenho.
 fluxo) e o motivo de um erro ou barrado. Clique numa para vê-la no desenho: nós verdes rodaram, vermelho deu erro,
 cinza não rodou, e cada ligação mostra quantos itens passaram. A faixa do alto resume a execução e fecha para voltar a
 editar. No painel do nó, a Entrada e a Saída daquela execução (até uns 10 KB por nó; passou disso, aparece
-**Cortado**). Nenhuma credencial aparece numa execução.
+**Cortado**). Nenhuma credencial aparece numa execução. Se alguma `{{ }}` veio vazia, a faixa do alto lista qual e em
+que nó ("`{{ x }}` veio vazio em <nó>").
 
 **Avisos**. O que um agente faz nos fluxos ("Revisor criou o fluxo …") e a falha de um fluxo ligado aparecem no canto
 da janela; sem janela, numa notificação do Windows (falha: no máximo um aviso a cada 10 minutos por fluxo).
 
 **Bandeja: com fluxo ligado, fechar a janela não encerra.** Se há pelo menos um fluxo ligado em qualquer espaço,
 fechar a última janela deixa o Orkester rodando na bandeja do Windows (perto do relógio), com o ícone "Orkester · N
-fluxos ligados": os agentes seguem vivos e os fluxos seguem disparando. Na primeira vez, um balão explica. Clique no
+fluxos ligados" (e, desde a 1.9.7, "· N agentes seguem abertos" quando há agentes vivos): os agentes seguem vivos e
+os fluxos seguem disparando. Na primeira vez, um balão explica, dizendo também quantos agentes seguem abertos. Clique no
 ícone (ou **Abrir**, no menu dele) para reabrir as janelas; abrir o atalho do Orkester também reabre. **Para fechar de
 vez, use Sair no ícone da bandeja.** Se o último fluxo ligado for desligado com o app na bandeja, ele sai sozinho. Sem
 fluxo ligado, fechar a última janela encerra o app como sempre.
@@ -711,8 +762,8 @@ Até 50 temas e 30 plugins; arquivo `.css` de até 64 KB.
 
 [//]: # "paginas/conexoes/Conexoes.tsx, paginas/conexoes/Credenciais.tsx, shared/chaves.ts, shared/ferramentasMcp.ts, shared/fluxos/credenciais.ts, main/portais.ts"
 
-O que liga o Orkester ao que está fora dele, em cinco abas: **Chaves**, **MCP**, **Páginas**, **Credenciais** e
-**Portais**.
+O que liga o Orkester ao que está fora dele, em cinco abas: **Chaves**, **MCP**, **Páginas**, **APIs** (era
+**Credenciais** até a 1.9.6) e **Portais**.
 
 **Chaves**: para um programa de fora (o seu Claude, o Codex) mexer no quadro como você. Dê um nome ("Claude
 Desktop", "notebook") → **Gerar chave**. A chave aparece **uma vez** ("Copie agora"), com o bloco de configuração
@@ -720,22 +771,52 @@ pronto em abas (**Claude Code**, **Claude Desktop**, **.mcp.json**, **Codex**) e
 Em **Suas chaves**, cada uma mostra se está em uso, o começo dela, a data e o último uso, e **Revogar** (na hora,
 sem volta). Até 20 chaves.
 
-**MCP**: o passo a passo para ligar o seu programa (tenha uma chave, escolha onde colar, troque
-`COLE_AQUI_SUA_CHAVE` pela chave) e **Baixar a lista (.md)** das 26 ferramentas. Detalhes em
-[`mcp.pt-BR.md`](mcp.pt-BR.md).
+**MCP**, em duas partes:
+
+- **Ligar programas ao Orkester**: o passo a passo para ligar o seu programa (tenha uma chave, escolha onde colar,
+  troque `COLE_AQUI_SUA_CHAVE` pela chave) e **Baixar a lista (.md)** das ferramentas.
+- **Servidores de fora** (1.9.7): os servidores MCP que o Orkester usa no nó **Ferramenta MCP** dos fluxos e nas
+  páginas "+" em que você marcar o servidor. **Adicionar servidor** (stdio: o comando, os argumentos, a pasta e as
+  variáveis, cada uma em texto ou num **Segredo**, com **Criar segredo** ali mesmo; ou http: a URL e um cabeçalho de
+  uma API de **APIs**, só https), **Importar do Claude Code** e **Importar de um arquivo…** (lê os `mcpServers`; o que é
+  segredo vira credencial cifrada; você marca quais entram; um servidor com chave nos argumentos ou na URL não é
+  oferecido, e o aviso diz onde ela está para você movê-la para uma variável de ambiente ou um cabeçalho). Cada cartão mostra a situação, o comando inteiro com o
+  aviso "roda no seu PC com os seus poderes", e os botões **Testar** (lista as ferramentas: "diz que só lê" ou, em
+  vermelho, "pode mudar coisas"), **Rever ferramentas mudadas** (aparece quando uma ferramenta mudou: ela fica
+  bloqueada até você aceitar), **Editar**, **Pausar / Religar** e **Remover**. Um servidor HTTP que entra por login
+  (o do ClickUp) fica com o selo **Precisa de login (chega na 1.9.8)**.
+- **Segredos dos servidores** (1.9.7): o valor de uma variável de ambiente que um servidor stdio lê. Não tem domínio
+  e nunca vai em cabeçalho nem em pedido HTTP. **Guardar o valor de uma variável de ambiente** abre o formulário; cada
+  segredo tem o mesmo cartão das APIs (**Trocar o valor**, **Editar**, **Apagar**, que pergunta `Apagar o segredo
+  "Nome"?` e lista os servidores que o usam); o botão do formulário é **Guardar o segredo**. O servidor cita o segredo pelo id,
+  então renomear não o quebra. Mesmo cofre e mesmo arquivo das APIs; até a 1.9.6 ele aparecia na aba Credenciais.
+
+Detalhes em [`mcp.pt-BR.md`](mcp.pt-BR.md) (as duas partes).
 
 **Páginas**: a chave geral **Ligar páginas próprias (experimental)**, **Adicionar página…** e um cartão por página
 instalada (veja [Páginas próprias](#páginas-próprias-)).
 
-**Credenciais**: senhas, tokens e chaves de API que o nó **HTTP** dos [fluxos](#página-fluxos) leva sem que o valor
-entre no fluxo. **Guardar uma credencial**: **Nome** (como os fluxos vão citá-la, "API de cotação"), **Tipo**
-(**Token (Bearer)**, **Cabeçalho próprio** com o **Nome do cabeçalho**, ou **Usuário e senha (Basic)**), **Domínios**
-(para onde ela pode ir, um por linha; `*.exemplo.org` vale para os subdomínios, não para o próprio `exemplo.org`) e o valor → **Guardar cifrada**. Em
-**Suas credenciais**, cada uma mostra o tipo, os domínios e só os 4 últimos caracteres, com **Trocar o valor**,
-**Editar** e **Apagar** (os fluxos que a citam não mudam: o próximo pedido deles dá erro, e o app diz quais são).
+**APIs** (era **Credenciais** até a 1.9.6): a chave de cada API que as [páginas "+"](#páginas-próprias-), o nó
+**HTTP** dos [fluxos](#página-fluxos) e o cabeçalho de um servidor MCP http usam sem que o valor apareça. Páginas e
+fluxos chamam a API pelo **nome**. **Guardar uma API**: **Nome** (como páginas e fluxos vão chamá-la, "ClickUp"),
+**Tipo** (**Token (Bearer)**, **Cabeçalho próprio** com o **Nome do cabeçalho**, ou **Usuário e senha (Basic)**),
+**Domínios onde ela pode ir** (um por linha; `*.exemplo.org` vale para os subdomínios, não para o próprio
+`exemplo.org`), o valor e **O que ela pode fazer**: **Só lê (GET, HEAD)** ou **Lê e escreve** (em vermelho). Uma API
+"só lê" faz páginas e fluxos só consultarem: um POST, PUT, PATCH ou DELETE é recusado antes de sair. No cabeçalho de
+um servidor MCP isso não vale (o MCP sempre faz POST, e o que muda coisas é escolhido por ferramenta). API nova nasce
+"só lê"; as guardadas na 1.9.6 contam como "lê e escreve". → **Guardar a API** (cifrada). Com ao menos uma API
+guardada, o formulário fica atrás do botão **+ Nova API**. Em **Suas APIs**, cada uma mostra
+o tipo, os domínios, o selo **só lê** ou **lê e escreve** (vermelho) e só os 4 últimos caracteres, com **Trocar o
+valor**, **Editar** e **Apagar**. **Editar** avisa ao mudar o nome: "Vão parar até você ajustar: …" (em âmbar, com a
+lista), ou "Nada usa esta API agora: mudar o nome não quebra nada."; depois de guardar, o app diz quem citava o nome
+antigo. **Apagar** pergunta antes, `Apagar a API "Nome"?`: o valor some e não dá para recuperar, e o diálogo lista
+quem usa ("Nada usa agora." ou os fluxos, páginas e servidores, que não são mexidos: o próximo pedido deles dá erro),
+com **Apagar assim mesmo** quando algo usa. Sem conseguir conferir quem usa, não apaga. Dá também para criar uma API sem
+vir aqui: o botão **Criar API** está no aceite de uma página e no nó HTTP, já com o domínio preenchido. Os segredos dos
+servidores MCP (variáveis de ambiente) ficam na aba **MCP**.
 Valem em todos os espaços, só vão por https e só para os domínios marcados, e ficam cifradas pelo cofre do Windows;
 sem o cofre, a aba fica **Só leitura** e não guarda nada. O valor nunca volta para a tela, nem para o `ork`, o MCP ou
-o nó Código. Até 100 credenciais. Detalhes no [guia dos fluxos](fluxos.pt-BR.md#credenciais).
+o nó Código. Até 100 (APIs e segredos somados). Detalhes no [guia dos fluxos](fluxos.pt-BR.md#credenciais).
 
 **Portais**: o login guardado do navegador dos cartões de portal ("Login guardado" ou "Sem login", em quantos sites)
 e **Limpar login**. O valor dos cookies nunca aparece.
@@ -755,14 +836,31 @@ completo**.
 
 - **Ligar**: vêm desligadas porque rodam código de fora (isolado do seu PC). Ligue em Configurações › Conexões › **Páginas**,
   ou pelo **+** → **Ligar páginas**.
-- **Adicionar** (botão **+**): **Resumo do espaço** (exemplo pronto), **Escolher pasta…** (uma pasta sua) ou **Pedir
-  a um agente para criar** (vira uma demanda no Kanban, entregue ao Maestro). O app lê a pasta sem rodar nada e mostra
-  o diálogo de aceite com cada permissão; **Adicionar e permitir** copia a página e põe o ícone na barra.
-- **Na página**: a moldura do app mostra o nome, a versão, a quem ela está ligada, **Ligar a agente…** (para ela
-  mandar recados a esse agente), **Recarregar a página** e **Permissões e ligações (Configurações › Conexões › Páginas)**.
+- **Adicionar** (botão **+**): os exemplos prontos **Resumo do espaço** e **Eco de API** (1.9.7; testa o pedido a uma
+  API pelo app com o httpbin.org, um serviço público de teste, e uma API de valor inventado), **Escolher pasta…** (uma
+  pasta sua) ou **Pedir a um agente para criar** (vira uma demanda no Kanban, entregue ao Maestro; abaixo da
+  descrição, marque **APIs que ela vai usar** e **MCPs que ela vai usar**: a demanda leva só nomes, domínios e "só lê /
+  escreve", nunca a chave). O app lê a pasta sem rodar nada e mostra o diálogo de aceite com cada
+  permissão; **Adicionar e permitir** copia a página e põe o ícone na barra.
+- **APIs e MCPs que a página enxerga (1.9.7)**: quem decide é você, não o manifesto. O aceite tem
+  duas seções: **APIs que esta página enxerga** (todas as suas APIs de Conexões › APIs, uma caixa cada; marcada, aparece
+  **também escreve**, só se o teto da API deixa, em vermelho quando marcada; **Criar API** com o domínio já
+  preenchido) e **MCPs que esta página enxerga** (os servidores de Conexões › MCP, menos os que precisam de login; marcar um abre as ferramentas dele,
+  cada uma com caixa e o rótulo "diz que só lê" ou, em vermelho, "pode mudar coisas", com **marcar as que dizem só
+  ler** e **marcar todas**). O manifesto da página só **sugere**: a API ou o servidor que atende vem marcado, com "a
+  página chama de '…'". Uma página com `rede` ou `local` não enxerga API nem MCP (as seções aparecem desligadas).
+  Atualizar a página nunca muda o que você marcou. A página vê só nome, domínios e "escreve ou não" do que você marcou,
+  nunca a chave. Detalhes no [guia das páginas](paginas.pt-BR.md#apis-e-mcps-que-a-página-enxerga).
+- **Na página**: a moldura do app mostra o nome, a versão, a quem ela está ligada, "usa: ClickUp, Eco de teste" (as
+  APIs e os servidores que ela enxerga; vermelho se alguma escreve ou se tem ferramenta MCP que pode mudar coisas)
+ , **Ligar a agente…** (para ela mandar recados a esse agente), **Recarregar a página** e
+  **Permissões, APIs e MCPs (Configurações › Conexões › Páginas)**.
 - **Em Configurações › Conexões › Páginas**, cada página tem: **Rever** (quando pede permissão nova ou mudou fora do app),
-  **Desligar / Religar**, **Atualizar da pasta**, **Remover**, **Revogar / Permitir de novo** por permissão, e a
-  lista **Ligada a**.
+  **Desligar / Religar**, **Atualizar da pasta**, **Remover**, **Revogar / Permitir de novo** por permissão, a
+  lista **Ligada a**, as mesmas duas seções do aceite (**APIs e MCPs que esta página enxerga**, com **Guardar APIs e MCPs**
+  e **Desfazer**; uma API ou um servidor apagado aparece "sumiu", para desmarcar) e o **Registro de
+  pedidos** com os últimos 100, que somem ao fechar o app. Desligar, remover ou desmarcar corta o pedido que a página
+  tiver em curso.
 - Uma página que trava ou come memória é fechada sozinha; três quedas em 10 minutos a desligam até você religar.
 
 ## O time e o comando `ork`
@@ -803,8 +901,9 @@ A referência completa, com os cerca de trinta verbos, está em [`ork.pt-BR.md`]
 O `ork` é para os agentes dentro do quadro. Para mexer no quadro **de fora** (o seu Claude Code, o Claude Desktop, o
 Codex), gere uma chave em Configurações › Conexões › **Chaves** e cole o bloco que o app dá. O cliente passa a ler o quadro, abrir
 agentes, subir partituras, trocar modelos, mexer no Kanban e nos fluxos, como se fosse você (um fluxo com Código,
-HTTP ou comando, só você liga, pela página). O Orkester precisa estar aberto.
-Tudo em [`mcp.pt-BR.md`](mcp.pt-BR.md).
+HTTP, Ferramenta MCP ou comando, só você liga, pela página). O Orkester precisa estar aberto.
+Tudo em [`mcp.pt-BR.md`](mcp.pt-BR.md). O caminho contrário (o Orkester usar um servidor MCP de outro) está em
+[Conexões](#conexões), aba MCP, parte **Servidores de fora**.
 
 ## Onde ficam os dados
 
@@ -820,7 +919,8 @@ Numa pasta só: `%USERPROFILE%\.orkester` (ou a pasta da variável `ORK_DADOS`, 
 | Kanban | `espacos/<id>/kanban.json` |
 | fluxos do espaço (um `.json` por fluxo, e `indice.json` com as pastas e a ordem) | `espacos/<id>/fluxos/` |
 | execuções dos fluxos (as 50 últimas de cada um) | `espacos/<id>/fluxos/execucoes/` |
-| credenciais dos fluxos (cada valor cifrado pelo cofre do Windows) | `credenciais.json` |
+| APIs e segredos dos servidores MCP (de Conexões › APIs e › MCP; cada valor cifrado pelo cofre do Windows) | `credenciais.json` |
+| servidores MCP de fora (só os ids das credenciais, nenhum valor) | `mcp-servidores.json` |
 | chave do selo que aprova os nós sensíveis (cifrada) | `fluxos-selo.json` |
 | presets, funções, partituras, base e destaque do tema, pastas fixadas do Leitor | `preferencias.json` |
 | seus temas e plugins de CSS | `temas.json` |
@@ -853,7 +953,8 @@ Arquivos ilegíveis não são apagados: o app guarda uma cópia `.ruim` ao lado 
 - **Fechei a janela e o Orkester continua aberto.** Há fluxo ligado: o app foi para a bandeja do Windows, com os
   agentes vivos. Para fechar de vez (por exemplo, antes de instalar uma versão nova), use **Sair** no ícone da bandeja.
 - **O fluxo não dispara, ou não liga.** Veja a aba **Execuções** do editor e os selos da lista. Para ligar, ele precisa
-  de um gatilho e de nenhum cartão ou coluna "a escolher"; com Código, HTTP ou comando, só você liga. Mais em
+  de um gatilho e de nenhum cartão, coluna ou servidor "a escolher"; com Código, HTTP, Ferramenta MCP ou comando, só
+  você liga. Mais em
   [`fluxos.pt-BR.md`](fluxos.pt-BR.md#quando-algo-dá-errado).
 - **Não consigo soltar em "Com o Maestro".** Abra um agente Claude ou Codex com a função **Maestro** no espaço.
 - **O espaço não abre nesta janela.** Ele já está aberto em outra; o app leva você até ela.

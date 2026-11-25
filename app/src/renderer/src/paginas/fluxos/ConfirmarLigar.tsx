@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AlertTriangle, Bot, CheckCircle2 } from 'lucide-react'
 import type { FluxoGravado } from '../../../../shared/fluxos/tipos'
+import { ehSensivel } from '../../../../shared/fluxos/formato'
 import { realcarLinhas } from '../../arquivos/realce'
-import { avisosDoFluxo, descreverNosSensiveis, mostradoDe, textosDaConfirmacao, type BlocoDoNo, type ModoDaConfirmacao, type NoParaConfirmar } from './ligarSensivel'
+import { avisosDoFluxo, descreverNosSensiveis, mostradoDe, textosDaConfirmacao, type BlocoDoNo, type CadastroDeServidores, type ModoDaConfirmacao, type NoParaConfirmar } from './ligarSensivel'
 import '../../estilos/fluxos-fora.css'
 
-// Confirmação de ligar um fluxo SENSÍVEL (Código, HTTP ou comando). Mostra, nó por nó, o que cada um faz por inteiro e o
+// Confirmação de ligar um fluxo SENSÍVEL (Código, HTTP, MCP ou comando). Mostra, nó por nó, o que cada um faz por inteiro e o
 // que mudou desde a última aprovação (marcando o que um agente mexeu), e só entrega o `mostrado` ao confirmar. Quem chama
 // manda esse texto ao main junto do `ligar`; o main o confere contra o disco e recusa se um agente mexeu no meio.
 //
@@ -21,7 +22,8 @@ import '../../estilos/fluxos-fora.css'
 
 /** Abre a confirmação. `null` = o usuário cancelou; senão, o `mostrado` para o `ligar` (ou o `rodar`). Sem nó sensível, devolve direto. */
 export function confirmarLigar(fluxo: FluxoGravado, modo: ModoDaConfirmacao = 'ligar'): Promise<string | null> {
-  if (!fluxo.nos.some((n) => n.tipo === 'fora.codigo' || n.tipo === 'fora.http' || n.tipo === 'orkester.comando')) return Promise.resolve(mostradoDe(fluxo))
+  // todo nó sensível do catálogo (Código, HTTP, comando, Ferramenta MCP…): a lista não é fixa aqui
+  if (!ehSensivel(fluxo)) return Promise.resolve(mostradoDe(fluxo))
   return new Promise((resolver) => {
     const alvo = document.createElement('div')
     alvo.setAttribute('data-confirmar-ligar-raiz', '')
@@ -44,6 +46,11 @@ function Bloco({ b, tipo }: { b: BlocoDoNo; tipo: NoParaConfirmar['tipo'] }) {
   return (
     <div className="ligar-bloco">
       <span className="ligar-bloco-rotulo">{b.rotulo}</span>
+      {b.perigo && (
+        <p className="conexoes-erro" role="alert" data-ligar-perigo>
+          {b.perigo}
+        </p>
+      )}
       {html !== null ? (
         <pre className="ligar-texto codigo-realce" dangerouslySetInnerHTML={{ __html: html }} />
       ) : (
@@ -94,7 +101,9 @@ function DialogoDeLigar({ fluxo, modo, aoResponder }: { fluxo: FluxoGravado; mod
   const [li, setLi] = useState(false)
 
   useEffect(() => {
-    descreverNosSensiveis(fluxo).then(setNos, (e: unknown) => setErro(e instanceof Error ? e.message : String(e)))
+    // o nome do servidor MCP vem do cadastro, pelo id (o do nó é texto de quem o escreveu)
+    const cadastro = fluxo.nos.some((n) => n.tipo === 'fora.mcp') ? window.ork.mcpFora.listar().then((l): CadastroDeServidores => l.map((s) => ({ id: s.id, nome: s.nome })), (): CadastroDeServidores => null) : Promise.resolve(undefined)
+    cadastro.then((c) => descreverNosSensiveis(fluxo, undefined, c)).then(setNos, (e: unknown) => setErro(e instanceof Error ? e.message : String(e)))
   }, [fluxo])
   useEffect(() => {
     const tecla = (e: KeyboardEvent): void => {

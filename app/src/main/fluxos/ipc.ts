@@ -1,7 +1,7 @@
 // Fluxos: os canais da página (`window.ork.fluxos`). Cada um passa o remetente ao serviço, que confere se a janela é
 // dona do espaço (ou se o espaço não tem janela). Nada aqui decide regra: está tudo em servico.ts.
 import type { IpcMain, IpcMainInvokeEvent } from 'electron'
-import { CANAIS_FLUXOS, type FluxoGravadoOk, type FluxoRodado, type ListaDeFluxos, type ResultadoDeFluxo } from '../../shared/api'
+import { CANAIS_FLUXOS, type FluxoGravadoOk, type FluxoQueUsa, type FluxoRodado, type ListaDeFluxos, type ResultadoDeFluxo } from '../../shared/api'
 import type { Execucao, FluxoGravado, ResumoDaExecucao } from '../../shared/fluxos/formato'
 import type { ServicoDeFluxos } from './servico'
 
@@ -27,6 +27,10 @@ export function registrarIpcDosFluxos(ipcMain: IpcMain, s: ServicoDeFluxos): voi
     } catch {
       return { pastas: [], fluxos: [], invalidos: [] }
     }
+  })
+  ipcMain.handle(CANAIS_FLUXOS.quemUsaColuna, (_e, espaco: unknown, colunaId: unknown): FluxoQueUsa[] => {
+    // sem catch: o erro rejeita a chamada e a tela do kanban não apaga a coluna (falha fechado, D1)
+    return s.quemUsaColuna(texto(espaco), texto(colunaId))
   })
   ipcMain.handle(CANAIS_FLUXOS.ler, (_e, espaco: unknown, id: unknown): FluxoGravado | null => {
     try {

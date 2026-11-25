@@ -12,7 +12,8 @@ export type GrupoDeNo = (typeof GRUPOS_DE_NOS)[number]
 const GRUPO_POR_TIPO: Partial<Record<TipoDeNo, GrupoDeNo>> = {
   'logica.definir': 'Dados e Código',
   'fora.codigo': 'Dados e Código',
-  'fora.http': 'Rede'
+  'fora.http': 'Rede',
+  'fora.mcp': 'Rede'
 }
 
 export function grupoDoNo(t: TipoDeNo): GrupoDeNo {
@@ -33,7 +34,18 @@ const sem = (t: string): string =>
  * texto: todos, agrupados na ordem de `GRUPOS_DE_NOS` (dentro do grupo, a do catálogo). Com texto: os que batem pelo
  * rótulo primeiro. `semGatilho`: a escolha veio de uma saída, e gatilho não recebe ligação.
  */
-export function buscarNos(texto: string, opcoes: { semGatilho?: boolean } = {}): TipoDeNo[] {
+export function buscarNos(texto: string, opcoes: { semGatilho?: boolean; gatilhosSoltos?: boolean } = {}): TipoDeNo[] {
+  const lista = buscarTodos(texto, opcoes)
+  if (!opcoes.gatilhosSoltos) return lista
+  // (1.9.7, D3) vindo de uma saída: os gatilhos ficam, mas num grupo à parte, no fim (entram soltos, sem ligação)
+  const ehG = (t: TipoDeNo): boolean => CATALOGO[t].categoria === 'gatilho'
+  return [...lista.filter((t) => !ehG(t)), ...lista.filter(ehG)]
+}
+
+/** A nota do grupo dos gatilhos quando a escolha veio de uma saída. */
+export const NOTA_DOS_GATILHOS_SOLTOS = 'gatilho entra solto'
+
+function buscarTodos(texto: string, opcoes: { semGatilho?: boolean }): TipoDeNo[] {
   const palavras = sem(texto).split(/\s+/).filter(Boolean)
   const tipos = TIPOS_DE_NO.filter((t: TipoDeNo) => !(opcoes.semGatilho && CATALOGO[t].categoria === 'gatilho'))
   const ordem = (t: TipoDeNo): number => GRUPOS_DE_NOS.indexOf(grupoDoNo(t))

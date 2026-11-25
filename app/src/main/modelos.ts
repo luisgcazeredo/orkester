@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 // Node executa as provas TypeScript diretamente e precisa da extensão neste import de execução.
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
-import { ESFORCOS, MODELOS_PADRAO, esforcoValido, esforcosDoMotor, modeloValido, type Esforco, type ListaDeModelos, type ModeloDisponivel } from '../shared/modelos.ts'
+import { ESFORCOS, MODELOS_PADRAO, esforcoValido, esforcosDoMotor, modeloValido, padraoDoClaude, padraoDoCodex, type Esforco, type ListaDeModelos, type ModeloDisponivel, type PadraoDoMotor } from '../shared/modelos.ts'
 import type { Agente } from '../shared/modelo'
 
 // Lista de modelos de cada motor, sem ficar velha: o cache do próprio Codex + um arquivo opcional do usuário
@@ -90,6 +90,29 @@ export function lerModelos(casa: string = homedir()): ListaDeModelos {
     lerJson(join(casa, '.codex', 'models_cache.json'), MAX_CACHE),
     lerJson(join(casa, '.orkester', 'modelos.json'), MAX_OVERRIDE)
   )
+}
+
+const MAX_CONFIG = 1024 * 1024
+
+/**
+ * O que o motor roda quando o cartão não diz (1.9.7, D4): lê SÓ as chaves de modelo e esforço do config dele
+ * (`~/.claude/settings.json`, `~/.codex/config.toml`); o resto do arquivo nem é interpretado. Sem arquivo, grande
+ * demais ou ilegível: `{}` e o rótulo fica "padrão". Nunca lança.
+ */
+export function lerPadraoDoMotor(agente: Agente, casa: string = homedir()): PadraoDoMotor {
+  try {
+    if (agente === 'claude') {
+      const caminho = join(casa, '.claude', 'settings.json')
+      return !existsSync(caminho) || statSync(caminho).size > MAX_CONFIG ? {} : padraoDoClaude(readFileSync(caminho, 'utf8'))
+    }
+    if (agente === 'codex') {
+      const caminho = join(casa, '.codex', 'config.toml')
+      return !existsSync(caminho) || statSync(caminho).size > MAX_CONFIG ? {} : padraoDoCodex(readFileSync(caminho, 'utf8'))
+    }
+  } catch {
+    /* config ilegível: fica sem padrão */
+  }
+  return {}
 }
 
 /**

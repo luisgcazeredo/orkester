@@ -1,4 +1,4 @@
-// Fluxos (1.9.6): o catálogo dos 13 nós. Para cada tipo: rótulo, categoria, saídas, se é sensível, onde vale expressão,
+// Fluxos (1.9.6): o catálogo dos nós (15 na 1.9.7, com o Consultar e a Ferramenta MCP). Para cada tipo: rótulo, categoria, saídas, se é sensível, onde vale expressão,
 // quais campos apontam para cartão ou coluna, os ajustes padrão e o validador (que recebe o que veio do disco, da
 // colagem, do `ork` ou do MCP, não confiável, e devolve os ajustes normalizados ou o motivo). Puro: roda no Node.
 import type { AjustesDaConsulta, AjustesPorTipo, CategoriaDoNo, CondicaoDoSe, CorpoHttp, MetodoHttp, NoDoFluxo, OperadorDoSe, ParNomeValor, OperacaoDaConsulta, QuandoDaRotina, RecursoDaConsulta, Referencia, TipoDeNo } from './tipos'
@@ -11,6 +11,8 @@ import { MAX_MINUTOS } from '../rotinas.ts'
 import { limparTextoDoRecado } from '../paginas.ts'
 // @ts-expect-error idem
 import { errosDeExpressao, partes, resolverTexto } from './expressoes.ts'
+// @ts-expect-error idem
+import { corpoJson } from './rede.ts'
 
 export const MAX_CONDICOES = 10
 export const MAX_CAMPOS = 30
@@ -20,6 +22,10 @@ export const MAX_VALOR = 2000
 export const MAX_CODIGO = 20_000
 export const MAX_URL = 2000
 export const MAX_CORPO = 20_000
+/** (1.9.7) O nome de uma ferramenta MCP (o da especificação, mais `/`). */
+export const NOME_DE_FERRAMENTA_MCP = /^[A-Za-z0-9_./-]{1,128}$/
+/** O nome do servidor MCP no nó: o mesmo teto do cadastro (`main/mcpFora/registro.ts`). */
+export const MAX_NOME_DO_SERVIDOR_MCP = 60
 
 export const OPERADORES_DO_SE: readonly OperadorDoSe[] = ['igual', 'diferente', 'contem', 'nao-contem', 'comeca', 'termina', 'vazio', 'nao-vazio', 'maior', 'menor', 'verdadeiro', 'falso']
 /** Operadores que não usam o `comparar`. */
@@ -406,7 +412,7 @@ const CATALOGO_: { [T in TipoDeNo]: DefinicaoDoNo<T> } = {
   'orkester.comando': {
     tipo: 'orkester.comando',
     rotulo: 'Comando no shell',
-    descricao: 'Digita um comando fixo (sem expressões) num cartão shell do espaço quando ele está livre. Só o usuário liga.',
+    descricao: 'Digita um comando fixo (sem expressões) num cartão shell do espaço quando ele está livre. Só você liga.',
     categoria: 'orkester',
     saidas: [''],
     sensivel: true,
@@ -513,7 +519,7 @@ const CATALOGO_: { [T in TipoDeNo]: DefinicaoDoNo<T> } = {
   'fora.codigo': {
     tipo: 'fora.codigo',
     rotulo: 'Código',
-    descricao: 'JavaScript isolado que recebe todos os itens e devolve itens. Sem disco, sem rede, 5 s. Só o usuário liga.',
+    descricao: 'JavaScript isolado que recebe todos os itens e devolve itens. Sem disco, sem rede, 5 s. Só você liga.',
     categoria: 'fora',
     saidas: [''],
     sensivel: true,
@@ -531,7 +537,7 @@ const CATALOGO_: { [T in TipoDeNo]: DefinicaoDoNo<T> } = {
   'fora.http': {
     tipo: 'fora.http',
     rotulo: 'HTTP',
-    descricao: 'Faz um pedido HTTP. Endereço do seu computador ou da rede local só com a sua permissão, no próprio nó. Só o usuário liga.',
+    descricao: 'Faz um pedido HTTP. Endereço do seu computador ou da rede local só com a sua permissão, no próprio nó. Só você liga.',
     categoria: 'fora',
     saidas: [''],
     sensivel: true,
@@ -569,10 +575,56 @@ const CATALOGO_: { [T in TipoDeNo]: DefinicaoDoNo<T> } = {
       if (x.credencial !== undefined && x.credencial !== '' && (!credencial || credencial.length > MAX_NOME)) return 'credencial: diga só o nome dela'
       return semExtras({ metodo: metodo as MetodoHttp, url, consulta, cabecalhos, corpo: { tipo, valor }, credencial: credencial || undefined })
     }
+  },
+  'fora.mcp': {
+    tipo: 'fora.mcp',
+    rotulo: 'Ferramenta MCP',
+    descricao: 'Chama uma ferramenta de um servidor MCP de fora (Conexões › MCP). A ferramenta que mudou fica bloqueada até você rever. Só você liga.',
+    categoria: 'fora',
+    saidas: [''],
+    sensivel: true,
+    expressoes: ['argumentos'],
+    referencias: [],
+    padrao: () => ({ servidor: { id: '', nome: '' }, ferramenta: '', argumentos: '{}' }),
+    validar: (b) => {
+      const x = objeto(b)
+      if (!x) return 'ajustes ausentes'
+      const s = objeto(typeof x.servidor === 'string' ? { nome: x.servidor } : x.servidor)
+      const nome = linha(s?.nome, MAX_NOME_DO_SERVIDOR_MCP + 1)
+      const id = s?.id === undefined ? '' : s.id
+      if (!s || typeof id !== 'string' || (id && !ID.test(id))) return 'servidor: escolha um servidor de Conexões › MCP'
+      if (!id && !nome) return 'escolha o servidor MCP'
+      if (nome.length > MAX_NOME_DO_SERVIDOR_MCP) return `servidor: o nome passa de ${MAX_NOME_DO_SERVIDOR_MCP} letras`
+      const ferramenta = linha(x.ferramenta, 129)
+      if (!ferramenta) return 'escolha a ferramenta'
+      if (!NOME_DE_FERRAMENTA_MCP.test(ferramenta)) return 'ferramenta: o nome dela como o servidor mostra (letras, números e _ - . /)'
+      const argumentos = argumentosDoMcp(x.argumentos)
+      if (typeof argumentos !== 'string') return argumentos.erro
+      return { servidor: { id, nome: nome || id }, ferramenta, argumentos }
+    }
   }
 }
 
 export const CATALOGO: { readonly [T in TipoDeNo]: DefinicaoDoNo<T> } = CATALOGO_
+
+/**
+ * (1.9.7) Os argumentos do nó MCP: um objeto JSON, como texto com `{{ }}` (o agente pode mandar o objeto: vira texto).
+ * Vazio = `{}`. Conferido com as expressões vazias: dentro de aspas viram texto, fora viram `null`.
+ */
+function argumentosDoMcp(v: unknown): string | { erro: string } {
+  let t: string
+  if (v === undefined || v === null || v === '') t = '{}'
+  else if (typeof v === 'string') t = textoLimpo(v) || '{}'
+  else if (objeto(v)) t = JSON.stringify(v, null, 2)
+  else return { erro: 'argumentos: um objeto JSON, como {"texto": "{{ titulo }}"}' }
+  if (t.length > MAX_CORPO) return { erro: `os argumentos passam de ${MAX_CORPO} letras` }
+  const e = erroDeExpressao(t, 'os argumentos')
+  if (e) return { erro: e }
+  const montado = corpoJson(t, {})
+  if (typeof montado !== 'string') return { erro: montado.erro.replace('o corpo JSON', 'os argumentos') }
+  if (!objeto(JSON.parse(montado || '{}'))) return { erro: 'argumentos: precisa ser um objeto JSON ({ ... })' }
+  return t
+}
 
 /** Na ordem do menu: gatilhos, Orkester, lógica, fora. */
 export const TIPOS_DE_NO = Object.keys(CATALOGO_) as TipoDeNo[]
@@ -642,6 +694,9 @@ export function faltaDoNo(no: Pick<NoDoFluxo, 'tipo' | 'ajustes'>, espaco?: Part
   const r = validarAjustes(no.tipo, no.ajustes)
   if (typeof r === 'string') return r
   if (no.tipo === 'orkester.comando' && comandoComExpressao((r as AjustesPorTipo['orkester.comando']).comando)) return '{{ }} não vale no comando'
+  if (no.tipo === 'fora.mcp' && !(r as AjustesPorTipo['fora.mcp']).servidor.id) {
+    return `escolha o servidor MCP no nó (o "${(r as AjustesPorTipo['fora.mcp']).servidor.nome}" não está ligado a um cadastro)`
+  }
   const p = pendenciasDoNo(no)
   if (p.length) return `escolha ${p.map((c) => `"${c}"`).join(', ')} (o nome não bateu com nada deste espaço)`
   const s = espaco ? referenciasSumidas(no, espaco)[0] : undefined

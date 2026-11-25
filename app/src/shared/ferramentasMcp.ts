@@ -68,7 +68,7 @@ export const FERRAMENTAS_MCP = {
   kanban_criar: {
     titulo: 'Criar uma tarefa no kanban',
     descricao:
-      'Cria uma tarefa e devolve o número dela (#N). Sem `coluna`, o usuário cria em Demandas e um agente em Fazendo. Com `responsavel`, o agente entra na lista de quem trabalha nela e é avisado na caixa de entrada dele.'
+      'Cria uma tarefa e devolve o número dela (#N). Sem `coluna`, o usuário cria em Demandas e um agente em Fazendo. Com `responsavel`, o agente entra na lista de quem trabalha nela e é avisado na caixa de entrada dele. Com `pasta`, ela já nasce numa pasta da coluna.'
   },
   kanban_mover: {
     titulo: 'Mover uma tarefa',
@@ -78,7 +78,7 @@ export const FERRAMENTAS_MCP = {
   kanban_editar: {
     titulo: 'Editar uma tarefa',
     descricao:
-      'Troca o título, a descrição ou as etiquetas de uma tarefa. Etiquetas com +a,-b põem e tiram; sem sinal, trocam a lista.'
+      'Troca o título, a descrição, as etiquetas ou a pasta de uma tarefa. Etiquetas com +a,-b põem e tiram; sem sinal, trocam a lista. Pasta vazia tira a tarefa da pasta.'
   },
   kanban_atribuir: {
     titulo: 'Atribuir uma tarefa',

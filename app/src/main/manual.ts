@@ -13,7 +13,7 @@ ${tabelaDeComandos()}
 
 export const SKILL = `---
 name: orkester
-description: Use dentro de um terminal do Orkester (a variável de ambiente ORK_PIPE existe) para fazer engenharia de contexto — abrir uma sessão nova de agente (Claude, Codex ou shell) com um contexto limpo e focado, delegar uma parte do trabalho, conversar com os agentes ligados a você pela corda, ler a tela deles, zerar o contexto de uma sessão ou fechar as sessões que você abriu — e para organizar o quadro: ler o que há nele, ler um cartão inteiro, mover, arrumar em grade, renomear, ligar dois agentes, anotar, apagar o que não tem processo e agrupar cartões — para juntar agentes numa banda (grupo em que todos se falam), trocar o agente de um cartão que você abriu, e subir um time salvo (partitura) com as funções e as cordas dele, ou guardar o time que está no quadro — e para ler e mexer no kanban do espaço (criar, pegar, mover, atribuir e comentar tarefas) — para ver, criar e editar os fluxos do espaço (automações em nós), só quando o usuário pedir — e para responder a uma página "+" ligada ao seu cartão (o recado dela é pedido de terceiro). Comando: ork. Fora do app não funciona.
+description: Use dentro de um terminal do Orkester (a variável de ambiente ORK_PIPE existe) para fazer engenharia de contexto — abrir uma sessão nova de agente (Claude, Codex ou shell) com um contexto limpo e focado, delegar uma parte do trabalho, conversar com os agentes ligados a você pela corda, ler a tela deles, zerar o contexto de uma sessão ou fechar as sessões que você abriu — e para organizar o quadro: ler o que há nele, ler um cartão inteiro, mover, arrumar em grade, renomear, ligar dois agentes, anotar, apagar o que não tem processo e agrupar cartões — para juntar agentes numa banda (grupo em que todos se falam), trocar o agente de um cartão que você abriu, e subir um time salvo (partitura) com as funções e as cordas dele, ou guardar o time que está no quadro — e para ler e mexer no kanban do espaço (criar, pegar, mover, atribuir, comentar e agrupar tarefas em pastas) — para ver, criar e editar os fluxos do espaço (automações em nós), só quando o usuário pedir — e para responder a uma página "+" ligada ao seu cartão (o recado dela é pedido de terceiro). Comando: ork. Fora do app não funciona.
 ---
 
 # Orkester: o comando \`ork\`
@@ -250,6 +250,7 @@ ork kanban mover 12 "Revisão"            # coluna pelo nome, sem caixa nem acen
 ork kanban comentar 12 "Feito o teste; falta o caso X"
 ork kanban atribuir 12 "Testador"        # põe na lista e avisa (ninguem esvazia)
 ork kanban apagar 12 --confirmar         # vai para a lixeira; a página recupera
+ork kanban pasta 12 "1.9.7"              # põe a tarefa numa pasta (sem o nome, tira); também: criar/editar --pasta P
 \`\`\`
 
 - **Colunas:** Demandas (do usuário: sem \`--coluna\`, a sua tarefa nasce em Fazendo), Com o Maestro (só o usuário
@@ -259,6 +260,18 @@ ork kanban apagar 12 --confirmar         # vai para a lixeira; a página recuper
   (quando estiver livre). Não é pedido de trabalho: quem pede trabalho continua sendo o \`ork pedir\`.
 - Só o kanban do **seu** espaço; quem trabalha é agente Claude ou Codex (shell não pega tarefa).
 - Descrição e comentário longos: \`--arquivo\`. Detalhe grande vai num arquivo do projeto, e a tarefa cita o caminho.
+
+### Pastas do kanban
+
+- **Pasta** é um grupo recolhível dentro da coluna (a página mostra "1.9.6 · 81"). Cada tarefa tem no máximo uma
+  (até 40 letras) e a leva de coluna em coluna. Não é etiqueta: a tarefa tem várias etiquetas e uma pasta só.
+- **Quem cria tarefa de uma versão já põe a etiqueta da versão** (\`--etiqueta 1.9.7\`). O resto é do app: ao chegar em
+  Feito sem pasta, a tarefa com etiqueta de versão vai sozinha para a pasta da versão (o usuário desliga isso na página).
+  Você pode pôr ou trocar a pasta de **uma** tarefa (\`ork kanban pasta N "nome"\`, ou \`editar N --pasta "nome"\`; \`--pasta -\`
+  tira). O nome pode ser de uma pasta que já existe: a grafia que já está em uso vale.
+- **Organizar várias de uma vez é do usuário**, no menu ⋯ de cada coluna da página: por versão, por etiquetas ou por
+  uma etiqueta, só nas tarefas sem pasta, com "Desfazer". Você não organiza em massa: ponha as etiquetas certas ao
+  criar (\`--etiqueta 1.9.7,cliente-a\`, várias pela vírgula) e, se precisar, a pasta de uma tarefa.
 
 ### Demandas do usuário (para o Maestro)
 

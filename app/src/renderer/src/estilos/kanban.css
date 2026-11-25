@@ -832,3 +832,102 @@
     box-shadow: var(--sombra);
   }
 }
+
+/* ---------- pastas (1.9.7, K2) ---------- */
+.kanban-pasta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+}
+
+.kanban-pasta-topo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px var(--espaco-1);
+  border: 0;
+  border-bottom: 1px solid var(--borda);
+  background: transparent;
+  color: var(--texto-suave);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kanban-pasta-topo:hover:not(:disabled) {
+  color: var(--texto);
+}
+
+.kanban-pasta-topo:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 1px;
+}
+
+.kanban-pasta-topo:disabled {
+  cursor: default;
+}
+
+.kanban-pasta-nome {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kanban-pasta-contagem {
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+.kanban-pasta.recolhida {
+  gap: 0;
+}
+
+.kanban-pasta.alvo-da-soltura .kanban-pasta-topo {
+  border-bottom-color: var(--destaque);
+  color: var(--texto);
+}
+
+.kanban-pasta-campo {
+  width: 100%;
+}
+
+/* 1.9.7: o aviso "N tarefas organizadas · Desfazer" e o menu ⋯ de cada coluna */
+.kanban-organizado {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: var(--espaco-3) var(--espaco-5) 0;
+  padding: var(--espaco-1) var(--espaco-2) var(--espaco-1) var(--espaco-3);
+  border: 1px solid color-mix(in srgb, var(--destaque) 45%, transparent);
+  border-radius: var(--raio-pequeno);
+  background: color-mix(in srgb, var(--destaque) 8%, transparent);
+  color: var(--texto);
+  font-size: 13px;
+}
+
+.kanban-organizado > svg {
+  flex-shrink: 0;
+  color: var(--destaque);
+}
+
+.kanban-organizado .kanban-botao {
+  height: 26px;
+}
+
+.kanban-coluna-mais {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  margin-right: calc(-1 * var(--espaco-1));
+  opacity: 0.6;
+}
+
+.kanban-coluna-topo:hover .kanban-coluna-mais,
+.kanban-coluna-mais:focus-visible {
+  opacity: 1;
+}

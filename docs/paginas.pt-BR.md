@@ -2,12 +2,13 @@
 
 [English](paginas.md) · Português
 
-[//]: # (Fontes: app/src/shared/paginas.ts, app/src/main/paginas.ts, app/src/preload/pagina.ts, app/src/preload/conferirDaPagina.ts, app/src/renderer/src/paginas/extra/*, app/exemplos/paginas/resumo-do-espaco/. Este arquivo aparece dentro do app em "+" → "Guia completo", pelo Markdown do Leitor, que mostra HTML cru como texto: nada de comentário HTML aqui, use esta forma.)
+[//]: # (Fontes: app/src/shared/paginas.ts, app/src/shared/paginasApi.ts, app/src/main/paginasApi.ts, app/src/main/paginas.ts, app/src/preload/pagina.ts, app/src/preload/conferirDaPagina.ts, app/src/renderer/src/paginas/extra/*, app/exemplos/paginas/resumo-do-espaco/. Este arquivo aparece dentro do app em "+" → "Guia completo", pelo Markdown do Leitor, que mostra HTML cru como texto: nada de comentário HTML aqui, use esta forma.)
 
 Uma **página própria** é uma pasta com uma tela web (HTML, CSS e JavaScript) que entra na barra da esquerda do
 Orkester pelo botão **+** e abre ali dentro, ao lado das páginas do app. Ela pode mostrar os agentes do espaço ao
-vivo, mandar recados a agentes que você ligou a ela, guardar dados próprios, falar com sites que ela declarar ou ler
-um serviço do seu próprio PC, sempre só com o que você permitiu. Ela roda isolada: não lê seus arquivos, não abre
+vivo, mandar recados a agentes que você ligou a ela, guardar dados próprios, falar com sites que ela declarar, ler
+um serviço do seu próprio PC, chamar as APIs que você marcou para ela (sem ver o token) ou usar as ferramentas MCP
+que você marcou, sempre só com o que você permitiu. Ela roda isolada: não lê seus arquivos, não abre
 programas, não vê a tela dos terminais.
 
 Este guia é o contrato inteiro: a linguagem, a pasta, o manifesto, a API `window.orkPagina`, as permissões, os
@@ -29,14 +30,16 @@ limites e o porquê deles, receitas prontas, como depurar e como pedir a um agen
 10. [Guardar dados](#guardar-dados)
 11. [Rede, CORS e a origem `null`](#rede-cors-e-a-origem-null)
 12. [Ler um serviço do seu PC (`local`)](#ler-um-serviço-do-seu-pc-local)
-13. [Falar com um agente](#falar-com-um-agente)
-14. [Todos os limites numa tabela](#todos-os-limites-numa-tabela)
-15. [O que não dá, e por quê](#o-que-não-dá-e-por-quê)
-16. [Receitas](#receitas)
-17. [Depurar](#depurar)
-18. [Atualizar, desligar e remover](#atualizar-desligar-e-remover)
-19. [Pedir a um agente para criar](#pedir-a-um-agente-para-criar)
-20. [Como o app isola a página](#como-o-app-isola-a-página)
+13. [APIs e MCPs que a página enxerga](#apis-e-mcps-que-a-página-enxerga)
+14. [Falar com um agente](#falar-com-um-agente)
+15. [Todos os limites numa tabela](#todos-os-limites-numa-tabela)
+16. [O que não dá, e por quê](#o-que-não-dá-e-por-quê)
+17. [Receitas](#receitas)
+18. [Depurar](#depurar)
+19. [Atualizar, desligar e remover](#atualizar-desligar-e-remover)
+20. [Pedir a um agente para criar](#pedir-a-um-agente-para-criar)
+21. [Como o app isola a página](#como-o-app-isola-a-página)
+22. [Experimente o exemplo](#experimente-o-exemplo)
 
 ## O que dá para fazer
 
@@ -52,6 +55,11 @@ Ideias que cabem no contrato:
   servidor aceite CORS (permissão `rede`).
 - **Ler um serviço que roda no seu PC** (um servidor de desenvolvimento, um coletor de métricas), só leitura
   (permissão `local`).
+- **Usar uma API que pede token** (ClickUp, GitHub, a sua): você cadastra a API em Conexões › APIs e marca, no aceite
+  ou no cartão da página, quais ela enxerga; quem chama é o app, o token nunca entra na página e o CORS do servidor
+  não importa.
+- **Usar ferramentas de um servidor MCP** cadastrado em Conexões › MCP (o n8n-mcp, um de planilhas), só as que você
+  marcar para a página.
 - **Juntar as coisas acima**: um painel que mostra o time e manda um pedido ao agente certo.
 
 O que **não** dá (ler arquivo, rodar comando, ver a tela dos terminais, abrir janela, baixar) está em
@@ -223,7 +231,7 @@ Dica: mantenha a pasta de **trabalho** (com `.git`, fontes TypeScript, testes) s
 | `versao` | sim | `N.N.N`, só números (`1.0.0`, `2.13.4`) |
 | `descricao` | não | até 200 caracteres. Aparece no aceite e em Configurações › Conexões |
 | `icone` | não | `lucide:<Nome>` da lista abaixo, ou um `.svg`/`.png` da pasta de até 32 KB. Vazio: a inicial do nome. SVG é mostrado como imagem, então script dentro dele nunca roda |
-| `permissoes` | não | objeto com `quadro`, `recado`, `rede`, `local` (veja [Permissões](#permissões)). Sem ele, a página não pede nada |
+| `permissoes` | não | objeto com `quadro`, `recado`, `rede`, `local`, `api`, `mcp` (veja [Permissões](#permissões)). Sem ele, a página não pede nada |
 
 Ícones `lucide:` aceitos: `LayoutDashboard` `Gauge` `ListChecks` `ListTodo` `Kanban` `Calendar` `CalendarDays`
 `Clock` `Timer` `Bell` `Inbox` `Mail` `MessageSquare` `MessagesSquare` `Notebook` `NotebookPen` `BookOpen` `FileText`
@@ -242,6 +250,9 @@ A página começa sem nada. O manifesto **pede**; você aceita no diálogo (tudo
 | `"recado": true` | ver os agentes que **você** ligou a ela, mandar recados a eles e receber as respostas. Os agentes podem agir com base no que leem | mandar recados aos agentes que você ligar a ela — eles podem trabalhar a partir disso |
 | `"rede": ["api.exemplo.com"]` | falar com esses hosts por `https` e `wss` (até 5) | falar com api.exemplo.com: o que ela mostra pode vir de lá e o que ela guarda pode ir para lá |
 | `"local": { "porta": 7788, "caminhos": ["/api/dados"] }` | fazer `GET`, só leitura, em `http://127.0.0.1:<porta>` nesses caminhos (1 a 5), pelo app. **Aparece em vermelho** | ler 127.0.0.1:7788/api/dados… deste PC, só leitura |
+| `"api": [{ "encaixe": "tarefas", "hosts": ["api.exemplo.com"], "escrita": true }]` | **só sugere.** Não concede nada: diz o nome que a página vai chamar e os hosts que ela espera, para o aceite pré-marcar a API certa. O que a página enxerga é o que **você** marca (veja [APIs e MCPs que a página enxerga](#apis-e-mcps-que-a-página-enxerga)) | a linha "a página chama de 'tarefas'" ao lado da API que atende |
+| `"mcp": [{ "encaixe": "planilhas", "ferramentas": ["ler_planilha"] }]` | **só sugere** o servidor e as ferramentas, para o aceite pré-marcar. O que vale é o que você marca | a linha "a página chama de 'planilhas'" ao lado do servidor, e as ferramentas sugeridas já marcadas |
+
 
 Sempre, peça o que pedir: **1 MB de dados próprios**. Nunca: ler arquivos, abrir programas, câmera, microfone,
 localização, notificações, área de transferência, USB, captura de tela, downloads, janelas novas.
@@ -258,6 +269,25 @@ Aponte só para rotas que **não mudam nada**.
 **`local` e `rede` não andam juntos.** Uma página que lê algo do seu PC não pode ter por onde mandar isso para a
 internet. O manifesto com as duas é recusado.
 
+**`api` e `mcp` no manifesto são sugestões (1.9.7).** Não pedem permissão, não aparecem na lista de permissões e
+nunca concedem nada. Servem para o aceite pré-marcar a API ou o servidor certo e guardar o nome que a página usa.
+Uma página que não traz `api` nem `mcp` também pode enxergar APIs e MCPs: basta você marcar.
+
+**Regras de `api`.** De 1 a 5 sugestões. Cada uma: `encaixe` (o nome que a página vai chamar, `a–z 0–9 _ -`,
+começando por letra, até 40), `hosts` (**opcional**, de 0 a 5, com as mesmas regras de `rede`; ajudam a achar a API
+candidata) e `escrita` (opcional, `true` diz que a página quer escrever; a caixa "também escreve" **nunca** vem marcada
+pela sugestão: só você a marca). Chave a mais e nome repetido são recusados.
+
+**Regras de `mcp`.** De 1 a 5 sugestões. Cada uma: `encaixe` (mesma regra de nome) e `ferramentas` (de 1 a 20, sem
+repetir; o nome como o servidor mostra, até 128, com letras, números, `_`, `-` e `.`). As ferramentas sugeridas vêm
+marcadas no aceite; as outras do servidor, desmarcadas.
+
+**Combinações.** `api` e `mcp` andam juntas, e com `quadro` e `recado`. **`api` ou `mcp` com `rede` ou
+`local` é recusado** (a página que fala por fora do app não pode ter um segundo caminho de
+saída). Pelo mesmo motivo, uma página com `rede` ou `local` não enxerga API nem MCP, mesmo sem sugerir: o aceite
+mostra as duas seções desligadas. O nome de uma sugestão não se repete entre `api` e `mcp`. O registro guarda no
+máximo 60 fichas por página.
+
 ### Quando o manifesto muda
 
 A cada carga, o app compara a cópia com o que você aceitou:
@@ -270,8 +300,12 @@ A cada carga, o app compara a cópia com o que você aceitou:
 - **Permissão revogada** continua revogada: a página não a pede de novo a cada carga. Volta só com **Permitir de
   novo** em Configurações › Conexões.
 
+- **Sugestão de `api`/`mcp` nova ou mudada** nunca deixa a página pendente e nunca tira um acesso: as APIs e os MCPs
+  que você marcou continuam os mesmos depois de atualizar.
+
 Em Configurações › Conexões › Páginas, cada página lista as permissões com **Revogar** e **Permitir de novo**. Vale na próxima chamada (em
-`rede`, a conexão é cortada na hora), e a página aberta é recarregada.
+`rede`, a conexão é cortada na hora), e a página aberta é recarregada. As APIs e os MCPs que ela enxerga têm seções
+próprias no cartão: veja [Atualizar, desligar e remover](#atualizar-desligar-e-remover).
 
 ## A API `window.orkPagina`
 
@@ -380,6 +414,60 @@ const r = await orkPagina.local.ler('/api/dados?janela=24h')
 if (r.status === 200) mostrar(JSON.parse(r.texto))
 ```
 
+### `api.disponiveis()` — as APIs que a página enxerga
+
+Não precisa de permissão no manifesto: devolve as APIs que **você** marcou para esta página (lista vazia se nenhuma).
+Cada uma vem com `{ nome, dominios, escrita, atende? }`: o nome como está em Conexões › APIs, os domínios dela,
+`escrita` (`true` só se você marcou "também escreve" **e** a API permite) e `atende` (os nomes do manifesto que ela
+atende, quando veio de uma sugestão). Nunca vem id, o fim da chave ou o valor. Detalhes em
+[APIs e MCPs que a página enxerga](#apis-e-mcps-que-a-página-enxerga).
+
+```js
+const apis = await orkPagina.api.disponiveis()
+// [{ nome: 'ClickUp', dominios: ['api.clickup.com'], escrita: false, atende: ['clickup'] }]
+if (!apis.length) aviso('Marque uma API para esta página em Configurações › Conexões › Páginas.')
+```
+
+### `api.pedir(nome, pedido)` — chamar uma API pelo app
+
+Quem faz o pedido é o app, com a chave da API. `nome` é o nome da API (`"ClickUp"`) ou o nome que a página usa no
+manifesto (`"clickup"`); maiúsculas, acentos e espaços não contam (`"Eco de teste"` = `"eco de teste"` =
+`"ecodeteste"`).
+
+```js
+const r = await orkPagina.api.pedir('ClickUp', { metodo: 'GET', caminho: '/api/v2/team' })
+// { status: 200, tipo: 'application/json', corpo: '{"teams":[…]}' }
+if (r.status === 200) mostrar(JSON.parse(r.corpo))
+```
+
+- `metodo`: `GET` (padrão), `HEAD`, `POST`, `PUT`, `PATCH` ou `DELETE`. Os quatro últimos precisam de "também
+  escreve" marcado e de uma API que "lê e escreve".
+- `caminho`: começa com `/`, até 2048. Sem `?` nem `#` (a consulta vai em `consulta`), sem espaço cru (use `%20`), sem
+  `//`, `\`, `@`, `.` ou `..`.
+- `consulta`: objeto de texto, número ou sim/não, até 8 KB.
+- `corpo`: texto vai como está; outro valor vai como JSON. Até 100 KB. `GET` e `HEAD` não levam corpo.
+- `host` (opcional): um dos domínios da API. Sem ele, vai o primeiro domínio sem curinga; uma API só com curinga
+  (`*.exemplo.com`) exige `host`.
+- A resposta é só `{ status, tipo, corpo }` (o corpo sempre em texto). **Nenhum cabeçalho volta.** Um status que não é
+  2xx volta como resposta, não como erro.
+
+### `mcp.disponiveis()`, `mcp.ferramentas(nome)` e `mcp.chamar(nome, ferramenta, argumentos)` — usar um servidor MCP
+
+`disponiveis` devolve os servidores que você marcou para a página: `[{ nome, atende?, ferramentas }]`, com as
+ferramentas marcadas que o servidor tinha na última conexão e que não estão bloqueadas (não liga o servidor).
+`ferramentas(nome)` lê a lista de novo no servidor e devolve só as marcadas e não bloqueadas:
+`[{ nome, descricao, esquema, dizQueSoLe }]` (`dizQueSoLe` é a palavra do servidor, não uma garantia). `chamar` roda
+uma delas. `nome` segue a mesma regra da `api`: o nome do servidor ou o do manifesto.
+
+```js
+const r = await orkPagina.mcp.chamar('planilhas', 'ler_planilha', { planilha: 'ID', intervalo: 'A1:C20' })
+// { texto: '…', estruturado: { … }, erro: false }
+if (r.erro) aviso(r.texto)   // a ferramenta respondeu, mas disse que falhou
+```
+
+`argumentos` é um objeto (padrão `{}`), até 100 KB. Ferramenta que você não marcou é recusada antes de chegar ao
+servidor. Imagem e arquivo não voltam, só texto e o conteúdo estruturado.
+
 ### `ao(evento, fn)` — escutar
 
 Assina um evento e devolve a função que cancela. Evento desconhecido **lança erro na hora** (não é promessa).
@@ -407,6 +495,18 @@ parar()
 | `o caminho "…" não está entre os aceitos` | o caminho de `local.ler` não está no manifesto |
 | `o serviço local não respondeu em 5 s` | o serviço está parado ou lento |
 | `a página precisa ser revista` / `a página está desligada` | resolva em Configurações › Conexões (Rever, Religar) |
+| `a página não enxerga a API "x": marque em Conexões › Páginas` (ou `o servidor MCP "x"`) | nenhuma API (ou servidor) marcada tem esse nome, nem atende a esse nome do manifesto. Confira com `api.disponiveis()` |
+| `a API que atendia "x" foi apagada: marque outra em Conexões › Páginas` (ou `o servidor MCP`) | a API foi apagada em Conexões › APIs; o cartão da página mostra "sumiu" |
+| `"x" serve a mais de uma API que a página enxerga: renomeie uma em Conexões › APIs` | dois nomes que só diferem em maiúscula, acento ou espaço; o app não escolhe por você |
+| `a página só lê nesta API: POST precisa de "também escreve" em Conexões › Páginas` | marque "também escreve" para essa API no cartão da página |
+| `a API x só lê: mude em Conexões › APIs` | a própria API está como "só lê"; "também escreve" na página não passa por cima |
+| `host fora da API x: use um destes domínios: …` / `a API x só tem domínio com curinga: diga o host no pedido` | siga a regra do `host` |
+| `caminho inválido` | siga a regra do `caminho` (a consulta vai em `consulta`) |
+| `no máximo 60 pedidos por minuto: espere um pouco` | o balde é um só para `api` e `mcp` |
+| `a ferramenta "x" de y não está marcada para esta página: marque em Conexões › Páginas` | marque a ferramenta no cartão da página |
+| `… está bloqueada: reveja em Conexões › MCP` | a ferramenta mudou no servidor; você revê em Conexões › MCP |
+| `não deu para conferir a ferramenta x antes de chamar…` | o servidor não devolveu a lista; tente de novo |
+| `a página fechou antes da resposta` | a página foi recarregada, desligada, removida ou teve a permissão revogada no meio do pedido |
 
 ## Eventos
 
@@ -503,6 +603,84 @@ precisa de chave, peça-a na tela e guarde em `orkPagina.dados` (fica só neste 
 Cookies não são guardados (origem opaca, armazenamento só em memória), então login por cookie em outro site não
 funciona: use token no cabeçalho `Authorization`.
 
+**Com uma API marcada, o CORS deixa de importar.** O pedido não sai da página: sai do app, que não é um navegador,
+então o servidor não precisa aceitar `Origin: null`. E o token fica com o app, numa API de Conexões › APIs (cifrada),
+em vez de ficar em `orkPagina.dados`. Para uma API que pede chave, prefira `api.pedir` a `rede`.
+
+## APIs e MCPs que a página enxerga
+
+**Quem decide é você, não o manifesto.** Uma API (cadastrada em Configurações › Conexões › **APIs**) ou um servidor
+MCP (Conexões › **MCP**) só chega à página se você marcar, no aceite ou depois no cartão dela. O manifesto pode
+**sugerir** (`api` e `mcp`, veja [Permissões](#permissões)); a sugestão só pré-marca a caixa e guarda o nome que a
+página usa. A página nunca vê o token, o id nem a configuração do servidor.
+
+**Só lê ou lê e escreve: dois tetos.** Cada API diz em Conexões › APIs o que ela pode fazer: **Só lê** (`GET` e `HEAD`)
+ou **Lê e escreve** (selo vermelho). API nova nasce "só lê"; API criada na 1.9.6 conta como "lê e escreve". Na página,
+a caixa "também escreve" (vermelha) só aparece para uma API que escreve. A página escreve só com as duas coisas: a API
+permite **e** você marcou "também escreve".
+
+**O aceite.** O diálogo tem duas seções:
+
+- **APIs que esta página enxerga**: todas as suas APIs, uma caixa cada, com os domínios e o selo cinza do teto, "teto:
+  só lê" ou "teto: lê e escreve". Marcada uma API que escreve, aparece a caixa "também escreve: pode criar, mudar e
+  apagar (POST, PUT, PATCH, DELETE)"; o vermelho fica só nela, quando marcada. Se a página sugere escrita, uma nota
+  cinza diz "a página sugere também escrever" (a caixa continua desmarcada). **Criar API** abre o formulário embutido
+  (**Guardar a API** ou **Não criar**) com o domínio da sugestão preenchido, e a nova já vem marcada; ele só abre
+  sozinho quando a página sugere uma API e você não tem nenhuma. Enquanto ele está aberto, o botão do aceite fica
+  desligado: "termine ou feche a API nova".
+- **MCPs que esta página enxerga**: os servidores de Conexões › MCP. Um que precisa de login aparece desligado, "(precisa
+  de login: ainda não dá para usar)"; um pausado pode ser marcado. Marcar um servidor abre as ferramentas dele, cada uma com caixa e rótulo: "diz que só lê (palavra do
+  servidor)" ou, em vermelho, "pode mudar coisas". Nenhuma vem marcada, salvo as sugeridas; há **marcar as que dizem
+  só ler**, **marcar todas** e **desmarcar todas**. Uma ferramenta sugerida que o servidor não tem aparece sem caixa
+  e fora da conta: "a página pede, mas o servidor não tem: fica de fora"; se ele ainda não listou nenhuma, use **Testar** em Conexões › MCP. O aceite espera a lista de
+  ferramentas de cada servidor marcado ser lida.
+- **Sugestões do manifesto**: ao lado da API ou do servidor que atende, a linha "a página chama de 'eco'". Uma
+  candidata única (nome igual, API cujos domínios cobrem os hosts sugeridos, ou o único servidor marcado) já vem
+  marcada, só para ler: "também escreve" nunca vem marcado, nem quando a sugestão pede escrita. Duas marcadas para a
+  mesma sugestão:
+  o botão do aceite desliga, com "marque só uma para 'eco'".
+  Sugestão sem API que a atenda: aviso âmbar "a página vai receber erro ao chamar 'eco'", e o aceite segue.
+- Página com `rede` ou `local`: as duas seções aparecem desligadas, "esta página usa a rede direta: não pode enxergar
+  APIs nem MCPs".
+- Página com `quadro` e uma API com escrita: "O que ela lê do quadro pode ir para <API>."
+- **Atualizar ou rever** só abre o diálogo se há permissão nova, se a página mudou fora do app, ou se uma sugestão
+  ainda não é atendida pelo que você marcou. Ele parte do que você já tinha marcado; sem diálogo, nada muda.
+
+**Como a página chama.** Pelo nome da API ou do servidor, ou pelo nome que ela usa no manifesto (`atende`), sem contar
+maiúsculas, acentos e espaços. A ordem: (1) a API marcada de nome igual; (2) a marcada que atende a esse nome. Nada:
+erro "a página não enxerga a API 'x'". Dois nomes que colidem: erro, o app não escolhe. Comece com
+`api.disponiveis()` / `mcp.disponiveis()` para mostrar na tela o que a página enxerga.
+
+**O pedido pela `api`.**
+- Sai só por **https** (porta 443), para o `host` pedido (que tem de estar nos domínios da API) ou para o primeiro
+  domínio dela sem curinga, com o IP conferido antes (nada da rede local).
+- A chave vai só se os domínios da API cobrem o destino, e só com um método que ela permite (trava dupla, a cada salto).
+- Na resposta, o valor da chave vira `•••` (no corpo, no tipo e nas mensagens de erro), também nas formas em que
+  um servidor costuma ecoá-lo: escapado com `%XX` (em qualquer caixa, até em parte), em formulário (`+` no lugar do
+  espaço), com os escapes do JSON (`\/`, `\"`, `\uXXXX`), em base64 e em base64url. Outra transformação (hash, cifra,
+  o token todo em minúsculas) não é coberta: escolha um serviço em que você confia.
+- **Desligar ou remover** a página, **desmarcar** a API, recarregar ou fechar a página **corta o pedido em curso**: a
+  página recebe "a página fechou antes da resposta". O corte não desfaz o que o servidor já tinha gravado antes dele.
+- **Redirecionamento** só é seguido para https, na porta padrão, para um domínio **da mesma API**; para fora, a
+  página recebe o 3xx e o app não vai. Trocou de host, a chave sai.
+- Limites: 60 pedidos por minuto por página (somando `api` e `mcp`), 20 s por pedido, resposta até 2 MB.
+
+**A chamada pela `mcp`.** Vai ao servidor que você marcou, pelo mesmo cadastro dos fluxos: as mesmas regras de
+impressão (ferramenta que mudou fica de fora até você rever em Conexões › MCP), os mesmos prazos e os segredos do
+servidor como `•••`. Só as ferramentas marcadas. Entra no mesmo balde de 60 por minuto.
+
+**Na moldura**, "usa: ClickUp, Eco de teste" mostra as APIs e os servidores que a página enxerga, pelo nome. Fica em
+vermelho quando alguma tem escrita ou alguma ferramenta "pode mudar coisas".
+
+**O registro.** Configurações › Conexões › Páginas › **Registro de pedidos** mostra os últimos 100 pedidos da página
+(hora, nome da API ou do servidor, método, caminho sem a consulta, status e tempo; nas chamadas `mcp`, o método é
+`MCP` e o caminho é o nome da ferramenta, ou `(lista)` no `mcp.ferramentas()`). Recusados entram como "não saiu". Não
+guarda corpo nem cabeçalho, e só vale até fechar o app.
+
+**Apagar ou renomear uma API.** Apagar uma API que alguma página enxerga deixa o cartão dela com "sumiu" (desmarque),
+e o pedido dá erro claro. Renomear avisa: páginas e fluxos que chamam pelo nome param até você ajustar (a página que
+chama pelo nome do manifesto continua, porque o `atende` fica).
+
 ## Ler um serviço do seu PC (`local`)
 
 Para o que roda na sua máquina (um servidor de desenvolvimento, um coletor de métricas, um script seu), a página não
@@ -584,6 +762,13 @@ Escreva o pedido de forma que o agente saiba responder: diga no próprio texto "
 | Resposta de agente | 64 KB; até 20 guardadas (256 KB) com a página fechada |
 | Dados | 256 KB por chave; 1 MB e 200 chaves no total |
 | `local.ler` | 5 s; 1 MB de resposta |
+| Sugestões `api` / `mcp` no manifesto | 5 cada; `api`: 0 a 5 hosts; `mcp`: 1 a 20 ferramentas |
+| APIs / servidores MCP que a página enxerga | 10 APIs; 5 servidores, até 20 ferramentas cada |
+| Fichas por página | 60 |
+| `api.pedir` + `mcp.chamar` + `mcp.ferramentas` | 60 por minuto, somados |
+| `api.pedir` | 20 s; resposta até 2 MB; corpo até 100 KB; consulta até 8 KB; caminho até 2048 |
+| `mcp.chamar` | argumentos até 100 KB; até 60 s para o servidor subir (se ainda não está de pé), 30 s para conferir a lista de ferramentas e 30 s para a chamada; resultado até 2 MB |
+| Registro de pedidos | os últimos 100, só na memória |
 | Memória da página | 400 MB (acima disso, é fechada) |
 | CPU | acima de 90% por 30 s, é fechada |
 | Travada | sem responder por 5 s, é fechada |
@@ -607,6 +792,12 @@ Escreva o pedido de forma que o agente saiba responder: diga no próprio texto "
 | WebRTC | passaria por fora das regras de rede; as interfaces `RTC…` são tiradas antes do seu script rodar |
 | `http:`, IP, `localhost` direto | só `https`/`wss` para hosts declarados; para o seu PC use `local`, que passa pelo app |
 | `rede` e `local` juntos | o que a página lê do seu PC não pode ter por onde sair |
+| `api` ou `mcp` junto com `rede` ou `local` | a página que fala pelo app não pode ter um segundo caminho de saída |
+| Ver as APIs e os servidores que você não marcou, ou a chave das marcadas | a página só vê nome, domínios e "escreve ou não" do que você marcou (`disponiveis()`); quem marca é você |
+| Marcar uma API ou um MCP sozinha | não há método do `orkPagina`, verbo `ork` nem ferramenta MCP para isso: só você, na janela do app |
+| Login OAuth (o "Entrar com…" de um serviço) | ainda não existe no app; use um token pessoal numa API de Conexões › APIs. O MCP HTTP com login chega na 1.9.8 |
+| `wss` com chave | `api.pedir` é só pedido HTTP; WebSocket com token fica para a 1.9.8 |
+| Ler os cabeçalhos da resposta de `api.pedir` | só `status`, `tipo` e `corpo` voltam: cabeçalho pode trazer cookie e token |
 | Agente instalar ou aceitar a página | só você adiciona e aceita, pelo diálogo nativo do app |
 
 ## Receitas
@@ -943,6 +1134,124 @@ async function iniciar() {
 iniciar().catch((e) => { $('aviso').textContent = e.message })
 ```
 
+### 7. Página que usa uma API com chave
+
+Lista as tarefas de uma lista do ClickUp. O token fica numa API sua em Configurações › Conexões › **APIs** (nome
+"ClickUp", domínio `api.clickup.com`, tipo **Cabeçalho próprio** com o cabeçalho `Authorization`, **Só lê**). A página
+chama pelo nome e nunca vê o token. O manifesto só **sugere** a API, para o aceite já vir com ela marcada.
+
+```json
+{ "formato": 1, "id": "tarefas-clickup", "nome": "Tarefas do ClickUp", "versao": "1.0.0", "icone": "lucide:ListTodo",
+  "permissoes": { "api": [{ "encaixe": "clickup", "hosts": ["api.clickup.com"] }] } }
+```
+
+```html
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><link rel="stylesheet" href="estilo.css"></head>
+<body>
+  <p id="enxerga"></p>
+  <input id="lista" placeholder="Número da lista" inputmode="numeric">
+  <button type="button" id="ler">Ler</button>
+  <ul id="tarefas"></ul>
+  <p id="situacao" role="status"></p>
+  <script src="app.js"></script>
+</body></html>
+```
+
+```js
+const $ = (id) => document.getElementById(id)
+
+async function mostrarOQueEnxerga() {
+  const apis = await orkPagina.api.disponiveis()
+  $('enxerga').textContent = apis.length
+    ? `Enxergo: ${apis.map((a) => a.nome).join(', ')}`
+    : 'Nenhuma API marcada: marque o ClickUp em Configurações › Conexões › Páginas.'
+}
+
+async function ler() {
+  const lista = $('lista').value.trim()
+  if (!/^\d+$/.test(lista)) { $('situacao').textContent = 'Digite o número da lista.'; return }
+  await orkPagina.dados.gravar('lista', lista)
+  try {
+    // "clickup" é o nome do manifesto; "ClickUp", o nome da API, também serve
+    const r = await orkPagina.api.pedir('clickup', { caminho: `/api/v2/list/${lista}/task`, consulta: { archived: false } })
+    if (r.status !== 200) { $('situacao').textContent = `O ClickUp respondeu ${r.status}.`; return }
+    const tarefas = JSON.parse(r.corpo).tasks ?? []
+    $('tarefas').replaceChildren(...tarefas.map((t) => {
+      const li = document.createElement('li')
+      li.textContent = `${t.name} · ${t.status?.status ?? 'sem status'}`
+      return li
+    }))
+    $('situacao').textContent = `${tarefas.length} tarefas.`
+  } catch (e) {
+    $('situacao').textContent = e.message   // ex.: a página não enxerga a API "clickup"
+  }
+}
+
+$('ler').addEventListener('click', () => void ler())
+void mostrarOQueEnxerga()
+orkPagina.dados.ler('lista').then((v) => { if (v) { $('lista').value = v; void ler() } })
+```
+
+No aceite, a API "ClickUp" já vem marcada, com "a página chama de 'clickup'" (os domínios dela cobrem o host
+sugerido). Para criar tarefas também, a API precisa ser **Lê e escreve** em Conexões › APIs e você marca "também
+escreve" no aceite ou no cartão da página; aí use `metodo: 'POST'`. A moldura passa a mostrar o "usa:" em vermelho.
+
+### 8. Página que usa um MCP
+
+Lê um intervalo de uma planilha por um servidor MCP cadastrado em Conexões › MCP. O login do Google fica com o
+servidor; a página só conhece o nome e a ferramenta (o nome da ferramenta muda de servidor para servidor; aqui,
+`ler_planilha`). O manifesto sugere a ferramenta, para ela vir marcada no aceite.
+
+```json
+{ "formato": 1, "id": "planilha", "nome": "Planilha", "versao": "1.0.0", "icone": "lucide:Database",
+  "permissoes": { "mcp": [{ "encaixe": "planilhas", "ferramentas": ["ler_planilha"] }] } }
+```
+
+```html
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><link rel="stylesheet" href="estilo.css"></head>
+<body>
+  <input id="planilha" placeholder="Id da planilha">
+  <input id="intervalo" value="A1:C20">
+  <button type="button" id="ler">Ler</button>
+  <pre id="resultado"></pre>
+  <p id="situacao" role="status"></p>
+  <script src="app.js"></script>
+</body></html>
+```
+
+```js
+const $ = (id) => document.getElementById(id)
+
+async function iniciar() {
+  // confere se a ferramenta está disponível (marcada, não bloqueada, servidor de pé)
+  const ferramentas = await orkPagina.mcp.ferramentas('planilhas')
+  if (!ferramentas.some((f) => f.nome === 'ler_planilha')) {
+    $('situacao').textContent = 'A ferramenta não está disponível: veja Configurações › Conexões › Páginas e › MCP.'
+    $('ler').disabled = true
+  }
+}
+
+$('ler').addEventListener('click', async () => {
+  try {
+    const r = await orkPagina.mcp.chamar('planilhas', 'ler_planilha', {
+      planilha: $('planilha').value.trim(), intervalo: $('intervalo').value.trim()
+    })
+    $('resultado').textContent = r.estruturado ? JSON.stringify(r.estruturado, null, 2) : r.texto
+    $('situacao').textContent = r.erro ? 'A ferramenta disse que falhou.' : ''
+  } catch (e) {
+    $('situacao').textContent = e.message
+  }
+})
+
+iniciar().catch((e) => { $('situacao').textContent = e.message })
+```
+
+No aceite, marque o servidor na seção **MCPs que esta página enxerga**: `ler_planilha` já vem marcada, e a linha "a
+página chama de 'planilhas'" liga o nome. Se o servidor mudar a ferramenta depois, ela some de `ferramentas()` até
+você rever em Conexões › MCP.
+
 ## Depurar
 
 Não há DevTools para as páginas: o app não tem menu nem atalho que o abra, e `console.log` não aparece em lugar
@@ -994,16 +1303,23 @@ nenhum. O que funciona:
 Tudo no cartão da página, em **Configurações** › **Conexões** › aba **Páginas**:
 
 - **Atualizar da pasta**: relê a pasta de onde a página veio e mostra o que mudou. Se a versão nova não pede
-  permissão nova, é aplicada na hora e as páginas abertas recarregam; senão, o diálogo mostra só as novas. O mesmo
+  permissão nova, é aplicada na hora e as páginas abertas recarregam; senão, o diálogo mostra só as novas. As APIs e os MCPs que ela enxerga continuam os mesmos (uma sugestão nova no manifesto não pede nada nem tira nada). O mesmo
   `id` vindo da mesma pasta é atualização; vindo de outra pasta é recusado ("remova-a antes"). Mudar o `id` no
   manifesto e atualizar também é recusado. Subir a `versao` não é obrigatório, mas ajuda (o diálogo mostra
   "Versão 1.0.0 → 1.1.0").
 - **Edite sempre a pasta original.** Mexer na cópia (`~/.orkester/paginas/<id>/`) faz a página "mudar fora do
   Orkester" e ela só volta com **Rever**.
 - **Desligar / Religar**: tira da barra e para de carregar, sem apagar nada.
-- **Remover** (com confirmação): apaga a cópia, os dados, o estado do navegador e as ligações. A pasta original não
+- **Remover** (com confirmação): apaga a cópia, os dados, o estado do navegador, as ligações e o que ela enxergava. A pasta original não
   é tocada.
-- **Revogar / Permitir de novo**: por permissão, na lista **Permissões** do cartão.
+- **Revogar / Permitir de novo**: por permissão (`quadro`, `recado`, `rede`, `local`), na lista **Permissões** do cartão.
+- **APIs e MCPs que esta página enxerga**: as mesmas duas seções do aceite, com **Guardar APIs e MCPs** e
+  **Desfazer**. Marcar, desmarcar, ligar ou desligar "também escreve" e marcar ferramentas vale na próxima chamada, e
+  a página aberta é recarregada. O cartão também mostra as sugestões do manifesto: marcar uma API ou um servidor aqui dá
+  o `atende` como no aceite ("a página chama de …"). Uma API que já estava marcada só ganha `atende` se você a
+  desmarcar e marcar de novo. Uma API ou um servidor apagado
+  aparece como "sumiu", para desmarcar. Abaixo,
+  **Registro de pedidos**.
 - Desligar a chave geral tira todas as páginas da barra na hora; nada carrega até ligar de novo.
 
 A página **descarrega ao sair dela**: clicar em outra página da barra fecha a sua, e voltar carrega do zero. O que
@@ -1030,6 +1346,17 @@ as permissões que usar. Regras: manifesto.json e index.html na raiz; JS e CSS e
 próprios (script inline não roda); nada de CDN, eval, localStorage ou innerHTML com dado
 de fora; só extensões aceitas. Não instale nem aceite a página: me diga o caminho da pasta.
 ```
+
+**APIs e MCPs no pedido.** Abaixo da descrição, o painel do **+** tem **APIs que ela vai usar** e **MCPs que ela vai
+usar**, com uma caixa para cada API de Conexões › APIs e cada servidor (e as ferramentas dele). A demanda leva só o
+nome, os domínios e "só lê / escreve" de cada API marcada, e o nome do servidor e das ferramentas: nunca id, fim da
+chave ou valor. As instruções ensinam o agente a chamar `orkPagina.api.disponiveis()` e `api.pedir("Nome", …)` (ou
+`mcp.chamar`), a pôr a sugestão no manifesto e a nunca pôr token nos arquivos. Marcar aqui não concede nada; o painel lembra: "O agente
+recebe só os nomes, nunca a chave. Quem libera é você, no aceite."
+
+Ao pedir direto num terminal, diga o nome da API como está em Conexões › APIs (e se precisa escrever) ou o servidor e
+as ferramentas, por exemplo: "chame a API `ClickUp` com `orkPagina.api.pedir('ClickUp', …)`, só leitura, e sugira
+`api: [{ encaixe: 'clickup', hosts: ['api.clickup.com'] }]` no manifesto".
 
 O agente não consegue adicionar nem aceitar a página: isso é só seu, pelo diálogo do app. Se ele mexer na cópia já
 instalada, a página para de carregar até você **Rever**.
@@ -1072,6 +1399,9 @@ Para quem quer saber o que acontece por baixo:
 - **Vigia.** A cada 5 s o app confere cada página aberta: sem responder a uma sonda por 5 s ("travou"), memória acima
   de 400 MB, CPU acima de 90% por 30 s, ou queda do processo → a página é fechada e o app segue. Três quedas em 10
   minutos desligam a página até você usar **Religar**.
+- **APIs e MCPs saem pelo app, não pela página.** A política da página não muda com elas (nada de host novo no
+  `connect-src`): o pedido passa pela ponte `orkPagina`, conferido no app a cada chamada (o que você marcou, a
+  escrita da página e da API, o domínio, a taxa), e só `{ status, tipo, corpo }` ou `{ texto, estruturado?, erro }` voltam.
 - **A moldura é do app.** O nome, a versão e os botões em cima da página são desenhados pela janela, fora do
   `<webview>`: a página não consegue imitá-los.
 
@@ -1083,3 +1413,22 @@ Para quem quer saber o que acontece por baixo:
    ponto de partida para copiar.
 3. Na moldura da página, **Ligar a agente…** → escolha um agente Claude ou Codex do espaço.
 4. Escreva um recado e envie; peça ao agente para responder com `ork pagina responder "Resumo do espaço" "…"`.
+
+**Eco de API** (1.9.7). Mostra o pedido pelo app sem precisar de conta nenhuma: usa o httpbin.org, um serviço público
+de teste que devolve o que recebe. O código está em
+[`app/exemplos/paginas/eco-de-api/`](../app/exemplos/paginas/eco-de-api/). O manifesto sugere uma API chamada `eco`
+para `httpbin.org`, com escrita.
+
+1. Antes, crie a API em Configurações › Conexões › **APIs**: nome "Eco de teste", domínio `httpbin.org`, tipo
+   **Token (Bearer)**, um valor **inventado** (`eco-token-de-teste-123`: o httpbin só ecoa) e **Lê e escreve**. (Se
+   pular este passo, o aceite oferece **Criar API** com `httpbin.org` já preenchido.)
+2. **+** → **Eco de API** → Adicionar. Na seção **APIs que esta página enxerga**, "Eco de teste" já vem marcada, com
+   "a página chama de 'eco'", só para ler. Marque **também escreve** (vermelho) e **Adicionar e permitir**.
+3. Na página: ela mostra o que enxerga (`api.disponiveis()`); **Ler (GET)** mostra a consulta ecoada; **Escrever
+   (POST)** mostra o texto que você mandou, devolvido; **Ver os cabeçalhos** mostra `Bearer •••` (o valor nunca
+   volta); **Pedir o redirecionamento** devolve 302 e o app não segue para o outro site.
+4. Em Configurações › Conexões › Páginas: o cartão com "Eco de teste" marcada, o **Registro de pedidos** com os 4
+   pedidos, e desmarcar **também escreve** + **Guardar** (o POST passa a ser recusado e aparece como "não saiu").
+
+Se o httpbin.org estiver fora do ar, troque o host por `postman-echo.com` no manifesto da sua cópia e nos domínios da
+API: os caminhos são os mesmos.

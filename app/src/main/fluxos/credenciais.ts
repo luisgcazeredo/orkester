@@ -17,6 +17,7 @@ import type { IpcMain } from 'electron'
 import { CANAIS_CREDENCIAIS } from '../../shared/api.ts'
 import type {
   ArquivoDeCredenciais,
+  CredencialGuardada,
   CredencialParaPedido,
   ListaDeCredenciais,
   ResultadoDaCredencial,
@@ -24,7 +25,7 @@ import type {
 } from '../../shared/fluxos/credenciais'
 // Node executa as provas TypeScript diretamente e precisa da extensão nestes imports de execução.
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
-import { ARQUIVO_VAZIO, apagarCredencial, conferirDestino, credencialNaoExiste, criarCredencial, editarCredencial, lerArquivoDeCredenciais, montarCabecalho, paraMostrar, trocarValorDaCredencial, visivel } from '../../shared/fluxos/credenciais.ts'
+import { ARQUIVO_VAZIO, apagarCredencial, conferirDestino, conferirMetodo, credencialNaoExiste, criarCredencial, editarCredencial, hostPermitido, lerArquivoDeCredenciais, montarCabecalho, paraMostrar, trocarValorDaCredencial, visivel } from '../../shared/fluxos/credenciais.ts'
 
 /** A parte do `safeStorage` do Electron que o cofre usa. */
 export interface Cifra {
@@ -39,11 +40,20 @@ export interface DependenciasDasCredenciais {
   cifra: Cifra
   /** `main/dados.ts`: temporário + `rename`; com `guardarRuim`, copia o atual para `.ruim` antes. */
   gravarJsonAtomico: (destino: string, valor: unknown, guardarRuim: boolean) => void
-  /** Fluxos (de qualquer espaço) que citam a credencial pelo nome, para a tela avisar ao apagar. Opcional. */
-  usadaEm?: (nome: string) => string[]
+  /**
+   * Quem usa a credencial, para a tela avisar ao apagar: fluxos (pelo nome) e, na 1.9.7, servidores MCP de fora e
+   * páginas (pelo id). Opcional.
+   */
+  usadaEm?: (nome: string, id: string) => string[]
   novoId?: () => string
   agora?: () => string
 }
+
+/** (1.9.7) A credencial ligada a um encaixe de página foi apagada. */
+export const CREDENCIAL_LIGADA_SUMIU = 'a credencial ligada a este encaixe não existe mais: ligue outra em Configurações › Conexões › Páginas'
+
+/** (1.9.7) A credencial citada por um servidor MCP de fora foi apagada. */
+export const CREDENCIAL_DO_SERVIDOR_SUMIU = 'uma credencial deste servidor não existe mais: escolha outra em Configurações › Conexões › MCP'
 
 const SEM_CIFRA =
   'o cofre do sistema não está disponível para cifrar credenciais; sem ele o Orkester não grava o valor (nunca em texto puro)'
@@ -77,6 +87,30 @@ export function criarCofreDeCredenciais(dep: DependenciasDasCredenciais) {
     agora
   })
 
+  /** Abre o valor cifrado. O erro nunca cita o valor. */
+  function decifrar(credencial: CredencialGuardada): { valor: string } | { erro: string } {
+    if (!cifraDisponivel()) return { erro: `credencial ${credencial.nome}: ${SEM_CIFRA}` }
+    try {
+      return { valor: dep.cifra.decryptString(Buffer.from(credencial.cifrado, 'base64')) }
+    } catch {
+      return { erro: `credencial ${credencial.nome}: não consegui abrir o valor neste computador; troque o valor em Conexões` }
+    }
+  }
+
+  /**
+   * Confere https, domínio e (1.9.7) o método, abre o valor e monta o cabeçalho. O erro nunca cita o valor. Sem
+   * `metodo`, não confere o "só lê" (o cabeçalho de servidor MCP HTTP: o MCP sempre faz POST e protege por ferramenta).
+   */
+  function abrir(credencial: CredencialGuardada, url: string, metodo?: string): CredencialParaPedido | { erro: string } {
+    const destino = conferirDestino(credencial, url)
+    if (destino) return { erro: destino }
+    const naoLe = conferirMetodo(credencial, metodo)
+    if (naoLe) return { erro: naoLe }
+    const aberto = decifrar(credencial)
+    if ('erro' in aberto) return aberto
+    return montarCabecalho(credencial, aberto.valor)
+  }
+
   /** Roda uma operação sobre o arquivo e grava. Erro do disco ou da cifra vira `{ erro }`, sem citar o valor. */
   function mudar(
     precisaCifra: boolean,
@@ -108,8 +142,21 @@ export function criarCofreDeCredenciais(dep: DependenciasDasCredenciais) {
       return mudar(true, (a) => trocarValorDaCredencial(a, id, valor, ambiente()))
     },
 
+    /**
+     * Com nome novo, devolve `usadaEm`: quem citava o nome antigo (a tela avisa que param até serem ajustados). Não
+     * saber quem usa não impede editar.
+     */
     editar(id: unknown, mudancas: unknown): ResultadoDaCredencial {
-      return mudar(false, (a) => editarCredencial(a, id, mudancas, { agora }))
+      const antes = ler().arquivo.itens.find((c) => c.id === id)
+      const r = mudar(false, (a) => editarCredencial(a, id, mudancas, { agora }))
+      if ('erro' in r || !antes || r.credencial.nome === antes.nome) return r
+      let usadaEm: string[] = []
+      try {
+        usadaEm = dep.usadaEm?.(antes.nome, antes.id) ?? []
+      } catch {
+        // idem
+      }
+      return { ...r, usadaEm }
     },
 
     /** Apaga do cofre. Os fluxos que a citam não mudam: o próximo pedido deles dá "credencial X não existe". */
@@ -118,7 +165,7 @@ export function criarCofreDeCredenciais(dep: DependenciasDasCredenciais) {
       if ('erro' in r) return r
       let usadaEm: string[] = []
       try {
-        usadaEm = dep.usadaEm?.(r.credencial.nome) ?? []
+        usadaEm = dep.usadaEm?.(r.credencial.nome, r.credencial.id) ?? []
       } catch {
         // não saber quem usa não impede apagar
       }
@@ -126,22 +173,60 @@ export function criarCofreDeCredenciais(dep: DependenciasDasCredenciais) {
     },
 
     /**
+     * (1.9.7) Quem usa a credencial agora (fluxos, páginas e servidores), SEM mexer em nada: a tela lista antes de
+     * apagar e antes de renomear. Não conseguir calcular vira `{ erro }` (a tela falha fechado, como o apagar coluna).
+     */
+    quemUsa(id: unknown): ResultadoDoApagar {
+      const c = typeof id === 'string' ? ler().arquivo.itens.find((x) => x.id === id) : undefined
+      if (!c) return { erro: 'essa credencial não existe mais' }
+      try {
+        return { ok: true, usadaEm: dep.usadaEm?.(c.nome, c.id) ?? [] }
+      } catch {
+        return { erro: 'não consegui conferir quem usa' }
+      }
+    },
+
+    /**
      * Para o nó HTTP (S5), no main, na hora do pedido: confere https e domínio, abre o valor e monta o cabeçalho.
      * `ocultar` vai para o `ctx.ocultar` do executor, que troca esses textos por `•••` em tudo o que a execução guarda.
      */
-    paraPedido(nome: string, url: string): CredencialParaPedido | { erro: string } {
+    paraPedido(nome: string, url: string, metodo?: string): CredencialParaPedido | { erro: string } {
       const credencial = ler().arquivo.itens.find((c) => c.nome === nome)
       if (!credencial) return { erro: credencialNaoExiste(nome) }
-      const destino = conferirDestino(credencial, url)
-      if (destino) return { erro: destino }
-      if (!cifraDisponivel()) return { erro: `credencial ${nome}: ${SEM_CIFRA}` }
-      let valor: string
-      try {
-        valor = dep.cifra.decryptString(Buffer.from(credencial.cifrado, 'base64'))
-      } catch {
-        return { erro: `credencial ${nome}: não consegui abrir o valor neste computador; troque o valor em Conexões` }
-      }
-      return montarCabecalho(credencial, valor)
+      return abrir(credencial, url, metodo)
+    },
+
+    /**
+     * (1.9.7) O mesmo `paraPedido`, achando pelo id: é como as páginas "+" guardam a ligação de um encaixe (renomear a
+     * credencial não quebra a página). Mesmas travas: https, domínio da credencial, cifra.
+     */
+    paraPedidoPorId(id: string, url: string, metodo?: string): CredencialParaPedido | { erro: string } {
+      const credencial = ler().arquivo.itens.find((c) => c.id === id)
+      if (!credencial) return { erro: CREDENCIAL_LIGADA_SUMIU }
+      return abrir(credencial, url, metodo)
+    },
+
+    /**
+     * (1.9.7) A credencial `id` cobre TODOS os `hosts` (domínios dela, regra `*.dominio`)? null = cobre; senão, o motivo.
+     * Só metadados: não abre o valor.
+     */
+    cobre(id: string, hosts: readonly string[]): string | null {
+      const credencial = ler().arquivo.itens.find((c) => c.id === id)
+      if (!credencial) return CREDENCIAL_LIGADA_SUMIU
+      const fora = hosts.filter((h) => !hostPermitido(h, credencial.dominios))
+      if (!hosts.length || fora.length) return `a credencial ${credencial.nome} não cobre ${fora.join(', ') || 'nenhum host'} (domínios dela: ${credencial.dominios.join(', ')})`
+      return null
+    },
+
+    /**
+     * (1.9.7) O valor de uma credencial do tipo `segredo`, por id, para a variável de ambiente de um servidor MCP stdio
+     * (`main/mcpFora/registro.ts`, na hora de subir). Outro tipo é recusado: credencial com domínio não sai do https.
+     */
+    segredoPorId(id: string): { valor: string } | { erro: string } {
+      const credencial = ler().arquivo.itens.find((c) => c.id === id)
+      if (!credencial) return { erro: CREDENCIAL_DO_SERVIDOR_SUMIU }
+      if (credencial.tipo !== 'segredo') return { erro: `credencial ${credencial.nome}: só uma do tipo segredo vai para variável de ambiente` }
+      return decifrar(credencial)
     },
 
     /** Credenciais com este nome existem? (para o motor avisar antes de ligar um fluxo; não abre nada). */
@@ -160,4 +245,5 @@ export function registrarCredenciais(ipc: Pick<IpcMain, 'handle'>, cofre: CofreD
   ipc.handle(CANAIS_CREDENCIAIS.trocarValor, (_e, id: unknown, valor: unknown) => cofre.trocarValor(id, valor))
   ipc.handle(CANAIS_CREDENCIAIS.editar, (_e, id: unknown, mudancas: unknown) => cofre.editar(id, mudancas))
   ipc.handle(CANAIS_CREDENCIAIS.apagar, (_e, id: unknown) => cofre.apagar(id))
+  ipc.handle(CANAIS_CREDENCIAIS.quemUsa, (_e, id: unknown) => cofre.quemUsa(id))
 }

@@ -69,6 +69,12 @@ export interface Tarefa {
   /** O Maestro a quem o usuário delegou (ao entrar na coluna `delegar`); sai quando ela volta para `entrada`. */
   delegada?: Pessoa & { em: number }
   etiquetas: string[]
+  /**
+   * A pasta (1.9.7): um grupo recolhível dentro da coluna, no máximo uma por tarefa, até `LIMITES_DO_KANBAN.pasta`
+   * letras. Não é etiqueta (a tarefa tem várias). Acompanha a tarefa de coluna em coluna. Campo opcional: o arquivo
+   * da 1.9.6 abre igual, sem subir o `versao`.
+   */
+  pasta?: string
   comentarios: Comentario[]
   criadaEm: number
   criadaPor: Quem
@@ -94,6 +100,16 @@ export interface ArquivoDoKanban {
   colunas: Coluna[]
   tarefas: Tarefa[]
   lixeira: Tarefa[]
+  /**
+   * O interruptor do "organizar automático" (1.9.7). Ausente = ligado; só o usuário o desliga. Só guarda o `false`
+   * (o arquivo da 1.9.6 não tem o campo e continua igual).
+   */
+  organizarAuto?: false
+  /**
+   * A arrumação da 1ª abertura (1.9.7) já rodou neste espaço: nunca roda de novo. Só guarda o `true`. Kanban novo já
+   * nasce com ela (não há tarefa antiga para arrumar); o da 1.9.6 não tem, e a página o arruma uma vez.
+   */
+  organizadoInicial?: true
 }
 
 /** Um agente do espaço, como o processo principal o vê. A situação só vem na leitura (a página mostra o ponto). */
@@ -156,6 +172,10 @@ export const LIMITES_DO_KANBAN = {
   descricao: 8 * 1024,
   etiquetas: 8,
   etiqueta: 24,
+  /** Letras do nome de uma pasta. */
+  pasta: 40,
+  /** Quantas tarefas uma operação `organizar` muda de uma vez (o teto de tarefas do kanban). */
+  organizar: 500,
   comentarios: 50,
   /** Em bytes (UTF-8). */
   comentario: 2 * 1024,
@@ -187,7 +207,7 @@ export function colunasPadrao(): Coluna[] {
 }
 
 export function kanbanVazio(): ArquivoDoKanban {
-  return { versao: 2, proximo: 1, colunas: colunasPadrao(), tarefas: [], lixeira: [] }
+  return { versao: 2, proximo: 1, colunas: colunasPadrao(), tarefas: [], lixeira: [], organizadoInicial: true }
 }
 
 /** A coluna que faz este papel, se houver. */
@@ -223,7 +243,7 @@ function cortarBytes(texto: string, maximo: number): string {
 }
 
 /** Uma linha: sem caracteres de controle, espaços juntados. */
-function linha(texto: unknown): string {
+export function linha(texto: unknown): string {
   return typeof texto === 'string' ? texto.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim() : ''
 }
 
@@ -265,7 +285,7 @@ function trabalhandoLido(lista: unknown, padrao: number): Tarefa['trabalhando'] 
   return saida
 }
 
-function etiquetasLidas(lista: unknown): string[] {
+export function etiquetasLidas(lista: unknown): string[] {
   if (!Array.isArray(lista)) return []
   const vistas = new Set<string>()
   const saida: string[] = []
@@ -277,6 +297,11 @@ function etiquetasLidas(lista: unknown): string[] {
     if (saida.length >= LIMITES_DO_KANBAN.etiquetas) break
   }
   return saida
+}
+
+/** O nome da pasta como o arquivo o guarda: uma linha, até o limite; vazio = sem pasta. */
+function pastaLida(valor: unknown): string | undefined {
+  return linha(valor).slice(0, LIMITES_DO_KANBAN.pasta).trim() || undefined
 }
 
 function comentariosLidos(lista: unknown): Comentario[] {
@@ -311,6 +336,7 @@ function tarefaLida(t: unknown, colunas: Coluna[], agora: number): Tarefa | null
     trabalhando: trabalhandoLido(x.trabalhando, criadaEm),
     ...(delegada ? { delegada: { ...delegada, em: numeroOk(delegadaEm) ? delegadaEm : criadaEm } } : {}),
     etiquetas: etiquetasLidas(x.etiquetas),
+    ...(pastaLida(x.pasta) ? { pasta: pastaLida(x.pasta) } : {}),
     comentarios: comentariosLidos(x.comentarios),
     criadaEm,
     criadaPor: quemLido(x.criadaPor) ?? desconhecido,
@@ -446,7 +472,9 @@ export function lerArquivoDoKanban(json: unknown, agora = Date.now()): { arquivo
   const lixeira = unicas(x.lixeira, LIMITES_DO_KANBAN.lixeira, true)
   const maior = Math.max(0, ...numeros)
   const proximo = inteiroPositivo(x.proximo) && x.proximo > maior ? x.proximo : maior + 1
-  return { arquivo: { versao: 2, proximo, colunas, tarefas, lixeira }, ...(soLeitura ? { soLeitura } : {}) }
+  const organizarAuto = (x as { organizarAuto?: unknown }).organizarAuto === false ? { organizarAuto: false as const } : {}
+  const organizadoInicial = (x as { organizadoInicial?: unknown }).organizadoInicial === true ? { organizadoInicial: true as const } : {}
+  return { arquivo: { versao: 2, proximo, colunas, tarefas, lixeira, ...organizarAuto, ...organizadoInicial }, ...(soLeitura ? { soLeitura } : {}) }
 }
 
 // ---------- operações ----------
@@ -461,10 +489,23 @@ export type Posicao = 'topo' | 'fim' | number
  * `coluna` é o id ou o nome (sem caixa nem acento). Mover para a coluna `delegar` é delegar ao Maestro.
  */
 export type OperacaoDoKanban =
-  | { tipo: 'criar'; titulo: string; descricao?: string; coluna?: string; responsavel?: string; etiquetas?: string[] }
+  | { tipo: 'criar'; titulo: string; descricao?: string; coluna?: string; responsavel?: string; etiquetas?: string[]; pasta?: string }
   | { tipo: 'mover'; numero: number; coluna: string; posicao?: Posicao }
-  /** `etiquetas` troca a lista; `etiquetasMais`/`etiquetasMenos` põem e tiram (o `--etiqueta +a,-b`). */
-  | { tipo: 'editar'; numero: number; titulo?: string; descricao?: string; etiquetas?: string[]; etiquetasMais?: string[]; etiquetasMenos?: string[] }
+  /**
+   * `etiquetas` troca a lista; `etiquetasMais`/`etiquetasMenos` põem e tiram (o `--etiqueta +a,-b`). `pasta`: o nome
+   * da pasta (até 40 letras); `null` ou vazio tira a tarefa da pasta; ausente não mexe.
+   */
+  | { tipo: 'editar'; numero: number; titulo?: string; descricao?: string; etiquetas?: string[]; etiquetasMais?: string[]; etiquetasMenos?: string[]; pasta?: string | null }
+  /**
+   * Em massa, numa gravação só (1.9.7): é do usuário (a página, menu ⋯ da coluna; as mudanças vêm de
+   * shared/kanbanOrganizar.ts). Devolve o `antes` de cada tarefa que mudou, e o desfazer é esta mesma operação com
+   * `mudancasParaDesfazer(antes)`. Agente nunca aplica. `soSemPasta`: pula a tarefa que já tem pasta (o que é
+   * automático nunca desfaz o trabalho manual, nem com a página atrasada). `inicial`: a arrumação da 1ª abertura;
+   * grava a marca `organizadoInicial` junto e, com a marca já gravada, não muda nada (implica `soSemPasta`).
+   */
+  | { tipo: 'organizar'; mudancas: MudancaDeOrganizar[]; soSemPasta?: boolean; inicial?: boolean }
+  /** Liga ou desliga o "organizar automático" (só o usuário). */
+  | { tipo: 'organizarAuto'; ligado: boolean }
   | { tipo: 'atribuir'; numero: number; responsavel: string }
   /**
    * Quem pede entra na lista; vai para a coluna de trabalho só se estava em entrada ou delegar. Sem `para`, só
@@ -530,14 +571,110 @@ export interface AvisoDoKanban {
   retirada?: true
 }
 
+/** O que uma operação `organizar` muda numa tarefa. Ausente = não mexe naquele campo. */
+export interface MudancaDeOrganizar {
+  numero: number
+  /** O nome da pasta; `null` ou vazio tira a tarefa da pasta. */
+  pasta?: string | null
+  /** Etiquetas a mais (as que já tem ficam; passar do teto de 8 recusa só as etiquetas desta tarefa). */
+  etiquetasMais?: string[]
+  /** Troca a lista inteira (é o que o desfazer usa). */
+  etiquetas?: string[]
+  /**
+   * Só o desfazer usa: aplica a mudança só se a tarefa ainda está assim (o que a organização gravou). Se alguém mexeu
+   * depois (outra janela, um agente), a tarefa é pulada e contada.
+   */
+  seEstiverEm?: { pasta: string | null; etiquetas: string[] }
+}
+
+/** O estado anterior dos dois campos que o `organizar` mexe, por tarefa que mudou: é o que o desfazer devolve. */
+export interface AntesDeOrganizar {
+  numero: number
+  pasta: string | null
+  etiquetas: string[]
+  /** O que a organização gravou nela: o desfazer só restaura se a tarefa ainda estiver assim. */
+  depois: { pasta: string | null; etiquetas: string[] }
+}
+
 export type ResultadoDoKanban =
-  | { ok: true; arquivo: ArquivoDoKanban; texto: string; numero?: number; avisos?: AvisoDoKanban[] }
+  | {
+      ok: true
+      arquivo: ArquivoDoKanban
+      texto: string
+      numero?: number
+      avisos?: AvisoDoKanban[]
+      /** Só na operação `organizar`: o estado anterior das tarefas que mudaram (vazio = nada mudou). */
+      antes?: AntesDeOrganizar[]
+    }
   | { ok: false; erro: string }
+
+/** A operação que desfaz um `organizar`: devolve pasta e etiquetas de cada tarefa ao que eram. */
+export function mudancasParaDesfazer(antes: readonly AntesDeOrganizar[]): MudancaDeOrganizar[] {
+  return antes.map((x) => ({ numero: x.numero, pasta: x.pasta, etiquetas: x.etiquetas, seEstiverEm: x.depois }))
+}
+
+// ---------- pastas (1.9.7) ----------
+
+/** "Cara de versão" (decisão de 25/11): `1.9.6`, `v2.0`, `2.0`. Não pegam `2024`, `fluxos` nem `1.2.3.4`. */
+const ETIQUETA_DE_VERSAO = /^v?\d+(?:\.\d+){1,2}$/i
+
+export function ehVersao(etiqueta: string): boolean {
+  return ETIQUETA_DE_VERSAO.test(etiqueta.trim())
+}
+
+/** A primeira etiqueta que parece versão, como está escrita. */
+export function versaoDasEtiquetas(etiquetas: readonly string[]): string | undefined {
+  return etiquetas.map((e) => e.trim()).find(ehVersao)
+}
+
+/** Quem consta como autor quando o organizar automático põe a pasta (`atualizadaPor`). */
+export const QUEM_ORGANIZA_SOZINHO: Quem = { nome: 'Organizar automático' }
+
+/**
+ * O "organizar automático": a tarefa que ACABOU de entrar na coluna final, sem pasta e com etiqueta de versão, ganha a
+ * pasta da versão. Compara os dois estados do arquivo, então pega todo caminho (mover, criar já em Feito, restaurar).
+ * Desligado (`organizarAuto: false`) não mexe. Quem já estava em Feito sem pasta fica como está (foi decisão de alguém).
+ */
+function pastaAoConcluir(antes: ArquivoDoKanban, depois: ArquivoDoKanban, agora: number): { arquivo: ArquivoDoKanban; pastas: { numero: number; pasta: string }[] } {
+  const final = depois.colunas.find((c) => c.final)?.id
+  if (depois.organizarAuto === false || !final) return { arquivo: depois, pastas: [] }
+  const eram = new Map(antes.tarefas.map((t) => [t.numero, t.coluna]))
+  const pastas: { numero: number; pasta: string }[] = []
+  const tarefas = depois.tarefas.map((t) => {
+    if (t.coluna !== final || t.pasta || eram.get(t.numero) === final) return t
+    const versao = versaoDasEtiquetas(t.etiquetas)
+    if (!versao) return t
+    pastas.push({ numero: t.numero, pasta: versao })
+    return { ...t, pasta: versao, atualizadaEm: agora, atualizadaPor: QUEM_ORGANIZA_SOZINHO }
+  })
+  return pastas.length ? { arquivo: { ...depois, tarefas }, pastas } : { arquivo: depois, pastas }
+}
+
+/**
+ * O nome de pasta pedido, pronto para gravar: `null` = sem pasta (vazio ou `null`). Se outra tarefa já tem uma pasta
+ * com o mesmo nome (sem caixa nem acento), vale a grafia dela: "geral" não vira uma segunda pasta ao lado de "Geral".
+ */
+function pastaOuErro(valor: unknown, tarefas: readonly Tarefa[]): string | null | { erro: string } {
+  if (valor === null || valor === undefined) return null
+  if (typeof valor !== 'string') return { erro: 'pasta inválida: diga o nome' }
+  const nome = linha(valor)
+  if (!nome) return null
+  if (nome.length > LIMITES_DO_KANBAN.pasta) return { erro: `pasta "${nome.slice(0, 20)}…" com ${nome.length} letras; o máximo é ${LIMITES_DO_KANBAN.pasta}` }
+  const igual = normalizar(nome)
+  return tarefas.find((t) => t.pasta && normalizar(t.pasta) === igual)?.pasta ?? nome
+}
 
 /** O erro de arrastar para "Com o Maestro" sem Maestro aberto (a página mostra este texto). */
 export const ERRO_SEM_MAESTRO = 'Não há Maestro aberto neste espaço: abra um agente com a função Maestro no Quadro'
 /** O erro de um agente que tenta delegar. */
 export const ERRO_AGENTE_DELEGA = 'delegar é do usuário (página ou MCP)'
+/** O erro de um agente que tenta organizar em massa ou mexer no interruptor do automático. */
+export const ERRO_AGENTE_ORGANIZA = 'organizar em massa é do usuário (página Kanban, menu ⋯ da coluna); uma tarefa você põe com `ork kanban pasta <n> "nome"`'
+
+const semPasta = (t: Tarefa): Tarefa => {
+  const { pasta: _p, ...resto } = t
+  return resto
+}
 
 const erro = (texto: string): ResultadoDoKanban => ({ ok: false, erro: texto })
 
@@ -735,8 +872,21 @@ export function textoDoPedidoAoMaestro(t: Pick<Tarefa, 'numero' | 'titulo' | 'de
 /** Nomes da lista, para os textos: `Back, Front`. */
 const nomesDe = (lista: readonly Pessoa[]): string => lista.map((p) => p.nome).join(', ')
 
-/** Aplica um pedido ao arquivo (sem mexer no de entrada). Tudo o que vem de fora é validado aqui. */
+/**
+ * Aplica um pedido ao arquivo (sem mexer no de entrada). Tudo o que vem de fora é validado aqui. Depois de qualquer
+ * pedido, a tarefa que acabou de chegar na coluna final ganha a pasta da versão (o organizar automático, que o
+ * usuário desliga em `organizarAuto`): é a mesma gravação, e o texto do resultado diz.
+ */
 export function aplicarOperacao(arquivo: ArquivoDoKanban, op: unknown, ctx: ContextoDoKanban): ResultadoDoKanban {
+  const r = aplicarSemAutomatico(arquivo, op, ctx)
+  if (!r.ok) return r
+  const { arquivo: organizado, pastas } = pastaAoConcluir(arquivo, r.arquivo, ctx.agora)
+  if (!pastas.length) return r
+  const dita = pastas.map((p) => `#${p.numero} → pasta "${p.pasta}"`).join(', ')
+  return { ...r, arquivo: organizado, texto: `${r.texto} Organizar automático: ${dita}.` }
+}
+
+function aplicarSemAutomatico(arquivo: ArquivoDoKanban, op: unknown, ctx: ContextoDoKanban): ResultadoDoKanban {
   const o = op as OperacaoDoKanban | null
   const a: ArquivoDoKanban = { ...arquivo, colunas: [...arquivo.colunas], tarefas: [...arquivo.tarefas], lixeira: [...arquivo.lixeira] }
   const { por, agora } = ctx
@@ -789,6 +939,8 @@ export function aplicarOperacao(arquivo: ArquivoDoKanban, op: unknown, ctx: Cont
       if (final) return erro(final)
       const responsavel = o.responsavel === undefined ? null : responsavelOuErro(String(o.responsavel), ctx)
       if (typeof responsavel === 'string') return erro(responsavel)
+      const pasta = pastaOuErro(o.pasta, a.tarefas)
+      if (pasta !== null && typeof pasta !== 'string') return erro(pasta.erro)
       const numero = a.proximo
       const tarefa: Tarefa = {
         numero,
@@ -798,6 +950,7 @@ export function aplicarOperacao(arquivo: ArquivoDoKanban, op: unknown, ctx: Cont
         ordem: tarefasDa(a, coluna.id).length,
         trabalhando: responsavel ? [{ ...responsavel, desde: agora }] : [],
         etiquetas,
+        ...(pasta ? { pasta } : {}),
         comentarios: [],
         criadaEm: agora,
         criadaPor: por,
@@ -905,15 +1058,105 @@ export function aplicarOperacao(arquivo: ArquivoDoKanban, op: unknown, ctx: Cont
           campos.push('etiquetas')
         }
       }
+      let tirouPasta = false
+      if (o.pasta !== undefined) {
+        const pasta = pastaOuErro(o.pasta, a.tarefas)
+        if (pasta !== null && typeof pasta !== 'string') return erro(pasta.erro)
+        if ((pasta ?? undefined) !== t.pasta) {
+          if (pasta) mudanca.pasta = pasta
+          else tirouPasta = true
+          campos.push('pasta')
+        }
+      }
       if (!campos.length) {
-        const algo = o.titulo !== undefined || o.descricao !== undefined || o.etiquetas !== undefined || o.etiquetasMais !== undefined || o.etiquetasMenos !== undefined
+        const algo = o.titulo !== undefined || o.descricao !== undefined || o.etiquetas !== undefined || o.etiquetasMais !== undefined || o.etiquetasMenos !== undefined || o.pasta !== undefined
         if (algo) return ok(`#${t.numero} sem mudança.`, t.numero)
-        return erro('diga o que mudar: --titulo, --descricao (ou --arquivo), --etiqueta')
+        return erro('diga o que mudar: --titulo, --descricao (ou --arquivo), --etiqueta, --pasta')
       }
       if (mudanca.titulo !== undefined) mudanca.tituloPor = por
       if (mudanca.descricao !== undefined) mudanca.descricaoPor = por
       tocar(t.numero, mudanca)
+      if (tirouPasta) a.tarefas = a.tarefas.map((x) => (x.numero === t.numero ? semPasta(x) : x))
       return ok(`#${t.numero} editada: ${campos.join(', ')}.`, t.numero)
+    }
+
+    case 'organizar': {
+      if (por.id) return erro(ERRO_AGENTE_ORGANIZA)
+      if (!Array.isArray(o.mudancas)) return erro('organizar precisa da lista de mudanças')
+      if (o.mudancas.length > LIMITES_DO_KANBAN.organizar) return erro(`${o.mudancas.length} mudanças de uma vez; o máximo é ${LIMITES_DO_KANBAN.organizar}`)
+      // a marca impede a 2ª vez: outra janela (ou a página atrasada) não arruma de novo
+      if (o.inicial === true && a.organizadoInicial) {
+        const r = ok('O kanban já tinha sido organizado na 1ª abertura; nada mudou.')
+        return r.ok ? { ...r, antes: [] } : r
+      }
+      const soSemPasta = o.soSemPasta === true || o.inicial === true
+      const antes: AntesDeOrganizar[] = []
+      const vistas = new Set<number>()
+      let ignoradas = 0
+      let puladas = 0
+      let comPasta = 0
+      for (const m of o.mudancas) {
+        const t = a.tarefas.find((x) => x.numero === m?.numero)
+        // tarefa que sumiu (apagada depois da prévia) ou repetida na lista: fica de fora, o resto vale
+        if (!t || vistas.has(t.numero)) {
+          ignoradas++
+          continue
+        }
+        vistas.add(t.numero)
+        // desfazer: só restaura quem ainda está como a organização deixou; quem mudou depois fica como está
+        if (m.seEstiverEm && (m.seEstiverEm.pasta !== (t.pasta ?? null) || JSON.stringify(m.seEstiverEm.etiquetas) !== JSON.stringify(t.etiquetas))) {
+          puladas++
+          continue
+        }
+        // quem já tem pasta fica onde está (alguém a pôs ali depois que a página leu)
+        if (soSemPasta && t.pasta) {
+          comPasta++
+          continue
+        }
+        const mudanca: Partial<Tarefa> = {}
+        let tirar = false
+        if (m.pasta !== undefined) {
+          // aqui o nome vale como veio: é a página que escolheu a grafia (renomear uma pasta passa por aqui)
+          const nome = m.pasta === null ? '' : linha(m.pasta)
+          if (nome.length > LIMITES_DO_KANBAN.pasta) {
+            ignoradas++
+            continue
+          }
+          if (nome) mudanca.pasta = nome
+          else tirar = true
+        }
+        if (m.etiquetas !== undefined || m.etiquetasMais !== undefined) {
+          const trocada = m.etiquetas === undefined ? t.etiquetas : etiquetasOuErro(m.etiquetas)
+          const nova = Array.isArray(trocada) ? etiquetasOuErro([...trocada, ...(Array.isArray(m.etiquetasMais) ? m.etiquetasMais : [])]) : trocada
+          // etiqueta inválida ou acima de 8: só as etiquetas desta tarefa ficam como estavam; a pasta segue
+          if (Array.isArray(nova)) {
+            if (JSON.stringify(nova) !== JSON.stringify(t.etiquetas)) mudanca.etiquetas = nova
+          } else ignoradas++
+        }
+        const pastaMuda = tirar ? t.pasta !== undefined : mudanca.pasta !== undefined && mudanca.pasta !== t.pasta
+        if (!pastaMuda) delete mudanca.pasta
+        if (!pastaMuda && mudanca.etiquetas === undefined) continue
+        antes.push({ numero: t.numero, pasta: t.pasta ?? null, etiquetas: t.etiquetas, depois: { pasta: tirar ? null : (mudanca.pasta ?? t.pasta ?? null), etiquetas: mudanca.etiquetas ?? t.etiquetas } })
+        tocar(t.numero, mudanca)
+        if (tirar) a.tarefas = a.tarefas.map((x) => (x.numero === t.numero ? semPasta(x) : x))
+      }
+      const partes = [
+        ignoradas ? `${ignoradas} ignorada${ignoradas === 1 ? '' : 's'}: não existe mais, nome grande demais ou etiquetas demais` : '',
+        puladas ? `${puladas} pulada${puladas === 1 ? '' : 's'}: mudaram depois` : '',
+        comPasta ? `${comPasta} já ${comPasta === 1 ? 'tinha' : 'tinham'} pasta` : ''
+      ].filter(Boolean)
+      if (o.inicial === true) a.organizadoInicial = true
+      const resto = partes.length ? ` (${partes.join('; ')})` : ''
+      const r = ok(antes.length ? `Organizadas ${antes.length} tarefa${antes.length === 1 ? '' : 's'}${resto}.` : `Nenhuma tarefa mudou${resto}.`)
+      return r.ok ? { ...r, antes } : r
+    }
+
+    case 'organizarAuto': {
+      if (por.id) return erro(ERRO_AGENTE_ORGANIZA)
+      if (typeof o.ligado !== 'boolean') return erro('diga se liga ou desliga o organizar automático')
+      if (o.ligado) delete a.organizarAuto
+      else a.organizarAuto = false
+      return ok(o.ligado ? 'Organizar automático ligado.' : 'Organizar automático desligado.')
     }
 
     case 'atribuir': {
@@ -1111,7 +1354,7 @@ function textoDaDelegacao(t: Tarefa, agentes: readonly AgenteDoKanban[]): string
 }
 
 function linhaDaTarefa(t: Tarefa, coluna: Coluna, agentes: readonly AgenteDoKanban[]): string {
-  const etiquetas = t.etiquetas.length ? ` [${t.etiquetas.join(', ')}]` : ''
+  const etiquetas = (t.etiquetas.length ? ` [${t.etiquetas.join(', ')}]` : '') + (t.pasta ? ` {pasta: ${t.pasta}}` : '')
   const delegada = coluna.papel === 'delegar' ? textoDaDelegacao(t, agentes) : ''
   const trabalhando = t.trabalhando.length ? ` → ${textoDoTrabalhando(t, agentes)}` : ''
   const comentarios = t.comentarios.length ? ` · ${t.comentarios.length} coment.` : ''
@@ -1192,6 +1435,7 @@ export function textoDaTarefa(arquivo: ArquivoDoKanban, numero: unknown, agentes
     `Trabalhando: ${t.trabalhando.length ? textoDoTrabalhando(t, agentes) : 'ninguém'}`,
     ...(t.delegada ? [`Delegada a "${t.delegada.nome}" em ${quando(t.delegada.em)}`] : []),
     ...(t.etiquetas.length ? [`Etiquetas: ${t.etiquetas.join(', ')}`] : []),
+    ...(t.pasta ? [`Pasta: ${t.pasta}`] : []),
     `Criada por "${t.criadaPor.nome}" em ${quando(t.criadaEm)} · atualizada por "${t.atualizadaPor.nome}" em ${quando(t.atualizadaEm)}`,
     ...ressalvaDeAutoria(t),
     '',
@@ -1292,7 +1536,7 @@ export function mudancasDeColuna(
 
 // ---------- o `ork kanban <ação>` vira operação (o `ork`, a chave de usuário e o MCP passam por aqui) ----------
 
-export const ACOES_DO_KANBAN = ['ver', 'criar', 'mover', 'editar', 'atribuir', 'pegar', 'soltar', 'comentar', 'apagar', 'coluna'] as const
+export const ACOES_DO_KANBAN = ['ver', 'criar', 'mover', 'editar', 'pasta', 'atribuir', 'pegar', 'soltar', 'comentar', 'apagar', 'coluna'] as const
 export type AcaoDoKanban = (typeof ACOES_DO_KANBAN)[number]
 
 /** A ação do `ork kanban <ação>`, para o handler do agente decidir o `--espaco` antes de rodar. */
@@ -1311,6 +1555,13 @@ function numeroOuErro(valor: string | undefined, uso: string): number {
   const n = numeroDaTarefa(valor)
   if (n === null) throw new Error(valor ? `"${valor}" não é número de tarefa: ${uso}` : `diga o número da tarefa: ${uso}`)
   return n
+}
+
+/** O `--pasta` do comando: o nome, ou `-` para tirar da pasta (o registro recusa opção vazia). `undefined` = não veio. */
+function pastaDoComando(valor: string | number | true | undefined): string | null | undefined {
+  const v = opcaoTexto(valor)
+  if (v === undefined) return undefined
+  return v.trim() === '-' ? null : v
 }
 
 function posicaoDe(valor: string | undefined): Posicao | undefined {
@@ -1339,13 +1590,15 @@ export function operacaoDoComando(
   switch (acao) {
     case 'criar': {
       const etiqueta = opcaoTexto(opcoes.etiqueta)
+      const pasta = pastaDoComando(opcoes.pasta)
       op = {
         tipo: 'criar',
         titulo: resto.join(' '),
         ...(descricao !== undefined ? { descricao } : {}),
         ...(opcaoTexto(opcoes.coluna) !== undefined ? { coluna: opcaoTexto(opcoes.coluna) } : {}),
         ...(opcaoTexto(opcoes.para) !== undefined ? { responsavel: opcaoTexto(opcoes.para) } : {}),
-        ...(etiqueta !== undefined ? { etiquetas: etiqueta.split(',').map((e) => e.trim()).filter(Boolean) } : {})
+        ...(etiqueta !== undefined ? { etiquetas: etiqueta.split(',').map((e) => e.trim()).filter(Boolean) } : {}),
+        ...(typeof pasta === 'string' ? { pasta } : {})
       }
       break
     }
@@ -1356,11 +1609,18 @@ export function operacaoDoComando(
       const etiqueta = opcaoTexto(opcoes.etiqueta)
       op = {
         tipo: 'editar',
-        numero: numeroOuErro(resto[0], 'ork kanban editar <n> [--titulo T] [--descricao T | --arquivo f.md] [--etiqueta +a,-b]'),
+        numero: numeroOuErro(resto[0], 'ork kanban editar <n> [--titulo T] [--descricao T | --arquivo f.md] [--etiqueta +a,-b] [--pasta P]'),
         ...(opcaoTexto(opcoes.titulo) !== undefined ? { titulo: opcaoTexto(opcoes.titulo) } : {}),
         ...(descricao !== undefined ? { descricao } : {}),
-        ...(etiqueta !== undefined ? lerEtiquetas(etiqueta) : {})
+        ...(etiqueta !== undefined ? lerEtiquetas(etiqueta) : {}),
+        ...(opcoes.pasta !== undefined ? { pasta: pastaDoComando(opcoes.pasta) } : {})
       }
+      break
+    }
+    case 'pasta': {
+      // `ork kanban pasta 12 "1.9.6"` põe; sem o nome, tira da pasta
+      const numero = numeroOuErro(resto[0], 'ork kanban pasta <n> ["nome"]  (sem o nome, tira da pasta)')
+      op = { tipo: 'editar', numero, pasta: resto.slice(1).join(' ').trim() || null }
       break
     }
     case 'atribuir':

@@ -17,12 +17,16 @@ import { dirname, join, resolve } from 'node:path'
 import {
   CANAIS_ORK_PAGINA,
   CANAIS_PAGINAS,
+  METODOS_API_MCP_DA_PAGINA,
+  type AcessosDaPagina,
   type AgenteParaPagina,
+  type PedidoDaPagina,
   type PropostaDePagina,
   type RespostaDaProposta,
   type ResultadoDePaginas,
   type ResumoDePagina,
-  type ResumoDoQuadroParaPagina
+  type ResumoDoQuadroParaPagina,
+  type SugestaoDePagina
 } from '../shared/api'
 import {
   LIMITES,
@@ -57,7 +61,19 @@ import {
   type Resultado,
   type SituacaoDaEscrita
 } from '../shared/paginas'
+import {
+  bloqueioDasFichas,
+  conferirAcessos,
+  paginaDepoisDoAceite,
+  sugestoesDe,
+  usosDe,
+  type ContextoDosAcessos,
+  type ServidorConhecido
+} from '../shared/paginasAcessos'
 import { PASTA_DADOS, idsDosEspacos, resumosDosEspacos } from './dados'
+import { cofreDeCredenciais } from './fluxos'
+import { registroMcpFora } from './mcpFora'
+import { apisDoCofre, criarApiDasPaginas, criarCorte, type CorteDosPedidos, type PaginaParaApi, type RedeDaApi } from './paginasApi'
 import { avisar, avisarTodas, espacoDaJanela } from './janelas'
 import { cordasDoEspaco, sessaoPorId, sessoesDoEspaco, telaDe, type Sessao } from './terminais'
 import { caixa, situacaoNaTela } from './espera'
@@ -306,6 +322,7 @@ function proporDaPasta(pasta: string, idEsperado?: string): RespostaDaProposta {
     bytes: lida.valor.bytes,
     pedidas,
     novas: existente ? novasPermissoes(pedidas, existente.aceitas, existente.recusadas) : pedidas,
+    ...acessosDaProposta(manifesto, pedidas, existente),
     ...(existente ? { versaoAntes: existente.versao } : {}),
     hash: hashDaArvore(lida.valor.mapa)
   })
@@ -339,6 +356,7 @@ function proporRever(id: string): RespostaDaProposta {
       pedidas,
       // mudou fora = aceite de novo (tudo o que não foi revogado); senão, só a diferença
       novas: novasPermissoes(pedidas, mudouFora ? [] : p.aceitas, p.recusadas),
+      ...acessosDaProposta(m.valor, pedidas, p),
       versaoAntes: p.versao,
       ...(mudouFora ? { mudouFora: true } : {}),
       hash
@@ -376,10 +394,69 @@ function instalarCopia(id: string, arvore: Arvore, hash: string): void {
   }
 }
 
-function aceitarProposta(token: string): ResultadoDePaginas & { id?: string } {
+/**
+ * (1.9.7) O que o diálogo precisa para as seções "APIs/MCPs que esta página enxerga": as sugestões do manifesto, os
+ * acessos de antes (atualizar/rever) e, se a página pede `rede`/`local`, o motivo de não poder enxergar nada.
+ */
+function acessosDaProposta(
+  m: ManifestoDePagina,
+  pedidas: readonly string[],
+  existente: PaginaRegistrada | undefined
+): Pick<PropostaDePagina, 'sugestoes' | 'acessosAntes' | 'semAcessos'> {
+  const sugestoes = sugestoesDe(m)
+  const semAcessos = bloqueioDasFichas(pedidas)
+  return {
+    ...(sugestoes.length ? { sugestoes } : {}),
+    ...(existente?.acessos ? { acessosAntes: existente.acessos } : {}),
+    ...(semAcessos ? { semAcessos } : {})
+  }
+}
+
+/** (1.9.7) Os servidores de fora como os acessos os veem: id, nome e o "diz que só lê" das ferramentas conhecidas. */
+function servidoresConhecidos(): ServidorConhecido[] {
+  return registroMcpFora.listar().map((s) => ({
+    id: s.id,
+    nome: s.nome,
+    ...(s.situacao === 'precisa-login' ? { precisaLogin: true } : {}),
+    ferramentas: registroMcpFora.ferramentas(s.id).map((f) => ({ nome: f.nome, dizQueSoLe: f.anotacoes?.readOnlyHint === true }))
+  }))
+}
+
+/** (1.9.7) APIs (do cofre, só metadados) e servidores de agora, para conferir acessos; `bloqueio` se pede rede/local. */
+function contextoDosAcessos(bloqueio?: string): ContextoDosAcessos {
+  return { apis: apisDoCofre(cofreDeCredenciais), servidores: servidoresConhecidos(), ...(bloqueio ? { bloqueio } : {}) }
+}
+
+/** (1.9.7) A página como a API das páginas a lê, a cada chamada: os acessos e o bloqueio por `rede`/`local`. */
+const paraApi = (p: PaginaRegistrada): PaginaParaApi => ({ id: p.id, acessos: p.acessos, bloqueio: bloqueioDasFichas(p.pedidas) })
+
+/**
+ * (1.9.7) Os acessos que o aceite manda, conferidos contra a versão proposta. Ausente (undefined/null) = ausente: em
+ * atualizar/rever ficam os de antes.
+ */
+function acessosDoAceite(prop: PropostaGuardada, bruto: unknown): Resultado<AcessosDaPagina | undefined> {
+  if (bruto === undefined || bruto === null) return { ok: true, valor: undefined }
+  const ctx = contextoDosAcessos(bloqueioDasFichas(prop.pedidas))
+  return conferirAcessos(bruto, ctx)
+}
+
+/** (1.9.7) Para o aviso ao apagar ou renomear uma API: "Página <nome>" das que a enxergam. */
+export function paginasQueUsamCredencial(credencialId: string): string[] {
+  return reg()
+    .paginas.filter((p) => (p.acessos?.api ?? []).some((a) => a.apiId === credencialId))
+    .map((p) => `Página ${p.nome}`)
+}
+
+function aceitarProposta(token: string, acessosPedidos?: unknown): ResultadoDePaginas & { id?: string } {
   const prop = propostas.get(String(token))
+  if (!prop || Date.now() - prop.criadaEm > PROPOSTA_VALE) {
+    propostas.delete(String(token))
+    return { ok: false, erro: 'a proposta expirou: escolha a pasta de novo' }
+  }
+  // acesso errado não gasta a proposta: o diálogo corrige e aceita de novo
+  const acessos = acessosDoAceite(prop, acessosPedidos)
+  if (!acessos.ok) return acessos
   propostas.delete(String(token))
-  if (!prop || Date.now() - prop.criadaEm > PROPOSTA_VALE) return { ok: false, erro: 'a proposta expirou: escolha a pasta de novo' }
   if (soLeitura) return { ok: false, erro: soLeitura }
   if (!reg().ligadas) return { ok: false, erro: 'as páginas próprias estão desligadas' }
   // a pasta é lida de novo: o que se copia tem de ser exatamente o que o usuário viu na proposta
@@ -396,32 +473,10 @@ function aceitarProposta(token: string): ResultadoDePaginas & { id?: string } {
     return { ok: false, erro: `não consegui copiar a página: ${mensagem(e)}` }
   }
   const agora = Date.now()
-  const base = {
-    nome: prop.manifesto.nome,
-    versao: prop.manifesto.versao,
-    descricao: prop.manifesto.descricao,
-    icone: prop.icone,
-    hash: prop.hash,
-    pedidas: prop.pedidas,
-    atualizadaEm: agora
-  }
   try {
-    if (!existente) {
-      mudar((r) => ({
-        ...r,
-        paginas: [
-          ...r.paginas,
-          { id, ...base, origem: prop.origem, aceitas: [...prop.novas], recusadas: [], cordas: [], quedas: [], instaladaEm: agora }
-        ]
-      }))
-    } else {
-      mudarPagina(id, (p) => ({
-        ...p,
-        ...base,
-        aceitas: [...new Set([...p.aceitas.filter((a) => prop.pedidas.includes(a)), ...prop.novas])],
-        recusadas: p.recusadas.filter((x) => prop.pedidas.includes(x))
-      }))
-    }
+    // o merge é puro (shared/paginasAcessos.ts): acessos ausentes em atualizar/rever = os de antes, intactos
+    if (!existente) mudar((r) => ({ ...r, paginas: [...r.paginas, paginaDepoisDoAceite(undefined, prop, acessos.valor, agora)] }))
+    else mudarPagina(id, (p) => paginaDepoisDoAceite(p, prop, acessos.valor, agora))
   } catch (e) {
     return { ok: false, erro: mensagem(e) }
   }
@@ -615,6 +670,8 @@ interface Aberta {
   cpuAlta: number
   /** a vigia derrubou por este motivo (o render-process-gone que vem depois o usa) */
   derrubada?: MotivoDeQueda
+  /** (1.9.7) corta os pedidos `api`/`mcp` em curso: ao fechar, recarregar ou esvaziar a página (revisão A2) */
+  corte: CorteDosPedidos
 }
 
 const abertas = new Map<number, Aberta>()
@@ -630,7 +687,11 @@ function enviar(a: Aberta, tipo: string, dados: unknown): void {
 }
 
 function recarregarAbertas(id: string): void {
-  for (const a of abertasDa(id)) a.guest.reload()
+  for (const a of abertasDa(id)) {
+    // o pedido do documento velho não sobrevive à recarga (revogar, aceitar de novo): corta antes
+    a.corte.cortar()
+    a.guest.reload()
+  }
 }
 
 /**
@@ -639,7 +700,11 @@ function recarregarAbertas(id: string): void {
  * do main não passa pelo `will-navigate`; o `did-fail-load` -3 (carga abortada) a moldura já ignora.
  */
 function esvaziarAbertas(id: string): void {
-  for (const a of abertasDa(id)) void a.guest.loadURL('about:blank').catch(() => {})
+  for (const a of abertasDa(id)) {
+    // desligar, remover ou chave geral: um POST em curso não termina depois (revisão A2)
+    a.corte.cortar()
+    void a.guest.loadURL('about:blank').catch(() => {})
+  }
 }
 
 /** A janela anexou um webview: se é página, liga o canal dela, os eventos e a vigia. */
@@ -647,7 +712,7 @@ export function paginaAnexada(guest: WebContents): void {
   const id = paginaDaSessao.get(guest.session)
   const host = guest.hostWebContents
   if (!id || !host) return
-  const a: Aberta = { id, guest, host, ouvindo: new Set(), cpuAlta: 0 }
+  const a: Aberta = { id, guest, host, ouvindo: new Set(), cpuAlta: 0, corte: criarCorte() }
   abertas.set(guest.id, a)
   // o preload também roda nos iframes da página (só para tirar o WebRTC): canal só do frame principal
   const doFramePrincipal = (quadro: WebFrameMain | null | undefined): boolean =>
@@ -685,6 +750,7 @@ export function paginaAnexada(guest: WebContents): void {
   })
   guest.once('destroyed', () => {
     if (a.semResposta) clearTimeout(a.semResposta)
+    a.corte.cortar()
     abertas.delete(guest.id)
     // sair da página descarrega: nada do navegador dela fica para a próxima vez (nem na memória). A cópia conferida
     // também sai (até 5 MB por página); reabrir relê o disco e confere o hash de novo. Os dados vão já ao disco.
@@ -812,6 +878,25 @@ const baldeGravar = criarBalde(10, 1000, agora)
 const baldeRecadoPorAgente = criarBalde(1, 10_000, agora)
 const baldeRecadoPorHora = criarBalde(30, 3_600_000, agora)
 
+/**
+ * (1.9.7) A `api` das páginas: 60 pedidos por minuto por página, 20 s, 2 MB e o registro dos últimos 100. O cofre é
+ * lido na hora de cada pedido (o `cofreDeCredenciais` de main/fluxos nasce quando aquele módulo carrega).
+ */
+const apiDasPaginas = criarApiDasPaginas({
+  cofre: {
+    paraPedidoPorId: (id, url, metodo) => cofreDeCredenciais.paraPedidoPorId(id, url, metodo),
+    listar: () => cofreDeCredenciais.listar()
+  },
+  // (C5a) o registro dos servidores de fora, lido na hora de cada chamada (mesmo motivo do cofre)
+  mcp: {
+    servidores: () => registroMcpFora.listar().map((s) => ({ id: s.id, nome: s.nome, ...(s.situacao === 'precisa-login' ? { precisaLogin: true } : {}) })),
+    ferramentasConhecidas: (id) => registroMcpFora.ferramentas(id),
+    ferramentasParaUso: (id) => registroMcpFora.ferramentasParaUso(id),
+    chamar: (id, ferramenta, argumentos, opcoes) => registroMcpFora.chamar(id, ferramenta, argumentos, opcoes),
+    segredosDe: (id) => registroMcpFora.segredosDe(id)
+  }
+})
+
 function nomeDoEspaco(espacoId: string | null): { id: string; nome: string } | null {
   if (!espacoId) return null
   const e = resumosDosEspacos().find((x) => x.id === espacoId)
@@ -927,6 +1012,17 @@ async function chamar(a: Aberta, metodo: string, args: unknown[]): Promise<unkno
       if (!url.ok) throw new Error(url.erro)
       return lerLocal(url.valor)
     }
+    // (1.9.7) os acessos lidos agora: desmarcar uma API, um servidor ou uma ferramenta vale já na próxima chamada
+    case METODOS_API_MCP_DA_PAGINA.apiDisponiveis:
+      return apiDasPaginas.disponiveis(paraApi(conferir(a)))
+    case METODOS_API_MCP_DA_PAGINA.mcpDisponiveis:
+      return apiDasPaginas.mcpDisponiveis(paraApi(conferir(a)))
+    case METODOS_API_MCP_DA_PAGINA.mcpFerramentas:
+      return apiDasPaginas.mcpFerramentas(paraApi(conferir(a)), args[0])
+    case METODOS_API_MCP_DA_PAGINA.mcpChamar:
+      return apiDasPaginas.mcpChamar(paraApi(conferir(a)), args[0], args[1], args[2], a.corte.sinal())
+    case METODOS_API_MCP_DA_PAGINA.apiPedir:
+      return apiDasPaginas.pedir(paraApi(conferir(a)), args[0], args[1], a.corte.sinal())
     default:
       throw new Error('chamada desconhecida')
   }
@@ -1077,10 +1173,33 @@ export function responderAPagina(eu: Sessao, quem: string, texto: string): strin
 
 // ================================================================ o que a janela pede (Conexões, moldura, aceite)
 
-function resumir(p: PaginaRegistrada): ResumoDePagina {
+/** (R5 S2) As sugestões `api`/`mcp` do manifesto da cópia aceita, por hash (a cópia só muda com novo aceite). */
+const sugestoesDaCopia = new Map<string, { hash: string; sugestoes: SugestaoDePagina[] }>()
+
+function sugestoesDaPagina(p: PaginaRegistrada): SugestaoDePagina[] {
+  const guardada = sugestoesDaCopia.get(p.id)
+  if (guardada && guardada.hash === p.hash) return guardada.sugestoes
+  let sugestoes: SugestaoDePagina[] = []
+  try {
+    const bruto = readFileSync(join(pastaDaCopia(p.id), 'manifesto.json'))
+    if (bruto.length <= 64 * 1024) {
+      const m = validarManifesto(JSON.parse(bruto.toString('utf8').replace(/^﻿/, '')))
+      if (m.ok) sugestoes = sugestoesDe(m.valor)
+    }
+  } catch {
+    // cópia sumida ou manifesto ilegível: sem sugestões (a pendência já avisa o resto)
+  }
+  sugestoesDaCopia.set(p.id, { hash: p.hash, sugestoes })
+  return sugestoes
+}
+
+/** (1.9.7) `ctx`: APIs e servidores lidos uma vez por lista (os `usos` com nome e "sumiu"). */
+function resumir(p: PaginaRegistrada, ctx: ContextoDosAcessos = contextoDosAcessos()): ResumoDePagina {
   const espacos = resumosDosEspacos()
   const pendente = pendenciaDe(p)
   const ultima = p.quedas[p.quedas.length - 1]
+  // só quando a cópia ainda é a aceita: se mudou fora, o manifesto lido não é o que o Luís aceitou
+  const sugestoes = pendente ? [] : sugestoesDaPagina(p)
   return {
     id: p.id,
     nome: p.nome,
@@ -1098,7 +1217,9 @@ function resumir(p: PaginaRegistrada): ResumoDePagina {
       espacoNome: espacos.find((e) => e.id === c.espacoId)?.nome ?? '(espaço apagado)',
       cartaoNome: sessaoPorId(c.cartaoId)?.espec.nome ?? '(cartão fechado)'
     })),
-    ...(ultima ? { ultimaQueda: ultima } : {})
+    ...(ultima ? { ultimaQueda: ultima } : {}),
+    ...(p.acessos ? { acessos: p.acessos, usos: usosDe(p.acessos, ctx.apis, ctx.servidores) } : {}),
+    ...(sugestoes.length ? { sugestoes } : {})
   }
 }
 
@@ -1116,6 +1237,20 @@ const idValido = (id: unknown): id is string => typeof id === 'string' && ID_DE_
 function exigirPagina(id: unknown): PaginaRegistrada {
   if (!idValido(id) || !paginaDe(id)) throw new Error('página não instalada')
   return paginaDe(id)!
+}
+
+/**
+ * (1.9.7) O cartão da página troca o que ela enxerga: conferido (existe, escrita ≤ teto da API, `atende` único, nada
+ * com rede/local); depois corta os pedidos em curso e recarrega a página aberta. Só pelo ipcMain (ipcSeguro) e pelo
+ * autoteste: a página não tem como chamar isto.
+ */
+function definirAcessos(id: unknown, acessos: unknown): void {
+  const p = exigirPagina(id)
+  const conferidos = conferirAcessos(acessos ?? {}, contextoDosAcessos(bloqueioDasFichas(p.pedidas)))
+  if (!conferidos.ok) throw new Error(conferidos.erro)
+  const novos = conferidos.valor.api || conferidos.valor.mcp ? conferidos.valor : undefined
+  mudarPagina(p.id, ({ acessos: _antes, ...x }) => ({ ...x, ...(novos ? { acessos: novos } : {}) }))
+  recarregarAbertas(p.id)
 }
 
 function exigirPermissaoPedida(p: PaginaRegistrada, permissao: unknown): string {
@@ -1144,7 +1279,7 @@ const VARIAVEL_DA_PASTA_DE_TESTE = 'ORK_AUTOTESTE_PASTA_DA_PAGINA'
  * e a pasta passa pelo MESMO funil do "Escolher pasta…" (varredura sem executar, manifesto, proposta, aceite, cópia
  * conferida de novo). Nada é instalado sem o aceite.
  */
-const EXEMPLOS_DE_PAGINA: readonly string[] = ['resumo-do-espaco']
+const EXEMPLOS_DE_PAGINA: readonly string[] = ['resumo-do-espaco', 'eco-de-api']
 
 function pastaDoExemplo(nome: unknown): string | null {
   if (typeof nome !== 'string' || !EXEMPLOS_DE_PAGINA.includes(nome)) return null
@@ -1155,7 +1290,7 @@ function pastaDoExemplo(nome: unknown): string | null {
 export function registrarPaginas(): void {
   ipcMain.handle(CANAIS_PAGINAS.listar, () => ({
     ligadas: reg().ligadas,
-    paginas: reg().paginas.map(resumir),
+    paginas: ((ctx) => reg().paginas.map((p) => resumir(p, ctx)))(contextoDosAcessos()),
     ...(soLeitura ? { soLeitura } : {})
   }))
 
@@ -1181,7 +1316,7 @@ export function registrarPaginas(): void {
     const pasta = pastaDoExemplo(nome)
     return pasta ? proporDaPasta(pasta) : { ok: false, erro: 'exemplo desconhecido' }
   })
-  ipcMain.handle(CANAIS_PAGINAS.aceitar, (_e, token: unknown) => aceitarProposta(String(token)))
+  ipcMain.handle(CANAIS_PAGINAS.aceitar, (_e, token: unknown, acessos: unknown) => aceitarProposta(String(token), acessos))
   ipcMain.handle(CANAIS_PAGINAS.recusar, (_e, token: unknown) => void propostas.delete(String(token)))
   ipcMain.handle(CANAIS_PAGINAS.rever, (_e, id: unknown): RespostaDaProposta => (idValido(id) ? proporRever(id) : { ok: false, erro: 'página não instalada' }))
   ipcMain.handle(CANAIS_PAGINAS.atualizar, (_e, id: unknown): RespostaDaProposta => {
@@ -1207,7 +1342,12 @@ export function registrarPaginas(): void {
     })
   )
 
-  ipcMain.handle(CANAIS_PAGINAS.ligarCorda, (_e, id: unknown, espacoId: unknown, cartaoId: unknown) =>
+  // (1.9.7) O cartão da página troca o que ela enxerga: conferido (existe, escrita ≤ teto da API, `atende` único, nada
+  // com rede/local); corta os pedidos em curso e recarrega a página aberta
+  ipcMain.handle(CANAIS_PAGINAS.definirAcessos, (_e, id: unknown, acessos: unknown) => tentar(() => definirAcessos(id, acessos)))
+  ipcMain.handle(CANAIS_PAGINAS.pedidos, (_e, id: unknown): PedidoDaPagina[] => (idValido(id) ? apiDasPaginas.pedidos(id) : []))
+
+  ipcMain.handle(CANAIS_PAGINAS.ligarCorda,(_e, id: unknown, espacoId: unknown, cartaoId: unknown) =>
     tentar(() => {
       const p = exigirPagina(id)
       if (typeof espacoId !== 'string' || !idsDosEspacos().includes(espacoId)) throw new Error('espaço desconhecido')
@@ -1259,6 +1399,7 @@ export function registrarPaginas(): void {
       for (const chave of [...respostasNaFila.keys()]) if (chave.startsWith(`${p.id}|`)) respostasNaFila.delete(chave)
       rmSync(pastaDaCopia(p.id), { recursive: true, force: true })
       apagarDados(p.id)
+      apiDasPaginas.esquecer(p.id)
       void session.fromPartition(`pagina-${p.id}`).clearStorageData().catch(() => {})
     })
   )
@@ -1287,11 +1428,24 @@ export const paginasNoTeste = {
   ligar(ligar: boolean): void {
     if (AUTOTESTE) mudar((r) => ({ ...r, ligadas: ligar }))
   },
-  instalar(pasta: string): ResultadoDePaginas & { id?: string } {
+  /**
+   * (1.9.7) `acessos`: o que o aceite marca (as APIs e os MCPs que a página enxerga).
+   */
+  instalar(pasta: string, acessos?: AcessosDaPagina): ResultadoDePaginas & { id?: string } {
     if (!AUTOTESTE) return { ok: false, erro: 'só no autoteste' }
     const r = proporDaPasta(pasta)
-    return r.ok ? aceitarProposta(r.proposta.token) : r
+    return r.ok ? aceitarProposta(r.proposta.token, acessos) : r
   },
+  /** (1.9.7) O mesmo que o cartão faz em Conexões › Páginas. */
+  definirAcessos(id: string, acessos: AcessosDaPagina): ResultadoDePaginas {
+    if (!AUTOTESTE) return { ok: false, erro: 'só no autoteste' }
+    return tentar(() => definirAcessos(id, acessos))
+  },
+  /** (1.9.7) O servidor falso no lugar da internet para a `api` das páginas. Fora do autoteste, lança. */
+  trocarRedeDaApi(rede: RedeDaApi): void {
+    apiDasPaginas.trocarRedeNoTeste(rede)
+  },
+  pedidos: (id: string): PedidoDaPagina[] => (AUTOTESTE ? apiDasPaginas.pedidos(id) : []),
   dados: (id: string): Record<string, unknown> => (AUTOTESTE ? { ...dadosDe(id) } : {}),
   pagina: (id: string): PaginaRegistrada | undefined => (AUTOTESTE ? paginaDe(id) : undefined),
   abertas: (id: string): WebContents[] => (AUTOTESTE ? abertasDa(id).map((a) => a.guest) : []),
@@ -1302,5 +1456,6 @@ export const paginasNoTeste = {
     descarregar(id)
     rmSync(pastaDaCopia(id), { recursive: true, force: true })
     apagarDados(id)
+    apiDasPaginas.esquecer(id)
   }
 }

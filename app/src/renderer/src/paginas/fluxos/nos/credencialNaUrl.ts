@@ -23,12 +23,12 @@ export function conferirCredencialNaUrl(nome: string, url: string, lista: readon
   const pedida = nome.trim()
   if (!pedida || !lista) return null
   const c = lista.find((x) => x.nome.toLowerCase() === pedida.toLowerCase())
-  if (!c) return { estado: 'erro', texto: `${credencialNaoExiste(pedida)}. Escolha outra, ou crie esta em Configurações › Conexões › Credenciais.` }
+  if (!c) return { estado: 'erro', texto: `${credencialNaoExiste(pedida)}. Escolha outra, ou crie esta em Configurações › Conexões › APIs.` }
   const alvo = url.trim()
   const dominios = c.dominios.join(', ')
-  if (!alvo) return { estado: 'aviso', texto: `Escreva a URL para conferir o domínio. Esta credencial só vai para: ${dominios}.` }
+  if (!alvo) return { estado: 'aviso', texto: `Escreva a URL para conferir o domínio. Esta API só vai para: ${dominios}.` }
   if (hostEscrito(alvo).includes('{{')) {
-    return { estado: 'aviso', texto: `O endereço muda com o item, então o domínio só é conferido na hora do pedido: a credencial só vai se ele for um destes: ${dominios}.` }
+    return { estado: 'aviso', texto: `O endereço muda com o item, então o domínio só é conferido na hora do pedido: a API só vai se ele for um destes: ${dominios}.` }
   }
   const motivo = conferirDestino(c, alvo)
   if (motivo) return { estado: 'erro', texto: `${motivo}. O pedido vai falhar.` }

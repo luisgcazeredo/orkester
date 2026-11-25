@@ -5,6 +5,7 @@ import { usarLoja } from '../../estado/loja'
 import type { PaginaInstalada } from './contrato'
 import { IconeDaPagina } from './Icone'
 import { LigarAgente } from './LigarAgente'
+import { textoDeUso } from './textos'
 import '../../estilos/extra.css'
 
 // A moldura do app em volta de uma página extra: cabeçalho com ícone, nome e versão desenhados pela JANELA (fora do
@@ -13,6 +14,8 @@ import '../../estilos/extra.css'
 export function Moldura({ pagina, aoRecarregar, children }: { pagina: PaginaInstalada; aoRecarregar?: () => void; children: ReactNode }) {
   const espacoId = usarLoja((e) => e.espaco?.id)
   const aqui = pagina.cordas.filter((c) => c.espacoId === espacoId)
+  // (1.9.7, F1) as APIs e os MCPs que ela enxerga, pelos nomes do main; vermelho com escrita ou ferramenta que pode mudar coisas
+  const usa = textoDeUso(pagina.usos)
   return (
     <div className="extra-moldura" data-pagina-extra={pagina.id}>
       <header className="extra-cabecalho">
@@ -22,6 +25,11 @@ export function Moldura({ pagina, aoRecarregar, children }: { pagina: PaginaInst
         <span className="extra-cordas suave" data-cordas-da-pagina>
           {aqui.length ? `ligada a ${aqui.map((c) => c.cartaoNome).join(', ')}` : 'não ligada a nenhum agente deste espaço'}
         </span>
+        {usa.texto && (
+          <span className={usa.perigo ? 'extra-usa suave escrita' : 'extra-usa suave'} title={usa.detalhe} data-usa-da-pagina>
+            {usa.texto}
+          </span>
+        )}
         <span className="extra-espaco-flex" />
         <LigarAgente pagina={pagina} />
         {aoRecarregar && (
@@ -29,7 +37,7 @@ export function Moldura({ pagina, aoRecarregar, children }: { pagina: PaginaInst
             <RotateCw size={13} />
           </button>
         )}
-        <button type="button" className="extra-botao extra-icone" title="Permissões e ligações (Configurações › Conexões › Páginas)" aria-label="Permissões e ligações desta página em Configurações, Conexões, Páginas" onClick={() => abrirConfiguracoes('conexoes', 'paginas')}>
+        <button type="button" className="extra-botao extra-icone" title="Permissões, APIs e MCPs (Configurações › Conexões › Páginas)" aria-label="Permissões, APIs e MCPs desta página em Configurações, Conexões, Páginas" onClick={() => abrirConfiguracoes('conexoes', 'paginas')}>
           <Settings2 size={13} />
         </button>
       </header>

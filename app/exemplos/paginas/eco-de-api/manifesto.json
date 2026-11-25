@@ -1,0 +1,11 @@
+{
+  "formato": 1,
+  "id": "eco-de-api",
+  "nome": "Eco de API",
+  "versao": "1.0.0",
+  "descricao": "Testa o pedido a uma API pelo Orkester com o httpbin.org: lê, escreve (ele devolve o que recebeu), mostra o token trocado por ••• e um redirecionamento que o app não segue.",
+  "icone": "icone.svg",
+  "permissoes": {
+    "api": [{ "encaixe": "eco", "hosts": ["httpbin.org"], "escrita": true }]
+  }
+}

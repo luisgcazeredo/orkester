@@ -14,7 +14,7 @@
  * não carrega.
  */
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ApiOrkPagina, CANAIS_ORK_PAGINA, EventosDaPagina } from '../shared/api'
+import type { ApiOrkPagina, CANAIS_ORK_PAGINA, EventosDaPagina, METODOS_API_MCP_DA_PAGINA } from '../shared/api'
 import { TETOS_NO_PRELOAD, conferirAntesDeEnviar, desligarWebRtc } from './conferirDaPagina'
 
 try {
@@ -25,6 +25,14 @@ try {
 
 // o tipo amarra estes textos aos de shared/api.ts: mudou lá, não compila aqui
 const C: typeof CANAIS_ORK_PAGINA = { chamar: 'pagina:chamar', ouvir: 'pagina:ouvir', evento: 'pagina:evento' }
+// (1.9.7) idem para os métodos de api e mcp (o preload só importa tipos de shared/api.ts: roda em sandbox)
+const M: typeof METODOS_API_MCP_DA_PAGINA = {
+  apiDisponiveis: 'api-disponiveis',
+  mcpDisponiveis: 'mcp-disponiveis',
+  apiPedir: 'api-pedir',
+  mcpFerramentas: 'mcp-ferramentas',
+  mcpChamar: 'mcp-chamar'
+}
 const EVENTOS: ReadonlyArray<keyof EventosDaPagina> = ['recado', 'quadro', 'tema']
 
 let emVoo = 0
@@ -69,6 +77,15 @@ const api: ApiOrkPagina = {
     chaves: () => chamar('dados-chaves')
   },
   local: { ler: (caminho) => chamar('local-ler', caminho) },
+  api: {
+    disponiveis: () => chamar(M.apiDisponiveis),
+    pedir: (nome, pedido) => chamar(M.apiPedir, nome, pedido)
+  },
+  mcp: {
+    disponiveis: () => chamar(M.mcpDisponiveis),
+    ferramentas: (nome) => chamar(M.mcpFerramentas, nome),
+    chamar: (nome, ferramenta, argumentos) => chamar(M.mcpChamar, nome, ferramenta, argumentos)
+  },
   ao(evento, fn) {
     if (!EVENTOS.includes(evento) || typeof fn !== 'function') throw new Error('evento desconhecido: use "recado", "quadro" ou "tema"')
     let lista = ouvintes.get(evento)

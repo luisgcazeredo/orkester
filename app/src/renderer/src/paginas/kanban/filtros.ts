@@ -13,30 +13,38 @@ export interface FiltroDaPagina {
   quem: string
   /** `''` = todas; senão o nome da etiqueta (sem caixa nem acento). */
   etiqueta: string
+  /** `''` = todas; `SEM_PASTA` = as sem pasta; senão o nome da pasta (sem caixa nem acento). */
+  pasta: string
   /** Esconde da coluna final o que foi concluído há mais de 7 dias. */
   esconderFeitoAntigo: boolean
 }
 
-export const FILTRO_INICIAL: FiltroDaPagina = { busca: '', quem: 'todos', etiqueta: '', esconderFeitoAntigo: true }
+/** O valor do filtro de pasta que pede só as tarefas sem pasta. */
+export const SEM_PASTA = '--sem-pasta--'
+
+export const FILTRO_INICIAL: FiltroDaPagina = { busca: '', quem: 'todos', etiqueta: '', pasta: '', esconderFeitoAntigo: true }
 
 const normalizar = (texto: string): string =>
   texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase('pt-BR').replace(/\s+/g, ' ').trim()
 
 /** Algum filtro além do "esconder Feito antigo" (que é o padrão) está ligado. */
 export function filtrando(f: FiltroDaPagina): boolean {
-  return !!f.busca.trim() || f.quem !== 'todos' || !!f.etiqueta
+  return !!f.busca.trim() || f.quem !== 'todos' || !!f.etiqueta || !!f.pasta
 }
 
 /** A tarefa passa nos filtros? `final`: ela está na coluna final. */
 export function passaNoFiltro(t: Tarefa, f: FiltroDaPagina, final: boolean, agora: number): boolean {
   if (f.quem === 'ninguem' ? t.trabalhando.length > 0 : f.quem !== 'todos' && !t.trabalhando.some((p) => p.id === f.quem)) return false
   if (f.etiqueta && !t.etiquetas.some((e) => normalizar(e) === normalizar(f.etiqueta))) return false
+  if (f.pasta) {
+    if (f.pasta === SEM_PASTA ? !!t.pasta?.trim() : normalizar(t.pasta ?? '') !== normalizar(f.pasta)) return false
+  }
   if (final && f.esconderFeitoAntigo && agora - (t.concluidaEm ?? t.atualizadaEm) > FEITO_ANTIGO_MS) return false
   const b = normalizar(f.busca)
   if (b) {
     const numero = b.replace(/^#/, '')
     if (/^\d+$/.test(numero)) return String(t.numero) === numero || normalizar(t.titulo).includes(b)
-    return normalizar(t.titulo).includes(b) || normalizar(t.descricao).includes(b)
+    return normalizar(t.titulo).includes(b) || normalizar(t.descricao).includes(b) || normalizar(t.pasta ?? '').includes(b)
   }
   return true
 }

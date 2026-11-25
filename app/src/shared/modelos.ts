@@ -194,6 +194,41 @@ export function modeloEfetivo(agente: Agente, comando: string | undefined, model
   return lerDaLinha(agente, aplicarModelo(agente, comando.trim(), modelo, esforco))
 }
 
+/** O que o próprio motor roda quando o cartão não diz (as chaves de modelo e esforço do config dele). */
+export interface PadraoDoMotor {
+  modelo?: string
+  esforco?: Esforco
+}
+
+function padraoValido(agente: 'claude' | 'codex', modelo: unknown, esforco: unknown): PadraoDoMotor {
+  const e = esforcoValido(esforco) && (agente === 'codex' || ESFORCOS_CLAUDE.includes(esforco)) ? esforco : undefined
+  return { ...(modeloValido(modelo) ? { modelo } : {}), ...(e ? { esforco: e } : {}) }
+}
+
+/** `~/.claude/settings.json` (texto): só as chaves `model` e `effortLevel`. JSON ruim ou valor fora do formato = sem padrão. */
+export function padraoDoClaude(json: string): PadraoDoMotor {
+  try {
+    const c: unknown = JSON.parse(json)
+    if (typeof c !== 'object' || c === null || Array.isArray(c)) return {}
+    const o = c as Record<string, unknown>
+    return padraoValido('claude', o.model, o.effortLevel)
+  } catch {
+    return {}
+  }
+}
+
+/** `~/.codex/config.toml` (texto): só `model` e `model_reasoning_effort`, no topo do arquivo (antes da 1ª `[tabela]`). */
+export function padraoDoCodex(toml: string): PadraoDoMotor {
+  const valores: Record<string, string> = {}
+  for (const linha of toml.split(/\r?\n/)) {
+    const t = linha.trim()
+    if (t.startsWith('[')) break
+    const m = /^(model|model_reasoning_effort)\s*=\s*(?:"([^"]*)"|'([^']*)')\s*(?:#.*)?$/.exec(t)
+    if (m) valores[m[1]] = m[2] ?? m[3]
+  }
+  return padraoValido('codex', valores.model, valores.model_reasoning_effort)
+}
+
 export interface ParteDoRotulo {
   texto: string
   /** Veio do padrão do motor, não de uma escolha: a tela mostra em tom suave. */
@@ -207,7 +242,7 @@ export const TEXTO_PADRAO = 'padrão'
  * `padrão` (`opus · padrão`, `padrão · medium`, só `padrão`), nunca vazio; shell não tem rótulo. Sem `agente` é o
  * rótulo antigo, só dos campos (funções e partituras não têm comando): vazio sem nada.
  */
-export function partesDoRotulo(no: { agente?: Agente; comando?: string; modelo?: string; esforco?: Esforco }): ParteDoRotulo[] {
+export function partesDoRotulo(no: { agente?: Agente; comando?: string; modelo?: string; esforco?: Esforco; padraoDoMotor?: PadraoDoMotor }): ParteDoRotulo[] {
   if (no.agente === undefined) {
     return [modeloValido(no.modelo) ? no.modelo : undefined, esforcoValido(no.esforco) ? no.esforco : undefined]
       .filter((t): t is string => Boolean(t))
@@ -215,14 +250,20 @@ export function partesDoRotulo(no: { agente?: Agente; comando?: string; modelo?:
   }
   if (no.agente === 'shell') return []
   const { modelo, esforco } = modeloEfetivo(no.agente, no.comando, no.modelo, no.esforco)
-  if (!modelo && !esforco) return [{ texto: TEXTO_PADRAO, padrao: true }]
+  // o que o config do motor diz entra entre parênteses; sem ele, o `padrão` seco de sempre
+  const dele = padraoValido(no.agente, no.padraoDoMotor?.modelo, no.padraoDoMotor?.esforco)
+  const padraoDe = (x?: string): string => (x ? `${TEXTO_PADRAO} (${x})` : TEXTO_PADRAO)
+  if (!modelo && !esforco) {
+    const lido = [dele.modelo, dele.esforco].filter(Boolean).join(' · ')
+    return [{ texto: padraoDe(lido), padrao: true }]
+  }
   return [
-    { texto: modelo ?? TEXTO_PADRAO, padrao: !modelo },
-    { texto: esforco ?? TEXTO_PADRAO, padrao: !esforco }
+    { texto: modelo ?? padraoDe(dele.modelo), padrao: !modelo },
+    { texto: esforco ?? padraoDe(dele.esforco), padrao: !esforco }
   ]
 }
 
 /** O rótulo do cartão como texto: `opus · xhigh`. Ver `partesDoRotulo` para o que muda com `agente`. */
-export function rotuloModelo(no: { agente?: Agente; comando?: string; modelo?: string; esforco?: Esforco }): string {
+export function rotuloModelo(no: { agente?: Agente; comando?: string; modelo?: string; esforco?: Esforco; padraoDoMotor?: PadraoDoMotor }): string {
   return partesDoRotulo(no).map((p) => p.texto).join(' · ')
 }

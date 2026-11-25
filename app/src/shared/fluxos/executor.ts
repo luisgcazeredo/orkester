@@ -10,11 +10,11 @@
 import type { AjustesPorTipo, CondicaoDoSe, Execucao, Item, Ligacao, NoDoFluxo, NoNaExecucao, TipoDeNo } from './tipos'
 // Node executa as provas TypeScript diretamente e precisa da extensão nestes imports de execução.
 // @ts-expect-error TS ainda exige allowImportingTsExtensions para esse modo de execução do Node.
-import { CORTE_DO_NO, MAX_BYTES_DA_LISTA, MAX_BYTES_DE_LOG, MAX_ITENS, MAX_ITENS_HTTP, MAX_ITENS_ORKESTER, MAX_LINHAS_DE_LOG, MAX_PASSOS, PRAZO_DA_EXECUCAO } from './formato.ts'
+import { CORTE_DO_NO, MAX_BYTES_DA_LISTA, MAX_BYTES_DE_LOG, MAX_ITENS, MAX_ITENS_HTTP, MAX_ITENS_MCP, MAX_ITENS_ORKESTER, MAX_LINHAS_DE_LOG, MAX_PASSOS, PRAZO_DA_EXECUCAO } from './formato.ts'
 // @ts-expect-error idem
-import { comandoComExpressao, ehGatilho, quantasSaidas, resolverAjustes } from './nos.ts'
+import { CATALOGO, comandoComExpressao, ehGatilho, quantasSaidas, resolverAjustes } from './nos.ts'
 // @ts-expect-error idem
-import { emTexto, resolverValor } from './expressoes.ts'
+import { emTexto, expressoesVazias, resolverValor } from './expressoes.ts'
 
 // ---------------------------------------------------------------- dependências
 
@@ -41,6 +41,11 @@ export interface AcoesDoFluxo {
   comando: AcaoPorItem<'orkester.comando'>
   avisar: AcaoPorItem<'orkester.avisar'>
   http: AcaoPorItem<'fora.http'>
+  /**
+   * (1.9.7) Uma chamada de ferramenta MCP por item. Devolve `{ texto, estruturado?, erro }` (`erro`: a ferramenta disse
+   * que falhou; o nó segue). Servidor pausado, ferramenta bloqueada etc.: lança (o nó dá erro).
+   */
+  mcp: AcaoPorItem<'fora.mcp'>
   /**
    * Consultar (só leitura): uma vez por item de entrada, com os ajustes resolvidos para ele. `itens`: um `json` por
    * ficha (já cortados no `limite`); `total`: quantos casaram antes do corte.
@@ -98,6 +103,40 @@ export function comContexto(json: Record<string, unknown>, contexto?: ContextoDa
     if (contexto[chave] !== undefined) Object.defineProperty(visto, chave, { value: contexto[chave], enumerable: false, configurable: true, writable: false })
   }
   return visto
+}
+
+/** (1.9.7, D5) As `{{ }}` vazias guardadas por nó (`NoNaExecucao.vazias`). */
+const MAX_VAZIAS = 10
+
+/** Os textos de um nó que aceitam `{{ }}`, pelos campos que o catálogo marca (mesmo desenho do `resolverAjustes`). */
+export function textosComExpressao(tipo: TipoDeNo, ajustes: unknown): string[] {
+  const base = (ajustes ?? {}) as Record<string, unknown>
+  const saida: string[] = []
+  for (const campo of CATALOGO[tipo].expressoes) {
+    const [lista, sub] = campo.split('[].')
+    const [obj, chave] = campo.split('.')
+    if (sub !== undefined) {
+      const itens = base[lista]
+      if (Array.isArray(itens)) for (const i of itens) if (ehObjeto(i) && typeof i[sub] === 'string') saida.push(i[sub] as string)
+    } else if (chave !== undefined) {
+      const o = base[obj]
+      if (ehObjeto(o) && typeof o[chave] === 'string') saida.push(o[chave] as string)
+    } else if (typeof base[campo] === 'string') saida.push(base[campo] as string)
+  }
+  return saida
+}
+
+/** As `{{ }}` do nó que vieram vazias em algum dos itens que chegaram (D5). */
+export function vaziasDoNo(no: Pick<NoDoFluxo, 'tipo' | 'ajustes'>, entrada: readonly Item[], contexto?: ContextoDasExpressoes): string[] {
+  if (ehGatilho(no.tipo)) return []
+  const textos = textosComExpressao(no.tipo, no.ajustes).filter((t) => t.includes('{{'))
+  if (!textos.length) return []
+  const achadas: string[] = []
+  for (const item of entrada) {
+    const visto = comContexto(item.json, contexto)
+    for (const t of textos) for (const e of expressoesVazias(t, visto)) if (!achadas.includes(e) && achadas.length < MAX_VAZIAS) achadas.push(e.slice(0, 80))
+  }
+  return achadas
 }
 
 export type ResultadoDoExecutor = Pick<Execucao, 'caminho' | 'nos' | 'ms'> & { resultado: 'ok' | 'erro'; erro?: string; noComErro?: string }
@@ -307,6 +346,8 @@ export async function executarFluxo(
   const filhos = (id: string): Ligacao[] => fluxo.ligacoes.filter((l) => l.de === id)
   const caminho: string[] = []
   const brutos = new Map<string, Bruto>()
+  /** (Revisão C, achado 4) Chamadas MCP já feitas por nó NESTA execução: o teto vale para a soma das chegadas. */
+  const chamadasMcp = new Map<string, number>()
   const controle = new AbortController()
   let erro: { no: string; mensagem: string } | null = null
 
@@ -368,20 +409,27 @@ export async function executarFluxo(
         return { saidas: [ficou], log: cortes.length ? cortes : undefined }
       }
       default: {
-        const nome = no.tipo === 'fora.http' ? 'http' : ACAO_ORKESTER[no.tipo]
+        const nome = no.tipo === 'fora.http' ? 'http' : no.tipo === 'fora.mcp' ? 'mcp' : ACAO_ORKESTER[no.tipo]
         if (!nome) throw new ErroDoNo(`tipo de nó desconhecido: ${no.tipo}`)
         // a Falta do comando (D5) não impede a leitura do disco: um fluxo antigo, ligado, para aqui e não digita nada
         if (no.tipo === 'orkester.comando' && comandoComExpressao((no.ajustes as AjustesPorTipo['orkester.comando']).comando)) throw new ErroDoNo('{{ }} não vale no comando')
-        const max = no.tipo === 'fora.http' ? MAX_ITENS_HTTP : MAX_ITENS_ORKESTER
+        const max = no.tipo === 'fora.http' ? MAX_ITENS_HTTP : no.tipo === 'fora.mcp' ? MAX_ITENS_MCP : MAX_ITENS_ORKESTER
+        const jaFeitas = no.tipo === 'fora.mcp' ? (chamadasMcp.get(no.id) ?? 0) : 0
+        if (jaFeitas && jaFeitas + entrada.length > max) {
+          throw new ErroDoNo(`nesta execução a Ferramenta MCP já fez ${jaFeitas} chamadas e chegaram mais ${entrada.length} itens; ela faz no máximo ${max} por execução: junte os itens antes, no nó Código`)
+        }
         if (entrada.length > max) {
           throw new ErroDoNo(
             no.tipo === 'fora.http'
               ? `chegaram ${entrada.length} itens e o HTTP faz no máximo ${max} pedidos: junte os itens antes, no nó Código`
-              : `chegaram ${entrada.length} itens e este nó age no máximo ${max} vezes: junte os itens antes, no nó Código`
+              : no.tipo === 'fora.mcp'
+                ? `chegaram ${entrada.length} itens e a Ferramenta MCP faz no máximo ${max} chamadas: junte os itens antes, no nó Código`
+                : `chegaram ${entrada.length} itens e este nó age no máximo ${max} vezes: junte os itens antes, no nó Código`
           )
         }
         const acao = opcoes.acoes[nome] as AcaoPorItem<TipoDeNo> | undefined
         if (!acao) throw new ErroDoNo(`o nó ${no.tipo} ainda não roda aqui`)
+        if (no.tipo === 'fora.mcp') chamadasMcp.set(no.id, jaFeitas + entrada.length)
         const saida: Item[] = []
         const recados: string[] = []
         for (const item of entrada) {
@@ -396,7 +444,7 @@ export async function executarFluxo(
     }
   }
 
-  type Bruto = { estado: 'ok' | 'erro'; ms: number; entrada: Item[]; saidas: Item[][]; erro?: string; recado?: string; log?: string[] }
+  type Bruto = { estado: 'ok' | 'erro'; ms: number; entrada: Item[]; saidas: Item[][]; erro?: string; recado?: string; log?: string[]; vazias?: string[] }
   /** Nó com várias entradas roda a cada chegada: a execução guarda a soma (itens, tempo, recados e log). */
   const anotar = (id: string, b: Bruto): void => {
     const antes = brutos.get(id)
@@ -409,7 +457,8 @@ export async function executarFluxo(
       saidas: antes.saidas.map((s, i) => [...s, ...(b.saidas[i] ?? [])]),
       erro: b.erro ?? antes.erro,
       recado: [antes.recado, b.recado].filter(Boolean).join(', ') || undefined,
-      log: juntar(antes.log, b.log)
+      log: juntar(antes.log, b.log),
+      vazias: juntar(antes.vazias, b.vazias)
     })
   }
 
@@ -430,7 +479,7 @@ export async function executarFluxo(
       const saidas = Array.from({ length: n }, (_, i) => r.saidas[i] ?? [])
       const finais = segredos.size ? saidas.map((s) => ocultarEm(s, lista())) : saidas
       finais.forEach((s, i) => conferirLista(s, n > 1 ? `saída ${i + 1}` : 'a saída'))
-      anotar(id, { estado: 'ok', ms: agora() - inicioDoNo, entrada, saidas: finais, recado: r.recado, log: r.log })
+      anotar(id, { estado: 'ok', ms: agora() - inicioDoNo, entrada, saidas: finais, recado: r.recado, log: r.log, vazias: vaziasDoNo(no, entrada, opcoes.contexto) })
       for (const l of filhos(id)) {
         if (erro) return
         const itens = finais[l.saida] ?? []
@@ -472,6 +521,7 @@ export async function executarFluxo(
     if (b.erro) n.erro = ocultarEm(b.erro, seg)
     if (b.recado) n.recado = ocultarEm(b.recado, seg)
     if (b.log) n.log = ocultarEm(b.log, seg)
+    if (b.vazias?.length) n.vazias = [...new Set(b.vazias)].slice(0, MAX_VAZIAS)
     nos[no.id] = n
   }
   const final: ResultadoDoExecutor = { resultado: erro ? 'erro' : 'ok', caminho, nos, ms: agora() - t0 }

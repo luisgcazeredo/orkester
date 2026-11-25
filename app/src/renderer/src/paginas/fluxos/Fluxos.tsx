@@ -242,7 +242,7 @@ export function Fluxos() {
         <h2>Fluxos</h2>
         <p className="suave">
           Um fluxo liga um <b>gatilho</b> (uma tarefa que muda de coluna, uma entrega, um agente que parou, a hora ou o botão Rodar fluxo) a uma sequência de
-          ações: um recado, uma tarefa nova, um aviso, um Código, um pedido HTTP ou um comando no shell. Código, HTTP e comando só ligam depois da sua
+          ações: um recado, uma tarefa nova, um aviso, um Código, um pedido HTTP, uma ferramenta MCP ou um comando no shell. Código, HTTP, MCP e comando só ligam depois da sua
           confirmação. Cada espaço tem os seus fluxos, e cada um tem teto por hora e nunca dispara de novo numa cadeia que ele mesmo começou.
         </p>
         <div className="fluxo-barra" data-fluxos-barra>

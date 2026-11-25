@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Eco de API</title>
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1 id="titulo">Eco de API</h1>
+      <p class="suave">
+        O httpbin.org é um serviço público de teste: ele devolve o que recebe. Cada botão abaixo faz um pedido pelo
+        Orkester, que leva a chave da API que você marcou para ela (a que atende <b>eco</b>). Esta página nunca vê o valor dela.
+      </p>
+      <p id="encaixe" class="suave"></p>
+    </header>
+
+    <section aria-labelledby="h-ler">
+      <h2 id="h-ler">1 · Ler</h2>
+      <p class="suave">GET /get com uma consulta. O eco mostra o que chegou lá.</p>
+      <button type="button" id="ler">Ler (GET)</button>
+    </section>
+
+    <section aria-labelledby="h-escrever">
+      <h2 id="h-escrever">2 · Escrever</h2>
+      <p class="suave">POST /post com um texto seu. Só funciona se a API lê e escreve e você marcou “também escreve” para esta página.</p>
+      <label for="mensagem">Texto</label>
+      <input id="mensagem" type="text" maxlength="200" value="olá do Orkester">
+      <button type="button" id="escrever">Escrever (POST)</button>
+    </section>
+
+    <section aria-labelledby="h-token">
+      <h2 id="h-token">3 · O token some</h2>
+      <p class="suave">GET /headers devolve os cabeçalhos que o serviço recebeu, inclusive o da chave da sua API. O Orkester troca o valor por •••.</p>
+      <button type="button" id="token">Ver os cabeçalhos (GET)</button>
+    </section>
+
+    <section aria-labelledby="h-redirecionar">
+      <h2 id="h-redirecionar">4 · Redirecionamento para fora</h2>
+      <p class="suave">O serviço manda ir para outro site. O Orkester não segue (a chave não sai dos domínios da API) e devolve o 302.</p>
+      <button type="button" id="redirecionar">Pedir o redirecionamento (GET)</button>
+    </section>
+
+    <section aria-labelledby="h-resultado" aria-live="polite">
+      <h2 id="h-resultado">Resultado</h2>
+      <p id="resumo" class="suave">Nada pedido ainda.</p>
+      <pre id="corpo" hidden></pre>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

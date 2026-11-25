@@ -1,11 +1,12 @@
 // O formulário de cada tipo de nó, e o ícone de cada tipo (lucide; nada do n8n).
 import type { ComponentType } from 'react'
-import { Bell, CirclePause, Clock, Code, Database, Globe, ListPlus, MessageSquare, MousePointerClick, PackageCheck, PencilLine, Split, SquareKanban, SquareTerminal, type LucideIcon } from 'lucide-react'
+import { Bell, CirclePause, Clock, Code, Database, Globe, Plug, ListPlus, MessageSquare, MousePointerClick, PackageCheck, PencilLine, Split, SquareKanban, SquareTerminal, type LucideIcon } from 'lucide-react'
 import type { TipoDeNo } from '../../../../../shared/fluxos/tipos'
 import { FormCodigo } from './Codigo'
 import type { PropsDoFormulario } from './comum'
 import { FormEntrega, FormKanban, FormManual, FormParou, FormRelogio } from './Gatilhos'
 import { FormHttp } from './Http'
+import { FormMcp } from './Mcp'
 import { FormDefinir, FormSe } from './Logica'
 import { FormAvisar, FormComando, FormConsultar, FormRecado, FormTarefa } from './Orkester'
 
@@ -25,7 +26,8 @@ export const FORMULARIOS: Record<TipoDeNo, ComponentType<PropsDoFormulario>> = {
   'logica.se': FormSe,
   'logica.definir': FormDefinir,
   'fora.codigo': FormCodigo,
-  'fora.http': FormHttp
+  'fora.http': FormHttp,
+  'fora.mcp': FormMcp
 }
 
 export const ICONES: Record<TipoDeNo, LucideIcon> = {
@@ -42,5 +44,6 @@ export const ICONES: Record<TipoDeNo, LucideIcon> = {
   'logica.se': Split,
   'logica.definir': PencilLine,
   'fora.codigo': Code,
-  'fora.http': Globe
+  'fora.http': Globe,
+  'fora.mcp': Plug
 }

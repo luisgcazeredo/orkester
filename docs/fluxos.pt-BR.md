@@ -2,11 +2,11 @@
 
 [English](fluxos.md) · Português
 
-[//]: # "Guia conferido no código da 1.9.6 em 23/11/2026. Fontes (relativas a app/src/): shared/fluxos/{tipos,formato,nos,fichas,expressoes,executor,rede,credenciais,exemplos}.ts, main/fluxos/{servico,verbos,codigo,http,credenciais,alcance,selo,index,consulta}.ts, main/motorDeAutomacoes.ts, shared/automacoes.ts (travas), main/regrasDaBandeja.ts."
+[//]: # "Guia conferido no código da 1.9.6 em 23/11/2026 e atualizado com as entregas da 1.9.7 em 24/11/2026 (nó fora.mcp: shared/fluxos/nos.ts, main/fluxos/mcp.ts, main/mcpFora/; D1, D3 e D5). Fontes (relativas a app/src/): shared/fluxos/{tipos,formato,nos,fichas,expressoes,executor,rede,credenciais,exemplos}.ts, main/fluxos/{servico,verbos,codigo,http,credenciais,alcance,selo,index,consulta}.ts, main/motorDeAutomacoes.ts, shared/automacoes.ts (travas), main/regrasDaBandeja.ts."
 
 Um **fluxo** é uma automação desenhada em nós: um **gatilho** (uma tarefa que muda de coluna, uma entrega, um agente
 que parou, a hora, ou o botão **Rodar fluxo**) seguido do que fazer (mandar um recado, criar uma tarefa, avisar
-você, decidir, mexer nos dados, rodar JavaScript, chamar uma API). Cada espaço tem os seus fluxos.
+você, decidir, mexer nos dados, rodar JavaScript, chamar uma API ou uma ferramenta de um servidor MCP). Cada espaço tem os seus fluxos.
 
 Este guia é a referência de quem monta um fluxo, à mão ou pedindo a um agente. Como usar a página (lista, pastas,
 editor, execuções) está no manual, em [Página Fluxos](manual.pt-BR.md#página-fluxos).
@@ -37,15 +37,19 @@ O caminho pela tela, do zero até um fluxo ligado:
 2. **Primeiro nó.** Clique no **+** do meio (**Adicionar o primeiro nó**) e escolha um gatilho. Para testar à mão,
    comece pelo **Manual**.
 3. **Próximos nós.** Arraste da bolinha de saída de um nó e solte no vazio: a busca abre e o nó escolhido já nasce
-   ligado. Soltar em cima de outro nó liga os dois. **+ Nó**, **Tab** ou **N** também abrem a busca.
+   ligado. Soltar em cima de outro nó liga os dois. **+ Nó**, **Tab** ou **N** também abrem a busca. Vinda de uma
+   saída (ou com um nó selecionado), a busca mostra os gatilhos num grupo à parte, no fim, com a nota "gatilho entra
+   solto": o gatilho escolhido nasce sem ligação, porque é o começo de um fluxo. Buscar "Manual" acha.
 4. **Ajustar.** Clique duplo num nó abre o painel em três colunas: **Entrada** (o que chegou), **Ajustes** (o que
    ele faz) e **Saída** (o que sai). O botão **Documentação** do painel mostra o trecho deste guia sobre aquele nó.
 5. **Testar.** Clique em **Salvar** (Ctrl+S) e depois em **Rodar fluxo**. Ele roda uma vez o que está salvo, pelo
    gatilho Manual, mesmo desligado.
 6. **Ver o que aconteceu.** A execução abre no desenho: verde rodou, vermelho deu erro, cinza não rodou. A aba
-   **Execuções** guarda as 50 últimas; abra um nó para ver a entrada e a saída daquela vez.
+   **Execuções** guarda as 50 últimas; abra um nó para ver a entrada e a saída daquela vez. Se alguma `{{ }}` veio
+   vazia, a faixa de cima da execução diz qual e em que nó ("`{{ x }}` veio vazio em Recado ao Maestro").
 7. **Ligar.** O interruptor **Ligado/Desligado** (no editor ou na lista) faz o fluxo disparar sozinho. Todo fluxo
-   nasce desligado. Um nó **sensível** (Código, HTTP ou Comando no shell) pede antes a sua confirmação, nó por nó, e
+   nasce desligado. Um nó **sensível** (Código, HTTP, Ferramenta MCP ou Comando no shell) pede antes a sua
+   confirmação, nó por nó, e
    só você liga um fluxo que tem um deles.
 
 Mais coisas que ajudam:
@@ -70,7 +74,7 @@ Para começar de um exemplo pronto: [Tarefa pronta avisa o Maestro](#1-tarefa-pr
   levando ao mesmo nó). Os ramos não se juntam: cada chegada roda o nó de novo, só com os itens que chegaram por ela.
   Ciclo não vale.
 - **Item a item ou de uma vez.** Se e Definir tratam cada item. O Código roda uma vez só, com todos. HTTP faz um
-  pedido por item (até 20). Recado, Tarefa, Comando, Avisar e Consultar agem uma vez por item (até 5); com mais, o nó dá erro
+  pedido por item (até 20), e a Ferramenta MCP, uma chamada por item (até 10 na execução inteira). Recado, Tarefa, Comando, Avisar e Consultar agem uma vez por item (até 5); com mais, o nó dá erro
   pedindo para juntar os itens antes, num nó Código. Assim nenhum fluxo manda 50 recados de uma vez.
 - **O primeiro erro para tudo.** O nó que falhou fica vermelho, os que não chegaram a rodar ficam cinza, e não há
   nova tentativa. A execução guarda a mensagem do erro.
@@ -178,6 +182,7 @@ pelo nome (veja [O formato JSON](#o-formato-json)).
 | | [Definir campos](#definir-campos--logicadefinir) | `logica.definir` |
 | Fora do Orkester | [Código](#código--foracodigo) (sensível) | `fora.codigo` |
 | | [HTTP](#http--forahttp) (sensível) | `fora.http` |
+| | [Ferramenta MCP](#ferramenta-mcp--foramcp) (sensível) | `fora.mcp` |
 
 Gatilho não recebe ligação: é o começo do fluxo, e o item que ele solta é o evento. Os outros nós recebem itens e
 soltam itens.
@@ -611,7 +616,7 @@ disco, sem rede, 5 segundos. **Sensível**: só você liga o fluxo. A API inteir
 
 ### HTTP · `fora.http`
 
-**O que faz.** Faz um pedido HTTP a uma API na internet, com uma [credencial](#credenciais) se precisar. Um pedido por
+**O que faz.** Faz um pedido HTTP a uma API na internet, com a chave de uma [API](#credenciais) se precisar. Um pedido por
 item, até 20. **Sensível**: só você liga o fluxo. Rede, prazos e o que fica guardado estão em
 [O nó HTTP e a rede](#o-nó-http-e-a-rede).
 
@@ -624,7 +629,7 @@ item, até 20. **Sensível**: só você liga o fluxo. Rede, prazos e o que fica 
 | `consulta` | pares `{ "nome", "valor" }` depois do `?`, até 30. O app codifica nome e valor: escreva o texto puro (`a b`, não `a%20b`) | sim, no valor | nenhum |
 | `cabecalhos` | pares `{ "nome", "valor" }`, até 30. Os do próprio protocolo (`Host`, `Content-Length`…) são do app | sim, no valor | nenhum |
 | `corpo` | `{ "tipo": "nenhum" \| "json" \| "texto" \| "formulario", "valor": "…" }`, até 20.000 letras. `GET` e `HEAD` não levam corpo | sim, no valor | `nenhum` |
-| `credencial` | o **nome** de uma credencial guardada em Configurações › Conexões › Credenciais | não | nenhuma |
+| `credencial` | o **nome** de uma API guardada em Configurações › Conexões › APIs. Na tela, o campo se chama **API** e lista só as APIs cujos domínios cobrem o host da URL (todas, se a URL tem `{{ }}`) | não | nenhuma |
 
 **Saída.** Um item por pedido, com `status`, `cabecalhos` (da resposta), `corpo` (já como objeto quando a resposta é
 JSON; senão texto) e `url` (só quando houve redirecionamento: o endereço final).
@@ -639,14 +644,70 @@ JSON; senão texto) e `url` (só quando houve redirecionamento: o endereço fina
 - Depois do nó: `{{ corpo.items[0].nome }}`, `{{ status }}`
 
 **Erros comuns.**
-- "X respondeu 401 …" (ou outro código que não é 2xx) → a API recusou; confira a credencial, a URL e o corpo.
+- "X respondeu 401 …" (ou outro código que não é 2xx) → a API recusou; confira a chave da API, a URL e o corpo.
+- "a API X só lê: mude em Conexões › APIs" → o método é `POST`, `PUT`, `PATCH` ou `DELETE` e a API está como **Só
+  lê**. A tela já avisa em vermelho no nó; o pedido nem sai. Se o fluxo precisa escrever, mude a API para **Lê e
+  escreve**.
 - "X é desta máquina ou da rede local; permita este endereço…" → se é de propósito, abra o nó e clique em
   **Permitir X neste fluxo** ([O nó HTTP e a rede](#o-nó-http-e-a-rede)). "… não pode ser usado: …" → esse endereço
   nunca é permitido; o motivo diz o que usar no lugar.
 - "credencial X: só vai por https" / "não está nos domínios dela" / "credencial X não existe" → confira a URL, os
-  domínios da credencial e o nome dela.
+  domínios da API e o nome dela (renomear uma API em Conexões › APIs quebra os nós que citam o nome antigo).
 - "chegaram N itens e o HTTP faz no máximo 20 pedidos" / "o pedido passou de 30 s" → junte os itens antes; veja se
   a API está no ar.
+
+### Ferramenta MCP · `fora.mcp`
+
+**O que faz.** Chama uma ferramenta de um **servidor MCP de fora** (um programa que você cadastrou em Configurações ›
+Conexões › MCP › **Servidores de fora**, à mão ou importado do Claude Code; veja [`mcp.pt-BR.md`](mcp.pt-BR.md#servidores-de-fora)).
+Uma chamada por item, no máximo 10 por execução (somando todas as vezes que o nó roda nela). **Sensível**: só você
+liga o fluxo, e a confirmação mostra o servidor, a ferramenta e os argumentos inteiros. O valor das credenciais do
+servidor nunca entra no fluxo. Antes de cada chamada, o app relê a lista de ferramentas do servidor: uma ferramenta
+que mudou depois do cadastro fica **bloqueada** até você rever, e se a lista não puder ser lida, a chamada é recusada.
+
+**Ajustes.**
+
+| Campo | O que é | aceita `{{ }}` | Padrão |
+|---|---|---|---|
+| `servidor` | o servidor cadastrado, `{ "id", "nome" }`. Pode vir só pelo nome (`"servidor": "n8n"`): aí ele fica **a escolher**, e você escolhe no nó antes de ligar | não | a escolher |
+| `ferramenta` | o nome da ferramenta como o servidor mostra (letras, números e `_ - . /`, até 128) | não | nenhuma |
+| `argumentos` | um **objeto JSON**, em texto, até 20.000 letras. Vazio vale `{}`. Lista ou valor solto são recusados | sim | `{}` |
+
+Na tela, você escolhe o servidor e depois a ferramenta (a lista é a que o app já conhece; **Atualizar** sobe o servidor
+e lê de novo). Os campos saem do esquema da ferramenta: texto, número, sim/não, escolha e lista (uma por linha) viram
+campos; o resto vai num campo JSON. As descrições da ferramenta e dos campos aparecem como `o servidor diz: "…"`:
+são a palavra do servidor. O formulário escreve o texto de `argumentos`, que você vê em **Ver o texto dos
+argumentos**.
+
+**Saída.** Um item por chamada: `texto` (o que a ferramenta devolveu em texto), `estruturado` (só se ela devolveu
+conteúdo estruturado), `erro` (`true` quando a **ferramenta** disse que falhou) e `omitidos` (só quando ela mandou
+imagem ou arquivo, que não entram). Com `erro: true` o nó não fica vermelho: o fluxo segue, e você decide num **Se**.
+Os segredos do servidor saem como `•••`.
+
+```json
+{ "texto": "3 linhas lidas", "estruturado": { "linhas": 3 }, "erro": false }
+```
+
+**Expressões úteis.**
+- Argumentos: `{ "planilha": "{{ id }}", "limite": {{ quantidade }} }` (dentro de aspas entra como texto escapado; fora,
+  como valor JSON; vazio vira `null`)
+- Depois do nó: `{{ texto }}`, `{{ estruturado.linhas }}`; num Se, `{{ erro }}` com o operador `verdadeiro` separa as
+  chamadas em que a ferramenta falhou
+
+**Erros comuns.**
+- "escolha o servidor MCP no nó (o "X" não está ligado a um cadastro…)" → o agente mandou só o nome: abra o nó e
+  escolha o servidor. Enquanto isso, o fluxo não liga.
+- "X: … está bloqueada: reveja em Conexões › MCP" → a ferramenta mudou (nome, descrição, esquema ou anotações) desde
+  que você aprovou. Abra Conexões › MCP, clique em **Rever ferramentas mudadas** e aceite; as outras ferramentas
+  seguem rodando.
+- "este servidor precisa de login (OAuth), que chega na 1.9.8; ou edite-o e ponha um cabeçalho com credencial" → o
+  servidor HTTP entra por login (OAuth), que ainda não existe no app; ou ponha nele um cabeçalho de credencial.
+- "pausado" → o servidor caiu 3 vezes em 10 minutos, ou você o pausou: **Religar** em Conexões › MCP.
+- "os argumentos precisam ser um objeto JSON ({ ... })" → confira o texto em **Ver o texto dos argumentos**.
+- "não deu para conferir a ferramenta X antes de chamar (…); a chamada foi recusada" → o servidor não devolveu a lista
+  de ferramentas (caiu, demorou); veja o cartão dele em Conexões › MCP e rode de novo.
+- "nesta execução a Ferramenta MCP já fez N chamadas…" / prazo → no máximo 10 chamadas por execução, cada uma até
+  30 s, dentro dos 60 s da execução: junte os itens antes.
 
 ## Campos padrão (fichas)
 
@@ -765,9 +826,12 @@ Uma expressão põe no texto um valor do item que chegou ao nó: `A tarefa #{{ n
   [O que toda expressão enxerga](#o-que-toda-expressão-enxerga).
 - **Não há conta, função nem referência a outro nó.** `{{ a + 1 }}` ou `{{ titulo.toUpperCase() }}` são recusados
   ao salvar, com a mensagem dizendo onde. Lógica vai num nó Código antes.
-- Caminho que não existe vira texto vazio. Objeto e lista viram JSON. Um `{{` sem `}}` fica como texto.
+- Caminho que não existe vira texto vazio. Objeto e lista viram JSON. Um `{{` sem `}}` fica como texto. Cada `{{ }}`
+  que veio vazia fica anotada no nó, e a execução aberta lista todas na faixa de cima ("`{{ x }}` veio vazio em
+  <nó>"): é o jeito mais rápido de achar um campo com o nome errado.
 - **Onde valem:** texto do Recado; título e descrição da Tarefa; texto do Avisar; valor e comparar do Se; valor do
-  Definir; URL, valores da consulta e dos cabeçalhos e corpo do HTTP.
+  Definir; URL, valores da consulta e dos cabeçalhos e corpo do HTTP; argumentos da Ferramenta MCP (escapados como o
+  corpo JSON do HTTP, logo abaixo).
 - **Onde não valem:** no Comando (texto fixo, de propósito: nada de fora vira comando), nos nomes dos campos, nos
   gatilhos.
 - **No corpo JSON do HTTP**, a expressão sai escapada do jeito certo: dentro de aspas (`"oi {{ nome }}"`) entra como
@@ -847,14 +911,29 @@ diferentes: só funcionam se você permitir, um por um, em cada fluxo.
 
 ## Credenciais
 
-Uma credencial é uma senha, token ou chave de API que o nó HTTP leva **sem que o valor entre no fluxo**.
+Uma credencial é uma senha, token ou chave de API que o nó HTTP leva **sem que o valor entre no fluxo**. Desde a 1.9.7,
+na tela, elas se chamam **APIs** (a aba Credenciais virou **APIs**), e os segredos dos servidores MCP ficam em
+Conexões › MCP. As mesmas APIs servem às páginas "+" em que você as marcar e ao cabeçalho dos servidores MCP http.
 
-- **Onde:** Configurações › Conexões › **Credenciais** → **Guardar uma credencial**: o nome com que os fluxos vão
-  citá-la ("API de cotação"), o tipo, os domínios e o valor → **Guardar cifrada**.
+- **Onde:** Configurações › Conexões › **APIs** → **Guardar uma API**: o nome com que fluxos e páginas vão chamá-la
+  ("ClickUp"), o tipo, os domínios, o valor e **O que ela pode fazer** → **Guardar a API** (cifrada). Com ao menos uma
+  API, o formulário abre pelo botão **+ Nova API**.
+- **Só lê ou lê e escreve** (1.9.7): uma API **Só lê** deixa o nó HTTP fazer só `GET` e `HEAD`; com `POST`, `PUT`,
+  `PATCH` ou `DELETE`, a tela avisa em vermelho e o núcleo recusa antes de sair ("a API X só lê: mude em Conexões ›
+  APIs"). **Lê e escreve** aparece com selo vermelho. API nova nasce "só lê"; as guardadas na 1.9.6 contam como "lê e
+  escreve", então nenhum fluxo que já rodava para. Não há permissão por fluxo: quem protege é o selo de nó sensível e
+  só você ligar o fluxo. No cabeçalho de um servidor MCP http isso não vale (o MCP sempre faz POST).
 - **Tipos:**
   - **Token (Bearer):** vai em `Authorization: Bearer <token>`. Cole só o token, sem a palavra Bearer.
   - **Cabeçalho próprio:** vai num cabeçalho com o nome que a API pede (ex.: `X-Api-Key`).
   - **Usuário e senha (Basic):** vai em `Authorization`, codificado como o HTTP Basic pede.
+  - **Segredo, sem domínio** (1.9.7): só para a variável de ambiente de um servidor MCP de fora que roda no seu PC (a
+    chave do n8n-mcp, por exemplo). Não tem domínio e **nunca vai em cabeçalho**: o nó HTTP não o lista e o app recusa
+    usá-lo num pedido. Não é API: é guardado e listado em Conexões › MCP › **Segredos dos servidores**. Ao importar
+    servidores do Claude Code, as variáveis secretas viram segredos.
+- **No nó:** o campo **Cabeçalhos** lembra "Senha e token vão numa API (abaixo), nunca aqui."
+- **Criar ali mesmo:** o nó HTTP tem o botão **Criar API**, que abre o formulário já com o host da URL nos
+  domínios; a nova já fica escolhida no nó.
 - **Domínios:** para onde ela pode ir, um por linha, até 20: `api.exemplo.com`, ou `*.exemplo.com` para os
   subdomínios. O curinga não cobre o próprio `exemplo.com`: se precisar dele, liste os dois. Nada de IP, `localhost` ou rede interna.
 - **Na hora do pedido**, ela só vai por **https** e só para um host da lista. Fora disso, o nó dá erro e o pedido não
@@ -865,24 +944,29 @@ Uma credencial é uma senha, token ou chave de API que o nó HTTP leva **sem que
   Sem o cofre disponível, a aba fica só de leitura e não guarda nada: o app nunca grava o valor em texto puro.
 - **Nunca saem:** nem para a tela, nem para o `ork`, nem para o MCP, nem para o nó Código. O fluxo, a exportação e a
   execução só levam o **nome**. Qualquer texto igual ao valor que aparecer numa execução vira `•••`.
-- **Apagar** uma credencial em uso não mexe nos fluxos: o próximo pedido deles dá `credencial X não existe`. Ao
-  apagar, o app diz quais fluxos a citavam. Renomear tem o mesmo efeito: edite os nós HTTP que citam o nome antigo.
+- **Apagar** uma API em uso não mexe nos fluxos: o próximo pedido deles dá `credencial X não existe`. Ao
+  apagar, o app diz quem a usava: os fluxos, as páginas "+" e os servidores MCP de fora. **Renomear** tem o mesmo
+  efeito nos fluxos: o formulário avisa antes, e depois de guardar o app diz quem citava o nome antigo. Edite os nós
+  HTTP que citam esse nome. Dois nomes que só diferem em maiúscula, acento ou espaço não podem coexistir.
 
-> **Use credencial, não cabeçalho escrito à mão.** Um token posto direto em `cabecalhos` (ou na URL) faz parte do
+> **Use uma API, não cabeçalho escrito à mão.** Um token posto direto em `cabecalhos` (ou na URL) faz parte do
 > fluxo: vai inteiro no Ctrl+C, no `ork fluxo ver --json`, no que um agente lê do fluxo e no arquivo do disco. Com
-> credencial, nada disso leva o valor. O editor avisa quando o nome de um cabeçalho ou de um parâmetro da consulta tem
+> uma API, nada disso leva o valor. O editor avisa quando o nome de um cabeçalho ou de um parâmetro da consulta tem
 > cara de segredo (`token`, `api-key`, `senha`…).
 
 ## Nós sensíveis: quem liga
 
-Código, HTTP e Comando no shell são **sensíveis**: rodam código, falam com a internet ou digitam num terminal. Um
-fluxo com qualquer um deles segue estas regras:
+Código, HTTP, Ferramenta MCP e Comando no shell são **sensíveis**: rodam código, falam com a internet, chamam um
+programa de fora ou digitam num terminal. Um fluxo com qualquer um deles segue estas regras:
 
 - **Agentes e clientes MCP podem criar e editar, mas não ligar.** O fluxo sensível que eles gravam fica desligado, e
   `ork fluxo ligar` (ou `fluxo_ligar`) nele é recusado.
 - **Só você liga, vendo os nós.** Ao ligar, abre uma confirmação com cada nó sensível **inteiro** (o código, a URL, o
-  comando). Cada um vem marcado: **igual ao que você aprovou**, **mudou** ou **novo**, e com o nome do agente que o
-  criou ou mexeu, se foi um agente.
+  comando; na Ferramenta MCP, o servidor, a ferramenta e o texto inteiro dos argumentos). O servidor aparece **pelo
+  cadastro** (o nome que o id tem em Conexões › MCP); em vermelho quando o nome gravado no nó é outro ("vale o do
+  cadastro"), quando o id não existe ou quando o nó não tem servidor. Cada um vem marcado: **igual
+  ao que você aprovou**, **mudou** ou **novo**, e com o nome do agente que o criou ou mexeu, se foi um agente. A
+  confirmação abre para qualquer nó sensível do catálogo, mesmo quando a Ferramenta MCP é o único.
 - **Mudou depois de aprovado, desliga.** Gravar uma mudança num nó sensível de um fluxo ligado o desliga, mesmo se foi
   você: ligue de novo para aprovar o que mudou. Nome, posição e notas não contam como mudança.
 - **Endereços da rede local também.** A lista de endereços do seu computador ou da sua rede que o HTTP pode chamar
@@ -915,7 +999,7 @@ fluxo com qualquer um deles segue estas regras:
 | pastas | 100, até 3 níveis |
 | nós / ligações por fluxo | 60 / 120 |
 | uma execução | 50 passos, 60 segundos, 1000 itens e 5 MB por lista |
-| itens por nó | Recado, Tarefa, Comando, Avisar e Consultar: 5 na entrada (o Consultar solta até 100). HTTP: 20 |
+| itens por nó | Recado, Tarefa, Comando, Avisar e Consultar: 5 na entrada (o Consultar solta até 100). HTTP: 20. Ferramenta MCP: 10 chamadas por execução, somando as chegadas (cada chamada até 30 s) |
 | execuções guardadas | as 50 últimas de cada fluxo |
 | entrada e saída guardadas por nó | ~10 KB (passou, aparece "Cortado"; as contagens continuam certas) |
 | condições do Se / campos do Definir | 10 / 30 |
@@ -992,12 +1076,12 @@ Uma entrega que fala em "bloqueado" ou "erro" vira uma tarefa com o texto dela. 
 
 A saída `1` do Se (falso) não está ligada: as entregas sem problema param ali.
 
-### 5. Issues abertas do GitHub para o Maestro (HTTP, credencial e Código)
+### 5. Issues abertas do GitHub para o Maestro (HTTP, API e Código)
 
 Toda manhã, busca as issues abertas de um repositório, junta numa lista e manda ao Maestro.
 
-1. Em Configurações › Conexões › Credenciais, guarde uma credencial **GitHub**, tipo **Token (Bearer)**, domínio
-   `api.github.com`, com um token seu.
+1. Em Configurações › Conexões › APIs, guarde uma API **GitHub**, tipo **Token (Bearer)**, domínio
+   `api.github.com`, com um token seu, **Só lê** (o fluxo só faz GET).
 2. Cole o fluxo abaixo, troque `dono/repo` pelo seu repositório e salve.
 3. Ligue: como tem HTTP e Código, a confirmação mostra os dois nós inteiros.
 
@@ -1131,6 +1215,68 @@ tem Código, só você liga, vendo o nó. Sem tarefa na Revisão, o Consultar so
 Troque `"Revisão"` pelo nome da sua coluna, se for outro. Para testar antes de ligar, ponha um gatilho **Manual** ligado
 ao Consultar e use **Rodar fluxo**.
 
+### 7. Tarefas do ClickUp num recado ao Maestro (HTTP e API)
+
+Toda manhã, lê as tarefas de uma lista do ClickUp e manda ao Maestro uma linha por tarefa, com o status. Não precisa do
+MCP do ClickUp (que entra por login e só chega na 1.9.8): a API REST aceita o token pessoal.
+
+1. No ClickUp, gere o seu token pessoal (Configurações › Apps). Em Configurações › Conexões › APIs, guarde uma
+   API **ClickUp**, **Só lê**, tipo **Cabeçalho próprio**, cabeçalho `Authorization`, domínio `api.clickup.com`, com o
+   token (a API do ClickUp quer o token puro nesse cabeçalho, sem "Bearer").
+2. Pegue o número da lista (fica no endereço da lista, no navegador).
+3. Monte: **Relógio** (diário, 9h) → **HTTP** → **Código** → **Recado** ao Maestro. Os ajustes do HTTP:
+
+```json
+{
+  "metodo": "GET",
+  "url": "https://api.clickup.com/api/v2/list/NUMERO-DA-LISTA/task",
+  "consulta": [{ "nome": "archived", "valor": "false" }],
+  "cabecalhos": [],
+  "corpo": { "tipo": "nenhum", "valor": "" },
+  "credencial": "ClickUp"
+}
+```
+
+O Código (a resposta traz a lista em `corpo.tasks`):
+
+```js
+const tarefas = $input.first().json.corpo.tasks ?? []
+if (!tarefas.length) return []
+const linhas = tarefas.slice(0, 30).map((t) => `${t.name} (${t.status?.status ?? 'sem status'})`)
+return [{ json: { total: tarefas.length, lista: linhas.join('\n') } }]
+```
+
+E o texto do Recado, em duas linhas: `ClickUp: {{ total }} tarefas abertas na lista.` e, embaixo, `{{ lista }}`. Ligue:
+a confirmação mostra o HTTP e o Código inteiros. Para testar antes, ponha um gatilho **Manual** ligado ao HTTP e use **Rodar fluxo**.
+
+### 8. Planilha do Google via MCP (Ferramenta MCP)
+
+Lê um intervalo de uma planilha do Google pela ferramenta de um servidor MCP e manda o resultado ao Maestro. O login do
+Google fica com o servidor MCP: escolha um servidor de planilhas que rode no seu PC (stdio) e cuide do próprio login.
+O Orkester só guarda o comando e, se o servidor pedir, uma chave como **Segredo** (Conexões › MCP › Segredos dos
+servidores).
+
+1. Em Configurações › Conexões › MCP › **Servidores de fora**, cadastre o servidor (ou **Importar do Claude Code**, se
+   ele já está lá). Clique em **Testar**: o app lista as ferramentas e guarda a impressão de cada uma.
+2. Monte: **Manual** → **Ferramenta MCP** → **Recado** ao Maestro. No nó MCP, escolha o servidor e a ferramenta de
+   leitura (o nome muda de servidor para servidor; nesta receita, `ler_planilha`). Os ajustes ficam assim:
+
+```json
+{
+  "servidor": { "id": "ID-DO-CADASTRO", "nome": "Planilhas" },
+  "ferramenta": "ler_planilha",
+  "argumentos": "{ \"planilha\": \"ID-DA-PLANILHA\", \"intervalo\": \"A1:C20\" }"
+}
+```
+
+3. No Recado: `Planilha: {{ texto }}`. Para tratar a falha da ferramenta, ponha um **Se** antes do recado com a
+   condição `{{ erro }}` · `falso`: a saída verdadeiro segue para o recado.
+4. **Rodar fluxo** pede a confirmação do nó sensível (servidor, ferramenta e argumentos): **Aprovar e rodar uma
+   vez**. Para rodar sozinho, troque o Manual por um Relógio e ligue.
+
+Se o servidor mudar a ferramenta depois (uma atualização dele), o nó para com "reveja em Conexões › MCP" até você
+aprovar a versão nova.
+
 ## Quando algo dá errado
 
 - **O fluxo não liga.** A mensagem diz o que falta: um gatilho, um cartão ou coluna "a escolher", ou a confirmação
@@ -1140,9 +1286,14 @@ ao Consultar e use **Rodar fluxo**.
   fica vermelho (rodou), mas o recado não chegou a ninguém: a execução aparece como "sem destino".
 - **O fluxo desligou sozinho.** A lista diz o motivo: disparou demais (passou do teto por hora), um cartão dele sumiu,
   uma coluna dele saiu do kanban ("desligado: uma coluna saiu do kanban"), ou um nó sensível mudou sem aprovação.
-- **Apaguei uma coluna do kanban.** O app avisa na janela (e na resposta do `ork`) quais fluxos usavam a coluna, num
-  gatilho Tarefa mudou de coluna ou num nó Tarefa, e quais foram desligados: os ligados desligam na hora. Abra cada um,
-  escolha outra coluna e ligue de novo.
+- **Apagar uma coluna do kanban.** Pela página Kanban, apagar uma coluna que um fluxo usa (num gatilho Tarefa mudou
+  de coluna ou num nó Tarefa) pede confirmação antes, com a lista dos fluxos (cada um uma vez) e **Ver o fluxo**, que
+  abre o editor. Se o app não conseguir conferir, ele não apaga e pede para tentar de novo. Pelo `ork` ou pelo MCP,
+  o aviso vem depois, como antes. Nos dois casos, os fluxos ligados que usavam a coluna desligam na hora: abra cada
+  um, escolha outra coluna e ligue de novo.
+- **Um campo saiu vazio.** Abra a execução: a faixa de cima diz qual `{{ }}` veio vazia e em que nó.
+- **Ferramenta MCP: "está bloqueada: reveja em Conexões › MCP".** A ferramenta mudou desde que você aprovou. Reveja
+  em Conexões › MCP › **Rever ferramentas mudadas**.
 - **"barrado: laço" ou "barrado: excesso"** nas execuções: veja [Travas e limites](#travas-e-limites).
 - **"junte os itens antes, no nó Código".** Chegaram mais de 5 itens a uma ação do Orkester (ou mais de 20 ao HTTP).
   Ponha um Código antes que junte os itens num só.
@@ -1150,7 +1301,9 @@ ao Consultar e use **Rodar fluxo**.
   abra o nó HTTP, clique em **Permitir … neste fluxo** e salve ([acima](#o-nó-http-e-a-rede)). Se o nome aponta para
   um endereço local, escreva o IP no lugar do nome e permita o IP.
 - **HTTP: "credencial X: só vai por https" ou "não está nos domínios dela".** Confira a URL e os domínios da
-  credencial.
+  API.
+- **HTTP: "a API X só lê".** O nó usa um método de escrita com uma API só lê: mude a API para **Lê e escreve** em
+  Conexões › APIs, ou use GET.
 - **Um arquivo de fluxo não abre.** A lista mostra os arquivos que não passaram na leitura, com o motivo; eles não
   rodam. O app não apaga nada.
 - Um fluxo ligado que falha avisa você (no canto da janela ou numa notificação), no máximo uma vez a cada 10 minutos

@@ -14,7 +14,7 @@ import { colarNoFluxo, ehSensivel, faltaParaLigar, noSensivel, proximoIdDeNo } f
 import { confirmar } from '../../ui/Perguntas'
 import { guardarSaida } from '../../casca/paginas'
 import { apiDoEditor } from './editor/api'
-import { buscarNos, grupoDoNo } from './editor/busca'
+import { buscarNos, grupoDoNo, NOTA_DOS_GATILHOS_SOLTOS } from './editor/busca'
 import { deslocamentoLivre, deslocamentoParaColar, lerColagem, nomeAoColar, textoParaCopiar } from './editor/colar'
 import {
   ALTURA_BASE,
@@ -405,7 +405,9 @@ export function Editor({ espacoId, fluxoId, editavel, aoSair, execucao = null, a
   // ---------------------------------------------------------------- nós
 
   /** Põe um nó do `tipo` no ponto (ligado à saída, se veio de uma); abre o painel quando ele tem o que ajustar. */
-  function adicionar(tipo: TipoDeNo, b: Busca): void {
+  function adicionar(tipo: TipoDeNo, busca0: Busca): void {
+    // (1.9.7, D3) gatilho escolhido a partir de uma saída entra solto: gatilho não recebe ligação
+    const b: Busca = CATALOGO[tipo].categoria === 'gatilho' && busca0.ligarDe ? { ...busca0, ligarDe: undefined } : busca0
     const motivo = recusaDeAdicionar(est)
     if (motivo) return avisar(motivo, 'perigo')
     const novoId = proximoIdDeNo(new Set(est.nos.map((n) => n.id)))
@@ -965,6 +967,7 @@ export function Editor({ espacoId, fluxoId, editavel, aoSair, execucao = null, a
         {noDoPainel && (
           <ContextoDaRede.Provider value={redeDoFluxo}>
             <PainelDoNo
+              key={noDoPainel.id}
               no={noDoPainel}
               ctx={ctx}
               somenteLer={somenteLer}
@@ -1122,7 +1125,7 @@ function Renomear({ nome, recusa, aoTerminar }: { nome: string; recusa: (nome: s
 function EscolhaDeNo({ busca, aoEscolher, aoFechar }: { busca: Busca; aoEscolher: (t: TipoDeNo) => void; aoFechar: () => void }) {
   const [texto, setTexto] = useState('')
   const [marcado, setMarcado] = useState(0)
-  const tipos = useMemo(() => buscarNos(texto, { semGatilho: !!busca.ligarDe }), [texto, busca.ligarDe])
+  const tipos = useMemo(() => buscarNos(texto, { gatilhosSoltos: !!busca.ligarDe }), [texto, busca.ligarDe])
   useEffect(() => setMarcado(0), [texto])
   const lista = useRef<HTMLUListElement>(null)
   useEffect(() => {
@@ -1185,7 +1188,15 @@ function EscolhaDeNo({ busca, aoEscolher, aoFechar }: { busca: Busca; aoEscolher
           grupo = g
           return (
             <li key={t} role="presentation">
-              {titulo && <span className="ed-busca-grupo">{titulo}</span>}
+              {titulo && (
+                <span className="ed-busca-grupo">
+                  {titulo}
+                  {busca.ligarDe && g === 'Gatilhos' && <span className="suave"> · {NOTA_DOS_GATILHOS_SOLTOS}</span>}
+                </span>
+              )}
+              {!titulo && texto && busca.ligarDe && CATALOGO[t].categoria === 'gatilho' && i === tipos.findIndex((x) => CATALOGO[x].categoria === 'gatilho') && (
+                <span className="ed-busca-grupo suave">{NOTA_DOS_GATILHOS_SOLTOS}</span>
+              )}
               {i === marcado && (
                 // irmão do item (botão dentro de botão não vale): abre a documentação sem escolher o nó
                 <button

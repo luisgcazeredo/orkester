@@ -7,8 +7,12 @@ import { abrirConfiguracoes } from '../configuracoes/abrir'
 import { mensagemDeErro } from './contrato'
 import { abrirProposta } from './DialogoAceite'
 import { alternarChaveDasPaginas, apiPaginas, iniciarEstadoDasPaginas, usarPaginas } from './estado'
+import type { FerramentaMcp } from '../../../../shared/api'
+import { ehApi } from '../conexoes/regrasDeCredenciais'
+import { usarCredenciais } from '../conexoes/usarCredenciais'
 import {
-  DESCRICAO_MAXIMA, EXEMPLOS, instrucoesDaDemanda, itemDePermissao, NAO_PODE, O_QUE_E, PASSOS_DO_GUIA, PODE, TEXTO_DESLIGADAS, textoDoPedido, tituloDaDemanda
+  DESCRICAO_MAXIMA, EXEMPLOS, instrucoesDaDemanda, itemDePermissao, NAO_PODE, NOTA_DO_PEDIDO, O_QUE_E, PASSOS_DO_GUIA, PODE, servidorEscolhivel, TEXTO_DESLIGADAS, textoDoPedido, tituloDaDemanda,
+  type EscolhaDaDemanda, type ServidorParaEscolher
 } from './textos'
 import '../../estilos/extra.css'
 
@@ -124,11 +128,122 @@ function Guia() {
   )
 }
 
+/**
+ * (1.9.7, F1) "APIs que ela vai usar" e "MCPs que ela vai usar": caixas, sem conceder nada (quem concede é o aceite).
+ * A demanda leva só nome, domínios e "só lê/escreve" de cada API, e o nome e as ferramentas de cada servidor.
+ */
+function UsosDoPedido({ escolha, mudar }: { escolha: EscolhaNaTela; mudar: (f: (e: EscolhaNaTela) => EscolhaNaTela) => void }) {
+  const { lista } = usarCredenciais()
+  const apis = (lista?.itens ?? []).filter(ehApi)
+  const [servidores, setServidores] = useState<ServidorParaEscolher[] | null>(null)
+  const [ferramentas, setFerramentas] = useState<Record<string, FerramentaMcp[]>>({})
+  useEffect(() => {
+    let vivo = true
+    window.ork.mcpFora.listar().then(
+      (l) => vivo && setServidores(l),
+      () => vivo && setServidores([])
+    )
+    return () => void (vivo = false)
+  }, [])
+  function marcarServidor(id: string, marcar: boolean): void {
+    mudar((e) => ({ ...e, mcps: marcar ? { ...e.mcps, [id]: [] } : Object.fromEntries(Object.entries(e.mcps).filter(([k]) => k !== id)) }))
+    if (marcar && !(id in ferramentas))
+      window.ork.mcpFora.ferramentas(id).then(
+        (f) => setFerramentas((x) => ({ ...x, [id]: f })),
+        () => setFerramentas((x) => ({ ...x, [id]: [] }))
+      )
+  }
+  if (!apis.length && !servidores?.length) return null
+  return (
+    <div className="extra-pedir-usos" data-usos-do-pedido>
+      {apis.length > 0 && (
+        <fieldset className="extra-pedir-grupo" data-apis-do-pedido>
+          <legend>APIs que ela vai usar</legend>
+          {apis.map((a) => (
+            <label key={a.id} className="extra-acesso-linha">
+              <input
+                type="checkbox"
+                checked={escolha.apis.includes(a.id)}
+                onChange={(ev) => mudar((e) => ({ ...e, apis: ev.target.checked ? [...e.apis, a.id] : e.apis.filter((x) => x !== a.id) }))}
+                data-pedir-api={a.nome}
+              />
+              {/* a 2ª linha (os domínios) fica recuada até o nome, como no aceite */}
+              <span className="extra-acesso-texto">
+                <b>{a.nome}</b>
+                <span className="suave">
+                  {a.dominios.join(', ')} · {a.soLeitura ? 'só lê' : 'lê e escreve'}
+                </span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+      )}
+      {!!servidores?.length && (
+        <fieldset className="extra-pedir-grupo" data-mcps-do-pedido>
+          <legend>MCPs que ela vai usar</legend>
+          {servidores.filter(servidorEscolhivel).map((s) => {
+            const marcadas = escolha.mcps[s.id]
+            return (
+              <div key={s.id}>
+                <label className="extra-acesso-linha">
+                  <input type="checkbox" checked={!!marcadas} onChange={(ev) => marcarServidor(s.id, ev.target.checked)} data-pedir-servidor={s.nome} />
+                  <span className="extra-acesso-texto">
+                    <b>{s.nome}</b>
+                  </span>
+                </label>
+                {marcadas && (
+                  <div className="extra-pedir-ferramentas">
+                    {!ferramentas[s.id] && <span className="suave">Lendo as ferramentas…</span>}
+                    {ferramentas[s.id]?.length === 0 && <span className="suave">O servidor ainda não listou as ferramentas: o agente escolhe as de leitura.</span>}
+                    {ferramentas[s.id]?.map((f) => (
+                      <label key={f.nome} className="extra-acesso-linha">
+                        <input
+                          type="checkbox"
+                          checked={marcadas.includes(f.nome)}
+                          onChange={(ev) =>
+                            mudar((e) => ({ ...e, mcps: { ...e.mcps, [s.id]: ev.target.checked ? [...(e.mcps[s.id] ?? []), f.nome] : (e.mcps[s.id] ?? []).filter((x) => x !== f.nome) } }))
+                          }
+                        />
+                        <code>{f.nome}</code>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </fieldset>
+      )}
+      {/* marcar aqui não libera nada para a página: é só o que o agente fica sabendo */}
+      <p className="suave extra-pedir-nota" data-nota-do-pedido>
+        {NOTA_DO_PEDIDO}
+      </p>
+    </div>
+  )
+}
+
+/** O que a pessoa marcou: ids na tela (para as caixas); a demanda recebe só nomes, domínios e ferramentas. */
+interface EscolhaNaTela {
+  apis: string[]
+  mcps: Record<string, string[]>
+}
+
 function PedirAAgente() {
   const espaco = usarLoja((e) => e.espaco)
   const [texto, setTexto] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [resultado, setResultado] = useState<{ ok: boolean; texto: string } | null>(null)
+  const [escolha, setEscolha] = useState<EscolhaNaTela>({ apis: [], mcps: {} })
+  const { lista: credenciais } = usarCredenciais()
+
+  /** Só nome, domínios e só lê (API) e nome e ferramentas (MCP): nunca id, fim da chave ou valor. */
+  async function escolhaDaDemanda(): Promise<EscolhaDaDemanda> {
+    const apis = (credenciais?.itens ?? []).filter((c) => ehApi(c) && escolha.apis.includes(c.id)).map((c) => ({ nome: c.nome, dominios: [...c.dominios], soLeitura: c.soLeitura === true }))
+    const ids = Object.keys(escolha.mcps)
+    const servidores = ids.length ? await window.ork.mcpFora.listar() : []
+    const mcps = servidores.filter((s) => ids.includes(s.id)).map((s) => ({ nome: s.nome, ferramentas: [...escolha.mcps[s.id]] }))
+    return { apis, mcps }
+  }
 
   async function pedir(): Promise<void> {
     const descricao = texto.trim()
@@ -138,7 +253,7 @@ function PedirAAgente() {
     setResultado(null)
     try {
       const leitura = await window.ork.kanban.ler(espacoId)
-      const criada = await window.ork.kanban.aplicar(espacoId, { tipo: 'criar', titulo: tituloDaDemanda(descricao), descricao: instrucoesDaDemanda(descricao) })
+      const criada = await window.ork.kanban.aplicar(espacoId, { tipo: 'criar', titulo: tituloDaDemanda(descricao), descricao: instrucoesDaDemanda(descricao, await escolhaDaDemanda()) })
       if (!criada.ok || criada.numero === undefined) throw new Error(criada.ok ? 'o kanban não devolveu o número da demanda' : criada.erro)
       const delegar = colunaDoPapel(criada.arquivo.colunas, 'delegar')
       let erroAoDelegar = ''
@@ -149,7 +264,10 @@ function PedirAAgente() {
         else erroAoDelegar = movida.erro
       } else if (!delegar) erroAoDelegar = 'o kanban deste espaço não tem a coluna "Com o Maestro"'
       setResultado({ ok: !!maestro, texto: textoDoPedido(criada.numero, maestro, erroAoDelegar) })
-      if (maestro) setTexto('')
+      if (maestro) {
+        setTexto('')
+        setEscolha({ apis: [], mcps: {} })
+      }
     } catch (e) {
       setResultado({ ok: false, texto: `Não consegui criar a demanda: ${mensagemDeErro(e)}` })
     }
@@ -176,6 +294,7 @@ function PedirAAgente() {
         onChange={(e) => setTexto(e.target.value)}
         data-descricao-da-pagina
       />
+      {espaco && <UsosDoPedido escolha={escolha} mudar={setEscolha} />}
       <div className="extra-opcao-pe">
         {resultado && (
           <p className={resultado.ok ? 'extra-ok' : 'extra-erro'} role={resultado.ok ? 'status' : 'alert'} data-resultado-do-pedido>
@@ -209,7 +328,21 @@ function Adicionar() {
                 <span className="extra-selo">Exemplo pronto</span>
               </div>
               <p className="suave">{x.descricao}</p>
-              <p className="extra-opcao-pede">Pede: {x.pede.map((f) => itemDePermissao(f).rotulo).join(' · ')}</p>
+              {x.pede.length > 0 && (
+                <p className="extra-opcao-pede">
+                  Pede:{' '}
+                  {x.pede.map((f, i) => {
+                    const item = itemDePermissao(f)
+                    return (
+                      <span key={f} className={item.perigo ? 'extra-pede-perigo' : undefined}>
+                        {i > 0 && ' · '}
+                        {item.rotulo}
+                      </span>
+                    )
+                  })}
+                </p>
+              )}
+              {!!x.sugere?.length && <p className="extra-opcao-pede">Sugere: {x.sugere.join(' · ')} (você marca no aceite)</p>}
               <div className="extra-opcao-pe">
                 <span className="extra-espaco-flex" />
                 <button type="button" className="extra-botao primario" disabled={ja} onClick={() => propor(() => api.adicionarExemplo(x.nome))} data-adicionar-exemplo={x.nome}>

@@ -5,12 +5,14 @@ import { CANAIS_APP } from '../shared/api'
 import { lerRespostaAoFechar, perguntaAoFechar, type Fechamento } from './fecharJanela'
 import { registrarAndares } from './andares'
 import { pararRotinas, registrarRotinas } from './rotinas'
-import { cofreDeCredenciais, motorDoCodigo, pararFluxos, registrarFluxos } from './fluxos'
+import { acrescentarUsoDeCredencial, cofreDeCredenciais, motorDoCodigo, pararFluxos, registrarFluxos } from './fluxos'
 import { registrarCredenciais } from './fluxos/credenciais'
+import { importadorMcpFora, registroMcpFora } from './mcpFora'
+import { registrarMcpFora } from './mcpFora/registro'
 import { registrarPanorama } from './panorama'
 import { registrarArea, registrarEsquemas, servirImagens } from './area'
 import { instalarIpcSeguro } from './ipcSeguro'
-import { anexarPagina, ehParticaoDePagina, guardarPagina, paginaAnexada, registrarPaginas } from './paginas'
+import { anexarPagina, ehParticaoDePagina, guardarPagina, paginaAnexada, paginasQueUsamCredencial, registrarPaginas } from './paginas'
 import { registrarChaves } from './chaves'
 import { registrarPortais } from './portais'
 import { registrarTemas } from './temas'
@@ -359,6 +361,10 @@ if (!autoteste && !medindo && !app.requestSingleInstanceLock()) {
     registrarRotinas()
     registrarFluxos()
     registrarCredenciais(ipcMain, cofreDeCredenciais)
+    // MCP de fora (1.9.7): só a janela cadastra (o ipcSeguro já guarda os canais); apagar credencial lista os servidores
+    registrarMcpFora(ipcMain, registroMcpFora, importadorMcpFora)
+    acrescentarUsoDeCredencial((id) => registroMcpFora.usandoCredencial(id))
+    acrescentarUsoDeCredencial(paginasQueUsamCredencial)
     registrarPanorama()
     registrarPaginas()
     quandoApagarEspaco(encerrarDoEspaco)
@@ -372,6 +378,8 @@ app.on('before-quit', () => {
   if (!autoteste && !medindo) gravarSessaoAgora()
   // nada do que os agentes conversaram pelo correio fica no disco depois que o app sai
   fecharCorreio(); fecharCano()
+  // os servidores MCP de fora (stdio) morrem com a árvore inteira (o `cmd /c npx` deixa netos)
+  registroMcpFora.encerrarTudoJa()
 })
 
 /**
@@ -396,12 +404,16 @@ function sairDoApp(): void {
   // ela não fica.
   const forca = setTimeout(() => {
     fecharCorreio(); fecharCano()
+    registroMcpFora.encerrarTudoJa()
     app.exit(0)
   }, 5000)
   forca.unref()
   pararRotinas()
   pararFluxos()
   encerrarTodos()
+  // os servidores MCP de fora depois dos agentes. É síncrono, mas com prazo (Revisão C, R1): um taskkill em lote e,
+  // só se precisar, uma lista do sistema, cada um com 1,2 s; o pior caso fica em ~3 s, dentro do prazo duro acima
+  registroMcpFora.encerrarTudoJa()
   // o Chrome do app fecha direito antes (sem o aviso de "não foi fechado corretamente" na próxima vez)
   void encerrarNavegador().finally(() => app.quit())
 }

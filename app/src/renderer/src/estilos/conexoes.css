@@ -461,6 +461,12 @@
   line-height: 1.45;
 }
 
+/* (1.9.7) quem para ao renomear: aviso (âmbar), não erro */
+/* com .conexoes na frente: sem isso empata (0,2,0) com `.configuracoes .suave` e `.conexoes .suave`, que vêm depois e deixam o aviso cinza */
+.conexoes .credencial-ajuda.credencial-atencao {
+  color: var(--atencao);
+}
+
 .credencial-linha {
   display: flex;
   gap: var(--espaco-2);
@@ -486,4 +492,429 @@
   border: 1px solid var(--borda-suave);
   border-radius: var(--raio-pequeno);
   background: var(--lateral-filtro);
+  color: var(--texto);
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------------ credenciais no tema (1.9.7, D6) */
+/* O formulário de credencial aparece em Conexões, no aceite de uma página e no nó HTTP: estas regras valem em qualquer
+   um dos três (por classe, não por ".conexoes"), com os tokens do tema, para select e área de texto não ficarem claros no
+   Escuro nem no OLED. */
+.credencial-form input,
+.credencial-form select,
+.credencial-form textarea,
+.credencial-escolha select {
+  padding: 6px var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  background: var(--lateral-filtro);
+  color: var(--texto);
+  font: inherit;
+  font-size: 14px;
+  outline: 0;
+  min-width: 0;
+}
+
+.credencial-form input {
+  height: 36px;
+  padding: 0 var(--espaco-3);
+}
+
+.credencial-form input::placeholder,
+.credencial-form textarea::placeholder {
+  color: var(--texto-suave);
+}
+
+.credencial-form input:focus,
+.credencial-form select:focus,
+.credencial-form textarea:focus,
+.credencial-escolha select:focus {
+  border-color: var(--destaque);
+}
+
+.credencial-form option,
+.credencial-escolha option {
+  background: var(--painel);
+  color: var(--texto);
+}
+
+.credencial-form button,
+.credencial-escolha button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: 6px var(--espaco-3);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.credencial-form button:hover:not(:disabled),
+.credencial-escolha button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.credencial-form button:disabled,
+.credencial-escolha button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.credencial-form button.primario {
+  border-color: var(--destaque);
+  background: var(--destaque);
+  color: var(--texto-sobre-destaque);
+  font-weight: 600;
+}
+
+.credencial-form button.primario:hover:not(:disabled) {
+  background: var(--destaque-forte);
+}
+
+.credencial-acoes {
+  justify-content: flex-end;
+}
+
+.credencial-erro {
+  margin: 0;
+  color: var(--perigo);
+  font-size: 13px;
+}
+
+.credencial-form code {
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+}
+
+/* o seletor "credencial do encaixe" (aceite e Conexões › Páginas): select + Criar credencial lado a lado */
+.credencial-escolha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.credencial-escolha select {
+  flex: 1;
+  min-width: 180px;
+  height: 36px;
+}
+
+.credencial-escolha select[data-a-escolher] {
+  border-color: var(--atencao);
+}
+
+/* ------------------------------------------------------------------ Conexões › Páginas: encaixes de API (1.9.7, A2) */
+.conexoes-encaixe {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  background: var(--lateral-filtro);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.conexoes-encaixe.revogado {
+  opacity: 0.75;
+}
+
+.conexoes-encaixe-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--espaco-2);
+}
+
+.conexoes-encaixe-modo.escrita {
+  color: var(--perigo);
+  font-weight: 600;
+}
+
+.conexoes-encaixe-credencial.sumiu {
+  color: var(--perigo);
+}
+
+.conexoes-registro {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+}
+
+.conexoes-registro li {
+  display: grid;
+  grid-template-columns: 64px 54px minmax(0, 1fr) auto auto;
+  gap: var(--espaco-2);
+  padding: 2px var(--espaco-2);
+  border-radius: var(--raio-micro);
+  background: var(--lateral-filtro);
+}
+
+.conexoes-registro li.falhou .conexoes-registro-status {
+  color: var(--perigo);
+}
+
+.conexoes-registro-caminho {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conexoes-registro-caixa {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+}
+
+/* ------------------------------------------------------------------ Conexões › MCP › Servidores de fora (1.9.7, C4) */
+.servidor-form select,
+.servidor-form textarea,
+.servidor-form input:not([type='radio']):not([type='checkbox']) {
+  padding: 6px var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  background: var(--lateral-filtro);
+  color: var(--texto);
+  font: inherit;
+  font-size: 14px;
+  outline: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.servidor-form input:not([type='radio']):not([type='checkbox']) {
+  height: 36px;
+  padding: 0 var(--espaco-3);
+}
+
+.servidor-form textarea {
+  resize: vertical;
+  font-family: var(--fonte-mono);
+  font-size: 12.5px;
+}
+
+.servidor-form select:focus,
+.servidor-form textarea:focus,
+.servidor-form input:focus {
+  border-color: var(--destaque);
+}
+
+.servidor-form option {
+  background: var(--painel);
+  color: var(--texto);
+}
+
+.servidor-form .credencial-form {
+  max-width: none;
+  padding: var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+}
+
+.servidor-opcao {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: 13px;
+}
+
+.servidor-variavel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  padding: var(--espaco-2);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+}
+
+.servidor-linha {
+  display: flex;
+  gap: var(--espaco-2);
+}
+
+.servidor-linha input {
+  flex: 1;
+}
+
+.servidor-linha select {
+  width: auto;
+  flex: 0 1 220px;
+}
+
+/* o comando inteiro à vista, como o terminal o mostraria */
+.servidor-comando {
+  margin: 0;
+  padding: var(--espaco-2) var(--espaco-3);
+  border-radius: var(--raio-pequeno);
+  background: var(--terminal-corpo);
+  color: var(--terminal-texto);
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.servidor-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espaco-2);
+  margin: 0;
+  padding: var(--espaco-2) var(--espaco-3);
+  border-left: 3px solid var(--atencao);
+  border-radius: var(--raio-micro);
+  background: var(--quadro-fundo);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.servidor-aviso svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--atencao);
+}
+
+.servidor-variaveis {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.servidor-variaveis code {
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+}
+
+.servidor-variaveis li.sumiu {
+  color: var(--perigo);
+}
+
+.servidor-painel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  padding: var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  background: var(--painel-alto);
+}
+
+.servidor-ferramentas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  max-height: 320px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.servidor-ferramenta-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--espaco-2);
+}
+
+.servidor-ferramenta code {
+  font-family: var(--fonte-mono);
+  font-size: 12.5px;
+}
+
+.servidor-rotulo {
+  font-size: 11.5px;
+  color: var(--texto-suave);
+}
+
+/* "pode mudar coisas" e "bloqueada" pesam: em vermelho */
+.servidor-rotulo.perigo {
+  color: var(--perigo);
+  font-weight: 600;
+}
+
+.servidor-descricao {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.dialogo:has(.servidores-importar) {
+  width: min(680px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.servidores-importar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  font-size: 13.5px;
+}
+
+.servidores-importar-lista,
+.servidor-avisos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.servidor-avisos {
+  padding-left: var(--espaco-4);
+  list-style: disc;
+  font-size: 12.5px;
+}
+
+.servidores-importar-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  background: var(--lateral-filtro);
+}
+
+.servidores-importar-item p {
+  margin: 0;
+}
+
+/* (1.9.7, F2) "O que ela pode fazer": só lê / lê e escreve (vermelho quando marcado) */
+.credencial-escrita {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-3);
+}
+
+.credencial-campo .credencial-escrita input[type='radio'] {
+  width: auto;
+}
+
+.credencial-escreve {
+  color: var(--perigo);
+  font-weight: 600;
 }

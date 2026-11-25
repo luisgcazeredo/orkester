@@ -682,3 +682,331 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- encaixes `api` no aceite e na moldura (1.9.7, A2) ---------- */
+
+/* (1.9.7) diálogo alto: o corpo rola e o título e os botões (Cancelar/Aceitar) ficam sempre à vista. O painel do "+"
+   (.extra-painel) já segue o mesmo padrão; aqui só garantimos que título e rodapé não encolhem */
+.dialogo:has(.extra-aceite) {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+}
+
+.dialogo:has(.extra-aceite) .extra-aceite {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--espaco-1);
+}
+
+.dialogo:has(.extra-aceite) > :not(.extra-aceite),
+.dialogo:has(.extra-painel) > :not(.extra-painel) {
+  flex-shrink: 0;
+}
+
+/* (1.9.7, F1) "APIs que esta página enxerga" e "MCPs que esta página enxerga": aceite e cartão em Conexões › Páginas */
+.extra-acessos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+.extra-acessos-secao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+}
+
+.extra-acessos-secao .extra-aceite-rotulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.extra-acessos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.extra-acessos-lista > li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  background: var(--lateral-filtro);
+}
+
+.extra-acessos-lista > li.sumiu {
+  border-style: dashed;
+}
+
+/* a caixa fica SEMPRE na mesma linha do nome (no aceite e no cartão de Conexões, onde `.conexoes input` a deformava) e o que
+   não couber desce para uma 2ª linha recuada até o nome */
+.extra-acesso-linha {
+  --caixa: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espaco-2);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.extra-acessos input[type='checkbox'],
+.extra-pedir-usos input[type='checkbox'] {
+  flex: none;
+  box-sizing: border-box;
+  width: var(--caixa, 14px);
+  height: var(--caixa, 14px);
+  margin: 2px 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  accent-color: var(--destaque);
+}
+
+.extra-acesso-caixa-vazia {
+  flex: none;
+  align-self: stretch;
+  width: var(--caixa, 14px);
+}
+
+.extra-acesso-texto {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: baseline;
+  min-width: 0;
+  gap: 0 var(--espaco-2);
+}
+
+.extra-acesso-dominios {
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+}
+
+/* o teto da API (o que ela permite): cinza; a escrita da página é a caixa "também escreve" */
+.extra-acesso-selo {
+  color: var(--texto-suave);
+  font-size: 11.5px;
+}
+
+.extra-acesso-atende,
+.extra-acesso-nota {
+  margin: 0;
+  color: var(--texto-suave);
+  font-size: 12px;
+}
+
+/* o "atende…" e o "também escreve" ficam alinhados com o nome, não com a caixa */
+.extra-acesso-atende,
+.extra-acesso-escrita-linha {
+  padding-left: calc(var(--caixa, 14px) + var(--espaco-2));
+}
+
+.extra-acesso-escrita-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--espaco-3);
+}
+
+.extra-acesso-sugere {
+  font-size: 11.5px;
+}
+
+/* escrever (criar, mudar, apagar) é o que pesa: em vermelho quando marcado */
+.extra-acesso-escrita {
+  display: flex;
+  align-items: baseline;
+  gap: var(--espaco-2);
+  font-size: 12.5px;
+}
+
+.extra-acesso-escrita.perigo {
+  color: var(--perigo);
+  font-weight: 600;
+}
+
+/* sugestão do manifesto sem ninguém para atender: âmbar, não impede aceitar */
+.extra-acesso-aviso {
+  margin: 0;
+  color: var(--atencao);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.extra-acessos-desligado {
+  margin: 0;
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 1px dashed var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+  color: var(--texto-suave);
+  font-size: 12.5px;
+}
+
+.extra-acessos-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: 12px;
+}
+
+.extra-acessos-acoes button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: 6px var(--espaco-3);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--texto);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.extra-acessos-acoes button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.extra-acessos-acoes button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.extra-acesso-ferramentas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  padding-left: var(--espaco-4);
+}
+
+/* ferramenta sugerida que o servidor não tem: cinza, não marca */
+.extra-ferramentas li.falta code,
+.extra-ferramenta-rotulo.falta {
+  color: var(--texto-suave);
+  opacity: 0.7;
+}
+
+/* por que Aceitar está desligado ("termine ou feche a API nova", conflito de nome…): dica em âmbar, não erro */
+.extra-aceite-falta {
+  margin-right: auto;
+  color: var(--atencao);
+  font-size: 12px;
+}
+
+/* "+" › Pedir a um agente: APIs e MCPs que ela vai usar */
+.extra-pedir-usos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-3);
+}
+
+.extra-pedir-grupo {
+  display: flex;
+  flex: 1 1 220px;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  margin: 0;
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 1px solid var(--borda-suave);
+  border-radius: var(--raio-pequeno);
+}
+
+.extra-pedir-nota {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 12px;
+}
+
+.extra-pedir-grupo legend {
+  padding: 0 var(--espaco-1);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.extra-pedir-ferramentas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  padding-left: var(--espaco-4);
+  font-size: 12px;
+}
+
+.extra-usa {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.extra-usa.escrita {
+  color: var(--perigo);
+}
+
+/* o que o exemplo pede e pesa (escrever numa API) sai em vermelho no painel do "+" */
+.extra-pede-perigo {
+  color: var(--perigo);
+  font-weight: 600;
+}
+
+/* encaixes `mcp` no aceite (1.9.7, C5b): cada ferramenta pedida com o rótulo do que o servidor diz dela */
+.extra-ferramentas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+}
+
+/* centralizado: a caixa (ou o espaço dela, na ferramenta que o servidor não tem), o nome e o rótulo ficam na mesma linha */
+.extra-ferramentas li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.extra-ferramentas .extra-acesso-linha {
+  align-items: center;
+}
+
+.extra-ferramentas code {
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+}
+
+.extra-ferramenta-rotulo {
+  color: var(--texto-suave);
+  font-size: 11.5px;
+}
+
+/* "pode mudar coisas" e "o servidor não informou" pesam: em vermelho */
+.extra-ferramenta-rotulo.perigo {
+  color: var(--perigo);
+  font-weight: 600;
+}
+
+/* "o servidor diz: …" alinhado com o nome da ferramenta (depois da caixa) */
+.extra-ferramenta-descricao {
+  flex-basis: 100%;
+  padding-left: calc(var(--caixa, 14px) + var(--espaco-2));
+  line-height: 1.4;
+}
+
+/* por que Guardar está desligado no cartão da página (mesmo âmbar da dica do aceite; não é erro) */
+.extra-falta-no-cartao {
+  color: var(--atencao);
+  font-size: 12px;
+}

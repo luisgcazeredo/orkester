@@ -10,6 +10,7 @@
 import { Menu, Tray, nativeImage, type NativeImage } from 'electron'
 // a imagem vai junto do bundle (out/), então serve no app instalado e no de dev; o .png de build/ não é empacotado
 import caminhoDoIcone from '../../build/icon.png?asset&asarUnpack'
+import { todasAsSessoes } from './terminais'
 import { criarBandeja, type Bandeja, type IconeDaBandeja } from './regrasDaBandeja'
 
 let contarLigados: () => number = () => 0
@@ -58,6 +59,8 @@ function criarIcone(texto: string, aoAbrir: () => void, aoSair: () => void): Ico
 export function iniciarBandeja(pontas: { abrir: () => void; sair: () => void }): Bandeja {
   bandeja = criarBandeja({
     contar: () => contarLigados(),
+    // os agentes vivos (claude/codex): é o que "segue aberto" com a janela fechada
+    agentes: () => todasAsSessoes().filter((s) => !s.fim && s.espec.agente !== 'shell').length,
     criarIcone,
     abrir: pontas.abrir,
     sair: pontas.sair,

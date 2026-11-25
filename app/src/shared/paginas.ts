@@ -6,7 +6,10 @@
  *
  * **Permissão como texto** ("ficha"): `quadro`, `recado`, `rede:<host>` e `local:<porta><caminho>`. Cada host e cada
  * caminho é uma ficha: dá para revogar um só, e um host novo no manifesto é uma permissão nova (não carrega sem aceite).
+ * (1.9.7) `api` e `mcp` do manifesto não viram fichas: são só sugestões. O que a página enxerga mora em
+ * `PaginaRegistrada.acessos` (regras em `shared/paginasAcessos.ts`; o pedido em `shared/paginasApi.ts`).
  */
+import type { AcessoApi, AcessoMcp, AcessosDaPagina } from './api'
 
 export const FORMATO_DO_MANIFESTO = 1
 export const FORMATO_DO_REGISTRO = 1
@@ -32,7 +35,15 @@ export const LIMITES = {
   dadosBytes: 1024 * 1024,
   dadosChaves: 200,
   localBytes: 1024 * 1024,
-  localMs: 5000
+  localMs: 5000,
+  /** (1.9.7) encaixes `api` (e, na C5a, `mcp`) por página */
+  encaixes: 5,
+  /** (1.9.7) fichas por página (o registro guarda até isto em pedidas, aceitas e recusadas) */
+  fichas: 60,
+  /** (1.9.7) `api.pedir`: o mesmo teto do preload (TETOS_NO_PRELOAD) */
+  apiCorpoBytes: 100 * 1024,
+  /** (1.9.7) `mcp.chamar`: o mesmo teto do preload */
+  mcpArgumentosBytes: 100 * 1024
 } as const
 
 /** Extensão → Content-Type. Qualquer outra extensão recusa a pasta inteira. */
@@ -79,13 +90,40 @@ const HOST = /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z
 const SUFIXO_LOCAL = /(^|\.)(localhost|local|lan|internal|intranet|home|corp|arpa|test|invalid|example)$/
 const CAMINHO_LOCAL = /^\/(?:[A-Za-z0-9._~-]+\/?)*$/
 
+/** (1.9.7) Nome de encaixe: entra na ficha (`api:<encaixe>:…`), então sem `:`; até 40, o teto do preload. */
+export const NOME_DE_ENCAIXE = /^[a-z][a-z0-9_-]{0,39}$/
+
+/**
+ * (1.9.7) Nome de ferramenta MCP numa ficha `mcp:<encaixe>:<ferramenta>`: o que a especificação MCP recomenda (1 a 128
+ * letras, números, `_`, `-` e `.`), e por isso nunca `:`.
+ */
+export const NOME_DE_FERRAMENTA = /^[A-Za-z0-9_.-]{1,128}$/
+/** (1.9.7) Ferramentas por encaixe `mcp`. */
+export const FERRAMENTAS_POR_ENCAIXE = 20
+
 export type TipoDePermissao = 'quadro' | 'recado' | 'rede' | 'local'
+
+/** (1.9.7) Um encaixe `mcp` do manifesto: a lista fechada de ferramentas de um servidor que o usuário liga no aceite. */
+export interface EncaixeMcpDoManifesto {
+  encaixe: string
+  ferramentas: string[]
+}
+
+/** Um encaixe `api` do manifesto: (1.9.7) só sugestão do nome que a página chama e dos hosts (0 a 5) que ela espera. */
+export interface EncaixeApiDoManifesto {
+  encaixe: string
+  hosts: string[]
+  /** sem `true`, só GET e HEAD */
+  escrita?: boolean
+}
 
 export interface PermissoesDoManifesto {
   quadro?: boolean
   recado?: boolean
   rede?: string[]
   local?: { porta: number; caminhos: string[] }
+  api?: EncaixeApiDoManifesto[]
+  mcp?: EncaixeMcpDoManifesto[]
 }
 
 export interface ManifestoDePagina {
@@ -150,7 +188,7 @@ export function validarManifesto(bruto: unknown): Resultado<ManifestoDePagina> {
   }
   const permissoes = bruto.permissoes ?? {}
   if (!objetoSimples(permissoes)) return falha('"permissoes" precisa ser um objeto')
-  const sobraP = chavesSobrando(permissoes, ['quadro', 'recado', 'rede', 'local'])
+  const sobraP = chavesSobrando(permissoes, ['quadro', 'recado', 'rede', 'local', 'api', 'mcp'])
   if (sobraP) return falha(`permissão desconhecida: "${sobraP.slice(0, 40)}"`)
   for (const k of ['quadro', 'recado'] as const) {
     if (permissoes[k] !== undefined && typeof permissoes[k] !== 'boolean') return falha(`"permissoes.${k}" é true ou false`)
@@ -183,12 +221,93 @@ export function validarManifesto(bruto: unknown): Resultado<ManifestoDePagina> {
     if (ruim !== undefined) return falha(`"permissoes.local.caminhos": "${String(ruim).slice(0, 60)}" não vale (começa com "/", sem ".." nem "//")`)
     saida.local = { porta: local.porta as number, caminhos: [...new Set(caminhos as string[])] }
   }
+  if (permissoes.api !== undefined) {
+    const api = validarApi(permissoes.api)
+    if (!api.ok) return api
+    if (api.valor.length) saida.api = api.valor
+  }
+  if (permissoes.mcp !== undefined) {
+    const mcp = validarMcp(permissoes.mcp)
+    if (!mcp.ok) return mcp
+    if (mcp.valor.length) saida.mcp = mcp.valor
+  }
+  // um nome de encaixe é um só na página: "api" e "mcp" não repetem (a moldura, o registro e o revogar falam por nome)
+  const repetido = (saida.mcp ?? []).find((m) => (saida.api ?? []).some((a) => a.encaixe === m.encaixe))
+  if (repetido) return falha(`o encaixe "${repetido.encaixe}" aparece em "api" e em "mcp": use nomes diferentes`)
   // o que a página lê do PC não pode ter por onde sair
   if (saida.local && saida.rede) return falha('"local" e "rede" não andam juntos: uma página que lê deste PC não fala com a internet')
+  // o que vem da conta do usuário (pela credencial ou por um servidor dele) também não
+  for (const k of ['api', 'mcp'] as const) {
+    if (saida[k] && (saida.rede || saida.local)) {
+      return falha(`"${k}" não anda com "rede" nem com "local": o que a página lê com a sua conta não pode ter outra porta de saída`)
+    }
+  }
+  const fichas = permissoesPedidas({ permissoes: saida }).length
+  if (fichas > LIMITES.fichas) return falha(`o manifesto pede ${fichas} permissões; o máximo é ${LIMITES.fichas}`)
   return {
     ok: true,
     valor: { formato: 1, id: bruto.id, nome, versao: bruto.versao, descricao, icone, permissoes: saida }
   }
+}
+
+/**
+ * (1.9.7) `permissoes.api`: até 5 encaixes `{ encaixe, hosts, escrita? }`, nome único, de 1 a 5 hosts válidos (a mesma
+ * regra de `rede`) sem repetir. Chave a mais recusa.
+ */
+function validarApi(bruto: unknown): Resultado<EncaixeApiDoManifesto[]> {
+  if (!Array.isArray(bruto)) return falha('"permissoes.api" é uma lista de { "encaixe", "hosts", "escrita" }')
+  if (bruto.length > LIMITES.encaixes) return falha(`"permissoes.api": no máximo ${LIMITES.encaixes} encaixes`)
+  const saida: EncaixeApiDoManifesto[] = []
+  for (const e of bruto) {
+    if (!objetoSimples(e)) return falha('"permissoes.api": cada encaixe é { "encaixe", "hosts", "escrita" }')
+    const sobra = chavesSobrando(e, ['encaixe', 'hosts', 'escrita'])
+    if (sobra) return falha(`chave desconhecida em "permissoes.api": "${sobra.slice(0, 40)}"`)
+    if (typeof e.encaixe !== 'string' || !NOME_DE_ENCAIXE.test(e.encaixe)) {
+      return falha('"permissoes.api": o "encaixe" tem de 1 a 40 letras minúsculas, números, "_" ou "-", começando por letra')
+    }
+    const nome = e.encaixe
+    if (saida.some((x) => x.encaixe === nome)) return falha(`"permissoes.api": o encaixe "${nome}" aparece duas vezes`)
+    // (1.9.7) sugestão: os hosts só ajudam a achar a API candidata, então podem faltar
+    const hosts = e.hosts ?? []
+    if (!Array.isArray(hosts) || hosts.length > LIMITES.hosts) return falha(`"permissoes.api" (${nome}): de 0 a ${LIMITES.hosts} hosts`)
+    const ruim = hosts.find((h) => !hostValido(h))
+    if (ruim !== undefined) {
+      return falha(`"permissoes.api" (${nome}): "${String(ruim).slice(0, 60)}" não vale (só nome exato em minúsculas, sem curinga, IP, porta, "https://", localhost ou rede local)`)
+    }
+    if (new Set(hosts).size !== hosts.length) return falha(`"permissoes.api" (${nome}): host repetido`)
+    if (e.escrita !== undefined && typeof e.escrita !== 'boolean') return falha(`"permissoes.api" (${nome}): "escrita" é true ou false`)
+    saida.push({ encaixe: nome, hosts: [...(hosts as string[])], ...(e.escrita ? { escrita: true } : {}) })
+  }
+  return { ok: true, valor: saida }
+}
+
+/**
+ * (1.9.7) `permissoes.mcp`: até 5 encaixes `{ encaixe, ferramentas }`, nome único, de 1 a 20 ferramentas com nome
+ * válido, sem repetir. Chave a mais recusa (não existe "escrita": cada ferramenta já é uma permissão).
+ */
+function validarMcp(bruto: unknown): Resultado<EncaixeMcpDoManifesto[]> {
+  if (!Array.isArray(bruto)) return falha('"permissoes.mcp" é uma lista de { "encaixe", "ferramentas" }')
+  if (bruto.length > LIMITES.encaixes) return falha(`"permissoes.mcp": no máximo ${LIMITES.encaixes} encaixes`)
+  const saida: EncaixeMcpDoManifesto[] = []
+  for (const e of bruto) {
+    if (!objetoSimples(e)) return falha('"permissoes.mcp": cada encaixe é { "encaixe", "ferramentas" }')
+    const sobra = chavesSobrando(e, ['encaixe', 'ferramentas'])
+    if (sobra) return falha(`chave desconhecida em "permissoes.mcp": "${sobra.slice(0, 40)}"`)
+    if (typeof e.encaixe !== 'string' || !NOME_DE_ENCAIXE.test(e.encaixe)) {
+      return falha('"permissoes.mcp": o "encaixe" tem de 1 a 40 letras minúsculas, números, "_" ou "-", começando por letra')
+    }
+    const nome = e.encaixe
+    if (saida.some((x) => x.encaixe === nome)) return falha(`"permissoes.mcp": o encaixe "${nome}" aparece duas vezes`)
+    const ferramentas = e.ferramentas
+    if (!Array.isArray(ferramentas) || !ferramentas.length || ferramentas.length > FERRAMENTAS_POR_ENCAIXE) {
+      return falha(`"permissoes.mcp" (${nome}): de 1 a ${FERRAMENTAS_POR_ENCAIXE} ferramentas`)
+    }
+    const ruim = ferramentas.find((f) => typeof f !== 'string' || !NOME_DE_FERRAMENTA.test(f))
+    if (ruim !== undefined) return falha(`"permissoes.mcp" (${nome}): "${String(ruim).slice(0, 60)}" não é nome de ferramenta (1 a 128 letras, números, "_", "-" ou ".")`)
+    if (new Set(ferramentas).size !== ferramentas.length) return falha(`"permissoes.mcp" (${nome}): ferramenta repetida`)
+    saida.push({ encaixe: nome, ferramentas: [...(ferramentas as string[])] })
+  }
+  return { ok: true, valor: saida }
 }
 
 // ---------------------------------------------------------------- permissões como fichas
@@ -200,6 +319,7 @@ export function permissoesPedidas(m: Pick<ManifestoDePagina, 'permissoes'>): str
     ...(p.recado ? ['recado'] : []),
     ...(p.rede ?? []).map((h) => `rede:${h}`),
     ...(p.local ? p.local.caminhos.map((c) => `local:${p.local!.porta}${c}`) : [])
+    // (1.9.7) `api` e `mcp` não geram ficha: manifesto mudado nunca deixa a página pendente nem derruba um acesso
   ]
 }
 
@@ -210,7 +330,7 @@ export interface FichaLida {
   caminho?: string
 }
 
-/** Lê uma ficha de permissão (`rede:api.x.com`, `local:7788/api/`). null = ficha que não existe. */
+/** Lê uma ficha (`rede:api.x.com`, `local:7788/api/`). null = não existe (inclui `api:`/`mcp:`: sugestão não vira ficha). */
 export function lerPermissao(ficha: string): FichaLida | null {
   if (ficha === 'quadro' || ficha === 'recado') return { tipo: ficha }
   if (ficha.startsWith('rede:')) return hostValido(ficha.slice(5)) ? { tipo: 'rede', host: ficha.slice(5) } : null
@@ -652,6 +772,8 @@ export interface PaginaRegistrada {
   quedas: QuedaDePagina[]
   instaladaEm: number
   atualizadaEm: number
+  /** (1.9.7) As APIs e os MCPs que a página enxerga, por id. Só o Luís concede (aceite e cartão). */
+  acessos?: AcessosDaPagina
 }
 
 export interface RegistroDePaginas {
@@ -667,6 +789,39 @@ const listaDeTextos = (v: unknown, max: number): string[] | null =>
   Array.isArray(v) && v.length <= max && v.every((x) => typeof x === 'string' && x.length <= 300) ? (v as string[]) : null
 
 const UUID = /^[0-9a-f-]{36}$/
+/** (1.9.7) Id de credencial ou de servidor de fora numa ligação. */
+export const ID_LIGADO = /^[A-Za-z0-9_-]{1,64}$/
+
+/**
+ * (1.9.7) Acessos lidos do disco: só a forma (id com cara de id, escrita booleana, nomes válidos, tetos); se a API ou
+ * o servidor ainda existe, o main vê na hora (o cartão mostra "sumiu"). Nada = undefined.
+ */
+export function lerAcessos(v: unknown): AcessosDaPagina | undefined {
+  if (!objetoSimples(v)) return undefined
+  const atende = (x: unknown): string[] | undefined => {
+    const l = Array.isArray(x) ? [...new Set(x.filter((n): n is string => typeof n === 'string' && NOME_DE_ENCAIXE.test(n)))].slice(0, 5) : []
+    return l.length ? l : undefined
+  }
+  const api: AcessoApi[] = []
+  for (const a of Array.isArray(v.api) ? v.api.slice(0, 10) : []) {
+    if (!objetoSimples(a) || typeof a.apiId !== 'string' || !ID_LIGADO.test(a.apiId) || api.some((x) => x.apiId === a.apiId)) continue
+    const at = atende(a.atende)
+    api.push({ apiId: a.apiId, escrita: a.escrita === true, ...(at ? { atende: at } : {}) })
+  }
+  const mcp: AcessoMcp[] = []
+  for (const s of Array.isArray(v.mcp) ? v.mcp.slice(0, 5) : []) {
+    if (!objetoSimples(s) || typeof s.servidorId !== 'string' || !ID_LIGADO.test(s.servidorId) || mcp.some((x) => x.servidorId === s.servidorId)) continue
+    const ferramentas = Array.isArray(s.ferramentas)
+      ? [...new Set(s.ferramentas.filter((f): f is string => typeof f === 'string' && NOME_DE_FERRAMENTA.test(f)))].slice(0, 20)
+      : []
+    const at = atende(s.atende)
+    mcp.push({ servidorId: s.servidorId, ferramentas, ...(at ? { atende: at } : {}) })
+  }
+  return api.length || mcp.length ? { ...(api.length ? { api } : {}), ...(mcp.length ? { mcp } : {}) } : undefined
+}
+
+/** (1.9.7) Fichas `api:`/`mcp:` gravadas pela 1.9.7 em obra: descartadas na leitura (decisão 0.4 do plano). */
+const fichaDeAgora = (f: string): boolean => !f.startsWith('api:') && !f.startsWith('mcp:')
 
 function lerIcone(v: unknown): IconeDePagina | null {
   if (!objetoSimples(v)) return null
@@ -679,9 +834,9 @@ function lerIcone(v: unknown): IconeDePagina | null {
 
 function lerPagina(v: unknown): PaginaRegistrada | null {
   if (!objetoSimples(v)) return null
-  const pedidas = listaDeTextos(v.pedidas, 20)
-  const aceitas = listaDeTextos(v.aceitas, 20)
-  const recusadas = listaDeTextos(v.recusadas, 20)
+  const pedidas = listaDeTextos(v.pedidas, LIMITES.fichas)?.filter(fichaDeAgora)
+  const aceitas = listaDeTextos(v.aceitas, LIMITES.fichas)?.filter(fichaDeAgora)
+  const recusadas = listaDeTextos(v.recusadas, LIMITES.fichas)?.filter(fichaDeAgora)
   if (typeof v.id !== 'string' || !ID_DE_PAGINA.test(v.id)) return null
   if (typeof v.nome !== 'string' || !v.nome || v.nome.length > LIMITES.nome || !nomeVisivel(v.nome)) return null
   if (typeof v.versao !== 'string' || !VERSAO.test(v.versao)) return null
@@ -704,6 +859,8 @@ function lerPagina(v: unknown): PaginaRegistrada | null {
     objetoSimples(v.desligada) && (motivoDesligada === 'usuario' || motivoDesligada === 'quedas') && Number.isFinite(v.desligada.em)
       ? { motivo: motivoDesligada, em: v.desligada.em as number }
       : undefined
+  // `ligacoes` (1.9.7 em obra) é descartado: na prévia, basta marcar de novo (decisão 0.4)
+  const acessos = lerAcessos(v.acessos)
   return {
     id: v.id,
     nome: v.nome,
@@ -719,7 +876,8 @@ function lerPagina(v: unknown): PaginaRegistrada | null {
     ...(desligada ? { desligada } : {}),
     quedas,
     instaladaEm: Number.isFinite(v.instaladaEm) ? (v.instaladaEm as number) : 0,
-    atualizadaEm: Number.isFinite(v.atualizadaEm) ? (v.atualizadaEm as number) : 0
+    atualizadaEm: Number.isFinite(v.atualizadaEm) ? (v.atualizadaEm as number) : 0,
+    ...(acessos ? { acessos } : {})
   }
 }
 

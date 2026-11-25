@@ -927,7 +927,7 @@
 .ed-aviso-sensivel {
   margin: 0;
   padding: var(--espaco-2);
-  border-left: 3px solid var(--perigo);
+  border-left: 3px solid var(--atencao); /* informação, não erro: âmbar (1.9.7) */
   border-radius: var(--raio-micro);
   background: var(--quadro-fundo);
   font-size: 12px;

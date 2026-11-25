@@ -8,8 +8,14 @@
 // vai por `https` e só para um host da lista `dominios` dela (nome exato ou `*.dominio`, que vale para os subdomínios).
 // Apagar uma credencial em uso não mexe nos fluxos: o próximo pedido dá "credencial X não existe".
 
-export type TipoDeCredencial = 'cabecalho' | 'bearer' | 'basic'
+export type TipoDeCredencial = 'cabecalho' | 'bearer' | 'basic' | 'segredo'
+/** Os tipos que vão num cabeçalho HTTP (o formulário do nó HTTP e do aceite de página oferece só estes). */
 export const TIPOS_DE_CREDENCIAL: readonly TipoDeCredencial[] = ['cabecalho', 'bearer', 'basic']
+/**
+ * (1.9.7) `segredo`: um valor cifrado SEM domínio, para variável de ambiente de servidor MCP stdio (a chave do n8n-mcp,
+ * por exemplo). Nunca vai em cabeçalho nem em pedido HTTP (`conferirDestino` recusa). Na tela, só a partir da C4.
+ */
+export const TIPOS_TODOS: readonly TipoDeCredencial[] = ['cabecalho', 'bearer', 'basic', 'segredo']
 
 /** O mesmo teto do nome de credencial no nó HTTP (`shared/fluxos/nos.ts`, `MAX_NOME` das automações). */
 export const MAX_NOME_DA_CREDENCIAL = 80
@@ -28,7 +34,13 @@ export interface CredencialGuardada {
   tipo: TipoDeCredencial
   /** Só no tipo `cabecalho`: o nome do cabeçalho (ex.: `X-Api-Key`). */
   cabecalho?: string
+  /** Vazio só no tipo `segredo` (que não tem domínio). */
   dominios: string[]
+  /**
+   * (1.9.7) `true`: a API só lê (GET e HEAD) e vale como teto para páginas e para o nó HTTP. Ausente = "lê e escreve"
+   * (como toda credencial da 1.9.6). Nunca existe em `segredo`.
+   */
+  soLeitura?: true
   /** Os 4 últimos caracteres do valor ('' se o valor é curto). */
   fim: string
   cifrado: string
@@ -58,14 +70,20 @@ export interface PedidoDeCredencial {
   tipo: TipoDeCredencial
   cabecalho?: string
   dominios: string[]
-  /** `bearer` e `cabecalho`: o token. `basic`: `usuario:senha`. */
+  /** (1.9.7) `true`: só lê (GET, HEAD). Ausente ou `false`: lê e escreve. */
+  soLeitura?: boolean
+  /** `bearer` e `cabecalho`: o token. `basic`: `usuario:senha`. `segredo`: o valor da variável. */
   valor: string
 }
 
 /** Editar não troca o valor (isso é `trocarValor`). Campo ausente fica como está. */
-export type MudancasDaCredencial = Partial<Pick<PedidoDeCredencial, 'nome' | 'tipo' | 'cabecalho' | 'dominios'>>
+export type MudancasDaCredencial = Partial<Pick<PedidoDeCredencial, 'nome' | 'tipo' | 'cabecalho' | 'dominios' | 'soLeitura'>>
 
-export type ResultadoDaCredencial = { ok: true; credencial: CredencialVisivel } | { erro: string }
+/**
+ * `usadaEm` (1.9.7): só no `editar` com nome novo, quem citava o nome antigo (fluxos pelo nome, páginas e servidores),
+ * para a tela avisar que eles param até serem ajustados.
+ */
+export type ResultadoDaCredencial = { ok: true; credencial: CredencialVisivel; usadaEm?: string[] } | { erro: string }
 /** `usadaEm`: fluxos que citam a credencial pelo nome (não são mexidos; o próximo pedido deles dá erro claro). */
 export type ResultadoDoApagar = { ok: true; usadaEm: string[] } | { erro: string }
 
@@ -118,6 +136,13 @@ export function dominioValido(bruto: unknown): string | { erro: string } {
   return curinga ? `*.${host}` : host
 }
 
+/** Os domínios do tipo: `segredo` não tem (lista ausente ou vazia); os outros precisam de pelo menos 1. */
+function dominiosDoTipo(tipo: TipoDeCredencial, bruto: unknown): string[] | { erro: string } {
+  if (tipo !== 'segredo') return dominiosValidos(bruto)
+  if (bruto === undefined || (Array.isArray(bruto) && !bruto.length)) return []
+  return { erro: 'credencial do tipo segredo não tem domínio: ela só vai para variável de ambiente de servidor MCP' }
+}
+
 function dominiosValidos(bruto: unknown): string[] | { erro: string } {
   if (!Array.isArray(bruto) || !bruto.length) return { erro: 'diga pelo menos 1 domínio para onde a credencial pode ir' }
   if (bruto.length > MAX_DOMINIOS) return { erro: `no máximo ${MAX_DOMINIOS} domínios por credencial` }
@@ -130,24 +155,44 @@ function dominiosValidos(bruto: unknown): string[] | { erro: string } {
   return saida
 }
 
+/**
+ * (1.9.7) O nome como a página e o nome do encaixe se comparam: sem caixa, sem acento e sem espaço
+ * (`"Click Up"` = `"clickup"` = `"Clíckup"`).
+ */
+export function nomeNormalizado(nome: string): string {
+  return nome.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/\s+/gu, '')
+}
+
 function nomeValido(bruto: unknown, outros: readonly CredencialGuardada[]): string | { erro: string } {
   const nome = typeof bruto === 'string' ? bruto.trim() : ''
   if (!nome) return { erro: 'dê um nome à credencial' }
   if (nome.length > MAX_NOME_DA_CREDENCIAL) return { erro: `nome com até ${MAX_NOME_DA_CREDENCIAL} caracteres` }
   if (temControle(nome)) return { erro: 'o nome não pode ter quebra de linha nem caractere de controle' }
-  if (outros.some((c) => c.nome.toLowerCase() === nome.toLowerCase())) return { erro: `já existe uma credencial "${nome}"` }
+  if (!nomeNormalizado(nome)) return { erro: 'dê um nome à credencial' }
+  const igual = outros.find((c) => nomeNormalizado(c.nome) === nomeNormalizado(nome))
+  if (igual) {
+    return { erro: igual.nome.toLowerCase() === nome.toLowerCase() ? `já existe uma credencial "${nome}"` : `já existe "${igual.nome}", que tem o mesmo nome sem contar caixa, acento e espaço` }
+  }
   return nome
 }
 
 function tipoECabecalho(tipo: unknown, cabecalho: unknown): { tipo: TipoDeCredencial; cabecalho?: string } | { erro: string } {
-  if (typeof tipo !== 'string' || !TIPOS_DE_CREDENCIAL.includes(tipo as TipoDeCredencial)) {
-    return { erro: 'tipo: cabecalho, bearer ou basic' }
+  if (typeof tipo !== 'string' || !TIPOS_TODOS.includes(tipo as TipoDeCredencial)) {
+    return { erro: 'tipo: cabecalho, bearer, basic ou segredo' }
   }
   if (tipo !== 'cabecalho') return { tipo: tipo as TipoDeCredencial }
   const nome = typeof cabecalho === 'string' ? cabecalho.trim() : ''
   if (!TOKEN.test(nome)) return { erro: 'cabeçalho: diga o nome dele, como X-Api-Key (letras, números e - _ .)' }
   if (CABECALHOS_PROIBIDOS.has(nome.toLowerCase())) return { erro: `o cabeçalho "${nome}" é do próprio HTTP e não leva credencial` }
   return { tipo: 'cabecalho', cabecalho: nome }
+}
+
+/** (1.9.7) O campo `soLeitura` de um pedido: ausente/`false` = lê e escreve; `true` não vale em `segredo`. */
+function soLeituraValido(bruto: unknown, tipo: TipoDeCredencial): boolean | { erro: string } {
+  if (bruto === undefined || bruto === false) return false
+  if (bruto !== true) return { erro: 'só lê: verdadeiro ou falso' }
+  if (tipo === 'segredo') return { erro: 'credencial do tipo segredo não faz pedido HTTP, então não tem "só lê"' }
+  return true
 }
 
 /** Confere o valor. Volta o valor aparado (as pontas em branco de quem colou não fazem parte do segredo). */
@@ -193,8 +238,10 @@ export function criarCredencial(
   if (typeof nome !== 'string') return nome
   const tc = tipoECabecalho(pedido.tipo, pedido.cabecalho)
   if ('erro' in tc) return tc
-  const dominios = dominiosValidos(pedido.dominios)
+  const dominios = dominiosDoTipo(tc.tipo, pedido.dominios)
   if ('erro' in dominios) return dominios
+  const soLeitura = soLeituraValido(pedido.soLeitura, tc.tipo)
+  if (typeof soLeitura !== 'boolean') return soLeitura
   const valor = valorValido(pedido.valor, tc.tipo)
   if (typeof valor !== 'string') return valor
   const agora = amb.agora()
@@ -204,6 +251,7 @@ export function criarCredencial(
     tipo: tc.tipo,
     ...(tc.cabecalho ? { cabecalho: tc.cabecalho } : {}),
     dominios,
+    ...(soLeitura ? { soLeitura: true as const } : {}),
     fim: fimDoValor(valor),
     cifrado: amb.cifrar(valor),
     criadaEm: agora,
@@ -246,10 +294,23 @@ export function editarCredencial(arquivo: ArquivoDeCredenciais, id: unknown, mud
     if ((tc.tipo === 'basic') !== (atual.tipo === 'basic')) {
       return { erro: 'para trocar de/para basic, apague e crie de novo (o valor muda de forma)' }
     }
-    const dominios = 'dominios' in mudancas ? dominiosValidos(mudancas.dominios) : atual.dominios
+    if ((tc.tipo === 'segredo') !== (atual.tipo === 'segredo')) {
+      return { erro: 'para trocar de/para segredo, apague e crie de novo (segredo não vai em cabeçalho)' }
+    }
+    const dominios = 'dominios' in mudancas ? dominiosDoTipo(tc.tipo, mudancas.dominios) : atual.dominios
     if ('erro' in dominios) return dominios
-    const { cabecalho: _velho, ...semCabecalho } = atual
-    return { ...semCabecalho, nome, tipo: tc.tipo, ...(tc.cabecalho ? { cabecalho: tc.cabecalho } : {}), dominios, editadaEm: amb.agora() }
+    const soLeitura = 'soLeitura' in mudancas ? soLeituraValido(mudancas.soLeitura, tc.tipo) : atual.soLeitura === true
+    if (typeof soLeitura !== 'boolean') return soLeitura
+    const { cabecalho: _velho, soLeitura: _antes, ...semCabecalho } = atual
+    return {
+      ...semCabecalho,
+      nome,
+      tipo: tc.tipo,
+      ...(tc.cabecalho ? { cabecalho: tc.cabecalho } : {}),
+      dominios,
+      ...(soLeitura ? { soLeitura: true as const } : {}),
+      editadaEm: amb.agora()
+    }
   })
 }
 
@@ -264,17 +325,19 @@ export function apagarCredencial(arquivo: ArquivoDeCredenciais, id: unknown):
 
 function itemValido(bruto: unknown): CredencialGuardada | null {
   if (!ehObjeto(bruto)) return null
-  const { id, nome, tipo, cabecalho, dominios, fim, cifrado, criadaEm, editadaEm } = bruto
+  const { id, nome, tipo, cabecalho, dominios, soLeitura, fim, cifrado, criadaEm, editadaEm } = bruto
   if (typeof id !== 'string' || !id || id.length > 80) return null
   if (typeof nome !== 'string' || !nome.trim() || nome.length > MAX_NOME_DA_CREDENCIAL || temControle(nome)) return null
   const tc = tipoECabecalho(tipo, cabecalho)
   if ('erro' in tc) return null
-  const ds = dominiosValidos(dominios)
+  const ds = dominiosDoTipo(tc.tipo, dominios)
   if ('erro' in ds) return null
   if (typeof fim !== 'string' || fim.length > 4 || temControle(fim)) return null
   if (typeof cifrado !== 'string' || !cifrado || !/^[A-Za-z0-9+/]+=*$/.test(cifrado)) return null
   if (typeof criadaEm !== 'string' || typeof editadaEm !== 'string') return null
-  return { id, nome, tipo: tc.tipo, ...(tc.cabecalho ? { cabecalho: tc.cabecalho } : {}), dominios: ds, fim, cifrado, criadaEm, editadaEm }
+  // só `true` vale (e nunca em segredo); qualquer outra coisa, ou a falta do campo (arquivo da 1.9.6), é "lê e escreve"
+  const soLe = soLeitura === true && tc.tipo !== 'segredo'
+  return { id, nome, tipo: tc.tipo, ...(tc.cabecalho ? { cabecalho: tc.cabecalho } : {}), dominios: ds, ...(soLe ? { soLeitura: true as const } : {}), fim, cifrado, criadaEm, editadaEm }
 }
 
 /**
@@ -307,7 +370,8 @@ export function hostPermitido(host: string, dominios: readonly string[]): boolea
  * A credencial pode ir neste pedido? Só por `https` e só para um host da lista dela. O erro diz o porquê sem citar
  * nada do valor.
  */
-export function conferirDestino(credencial: Pick<CredencialGuardada, 'nome' | 'dominios'>, url: string): string | null {
+export function conferirDestino(credencial: Pick<CredencialGuardada, 'nome' | 'dominios'> & { tipo?: TipoDeCredencial }, url: string): string | null {
+  if (credencial.tipo === 'segredo') return `credencial ${credencial.nome}: é do tipo segredo e não vai em cabeçalho nem em pedido HTTP`
   let alvo: URL
   try {
     alvo = new URL(url)
@@ -319,6 +383,19 @@ export function conferirDestino(credencial: Pick<CredencialGuardada, 'nome' | 'd
     return `credencial ${credencial.nome}: ${alvo.hostname} não está nos domínios dela (${credencial.dominios.join(', ')})`
   }
   return null
+}
+
+/** Os métodos que uma API "só lê" aceita. */
+const METODOS_DE_LEITURA: readonly string[] = ['GET', 'HEAD']
+
+/**
+ * (1.9.7) A API "só lê" aceita este método? `null` = pode; senão, o motivo (nunca cita o valor). Sem método (quem não
+ * sabe qual vai usar, como o cabeçalho de servidor MCP, que sempre faz POST e protege por ferramenta) não confere.
+ */
+export function conferirMetodo(credencial: Pick<CredencialGuardada, 'nome' | 'soLeitura'>, metodo?: string): string | null {
+  if (!credencial.soLeitura || metodo === undefined) return null
+  if (METODOS_DE_LEITURA.includes(metodo.trim().toUpperCase())) return null
+  return `a API ${credencial.nome} só lê: mude em Conexões › APIs`
 }
 
 const base64Utf8 = (s: string): string => {

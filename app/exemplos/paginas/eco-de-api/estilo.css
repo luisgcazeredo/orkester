@@ -1,0 +1,80 @@
+/*
+ * Eco de API — só tokens do tema do Orkester. O app manda os valores do tema em uso (evento "tema"); o valor depois da
+ * vírgula é o do tema Escuro, para a página não aparecer sem cor antes de o evento chegar.
+ */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 14px/1.45 var(--fonte-interface, system-ui, sans-serif);
+  background: var(--quadro-fundo, #141519);
+  color: var(--texto, #e7e9f0);
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 20px 18px 32px;
+  display: grid;
+  gap: 16px;
+}
+
+h1 { font-size: 20px; margin: 0 0 6px; }
+h2 { font-size: 13px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--texto-suave, #878e9f); }
+p { margin: 0 0 8px; }
+.suave { color: var(--texto-suave, #878e9f); }
+
+section {
+  background: var(--painel, #1b1d23);
+  border: 1px solid var(--borda, #2a2e38);
+  border-radius: var(--raio, 10px);
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+label { font-size: 12px; color: var(--texto-suave, #878e9f); }
+input {
+  width: 100%;
+  font: inherit;
+  color: var(--texto, #e7e9f0);
+  background: var(--painel-alto, #212531);
+  border: 1px solid var(--borda, #2a2e38);
+  border-radius: var(--raio-pequeno, 7px);
+  padding: 7px 9px;
+}
+button {
+  font: inherit;
+  cursor: pointer;
+  color: var(--texto-sobre-destaque, #ffffff);
+  background: var(--destaque, #4060e8);
+  border: 0;
+  border-radius: var(--raio-pequeno, 7px);
+  padding: 7px 14px;
+}
+button:hover:not(:disabled) { background: var(--destaque-forte, #3250d8); }
+button:disabled { opacity: 0.5; cursor: default; }
+:is(input, button):focus-visible { outline: 2px solid var(--destaque, #4060e8); outline-offset: 2px; }
+
+#resumo { width: 100%; }
+#resumo.erro { color: var(--perigo, #e5534b); }
+#resumo.ok { color: var(--vivo, #35c46b); }
+
+pre {
+  width: 100%;
+  max-height: 340px;
+  margin: 0;
+  overflow: auto;
+  padding: 10px 12px;
+  background: var(--painel-alto, #212531);
+  border: 1px solid var(--borda-suave, #23262f);
+  border-radius: var(--raio-pequeno, 7px);
+  font: 12px/1.5 var(--fonte-mono, ui-monospace, monospace);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 420px) {
+  main { padding: 14px 10px 24px; }
+}

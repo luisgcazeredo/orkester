@@ -41,6 +41,8 @@ export const CORTE_DO_NO = 10 * 1024
 /** Recado, tarefa, comando e avisar: até 5 itens ("junte os itens antes, no nó Código"). */
 export const MAX_ITENS_ORKESTER = 5
 export const MAX_ITENS_HTTP = 20
+/** (1.9.7) A Ferramenta MCP chama item a item, até isto (cada chamada tem até 30 s; a execução, 60 s). */
+export const MAX_ITENS_MCP = 10
 export const MAX_RESUMO_DO_GATILHO = 120
 export const MAX_LINHAS_DE_LOG = 50
 export const MAX_BYTES_DE_LOG = 2048

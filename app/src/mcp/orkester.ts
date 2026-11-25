@@ -290,11 +290,12 @@ servidor.registerTool(
       coluna: z.string().optional().describe('Coluna onde nasce. Sem isto, a primeira.'),
       responsavel: z.string().optional().describe('Nome do agente (Claude ou Codex) do espaço.'),
       etiquetas: z.array(z.string()).optional().describe('Até 8, de até 24 letras.'),
+      pasta: z.string().optional().describe('Pasta (grupo recolhível) da coluna, até 40 letras. Uma tarefa de versão leva a etiqueta da versão: em Feito ela vai sozinha para a pasta dela.'),
       espaco: espacoDoKanban
     }
   },
-  ({ titulo, descricao, coluna, responsavel, etiquetas, espaco: ondeEspaco }) =>
-    rodarKanban(['criar', titulo], comEspaco({ descricao, coluna, para: responsavel, etiqueta: etiquetas?.join(',') }, ondeEspaco))
+  ({ titulo, descricao, coluna, responsavel, etiquetas, pasta, espaco: ondeEspaco }) =>
+    rodarKanban(['criar', titulo], comEspaco({ descricao, coluna, para: responsavel, etiqueta: etiquetas?.join(','), pasta }, ondeEspaco))
 )
 
 servidor.registerTool(
@@ -321,12 +322,15 @@ servidor.registerTool(
       titulo: z.string().optional(),
       descricao: z.string().optional().describe('Markdown, até 8 KB. "" apaga a descrição; sem isto, fica como está.'),
       etiquetas: z.string().optional().describe('"+a,-b" põe a e tira b; "a,b" troca a lista; "" tira todas.'),
+      pasta: z.string().optional().describe('Pasta da tarefa (até 40 letras); "" tira da pasta; sem isto, fica como está.'),
       espaco: espacoDoKanban
     }
   },
-  ({ numero: n, titulo, descricao, etiquetas, espaco: ondeEspaco }) => {
-    // vazio limpa (descrição, etiquetas); ausente não mexe — ver pedidoDeEdicao
+  ({ numero: n, titulo, descricao, etiquetas, pasta, espaco: ondeEspaco }) => {
+    // vazio limpa (descrição, etiquetas, pasta); ausente não mexe — ver pedidoDeEdicao. A pasta vazia viaja como "-"
+    // (o registro de verbos recusa opção vazia, e o `ork kanban editar --pasta -` tira da pasta)
     const { opcoes, texto: conteudo } = pedidoDeEdicao({ titulo, descricao, etiquetas }, ondeEspaco)
+    if (pasta !== undefined) opcoes.pasta = pasta.trim() ? pasta : '-'
     return rodarKanban(['editar', String(n)], opcoes, conteudo)
   }
 )

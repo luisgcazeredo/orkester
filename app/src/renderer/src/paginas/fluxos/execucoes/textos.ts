@@ -97,3 +97,23 @@ export function marcasDosNos(execucao: Pick<Execucao, 'nos'>): { cortados: numbe
   const nos = Object.values(execucao.nos)
   return { cortados: nos.filter((n) => n.cortado).length, comLog: nos.filter((n) => n.log && n.log.length > 0).length }
 }
+
+// ---------------------------------------------------------------- {{ }} vazias (1.9.7, D5)
+
+/** As `{{ }}` que vieram vazias em cada nó (o executor grava `vazias`, até 10 por nó), na ordem do caminho. */
+export function vaziasDaExecucao(execucao: Pick<Execucao, 'nos'> & { caminho?: readonly string[] }, nomes: Readonly<Record<string, string>> = {}): { no: string; nome: string; expressoes: string[] }[] {
+  const ids = [...new Set([...(execucao.caminho ?? []), ...Object.keys(execucao.nos)])]
+  const achadas: { no: string; nome: string; expressoes: string[] }[] = []
+  for (const id of ids) {
+    // a execução vem do disco: confere o formato mesmo com o tipo declarado
+    const v: unknown = execucao.nos[id]?.vazias
+    const expressoes = Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+    if (expressoes.length) achadas.push({ no: id, nome: nomes[id] ?? id, expressoes })
+  }
+  return achadas
+}
+
+/** "{{ a.b }} veio vazio em Avisar", "2 {{ }} vieram vazias em Recado". */
+export function frasesDasVazias(vazias: ReturnType<typeof vaziasDaExecucao>): string[] {
+  return vazias.map((v) => (v.expressoes.length === 1 ? `${v.expressoes[0]} veio vazio em ${v.nome}` : `${v.expressoes.join(', ')} vieram vazios em ${v.nome}`))
+}

@@ -17,14 +17,28 @@ export function decidirAoFecharUltima(e: { ligados: number; autoteste: boolean; 
   return Number.isFinite(e.ligados) && e.ligados > 0 ? 'bandeja' : 'sair'
 }
 
-/** O texto do ícone (dica ao passar o mouse): diz quantos fluxos estão ligados. */
-export function textoDaBandeja(ligados: number): string {
-  return `Orkester · ${ligados} ${ligados === 1 ? 'fluxo ligado' : 'fluxos ligados'}`
+/** "3 agentes seguem abertos" (1.9.7, D2). Vazio com 0 ou conta estranha: o que não se sabe não se diz. */
+export function textoDosAgentesAbertos(agentes: number): string {
+  if (!Number.isFinite(agentes) || agentes < 1) return ''
+  const n = Math.floor(agentes)
+  return n === 1 ? '1 agente segue aberto' : `${n} agentes seguem abertos`
+}
+
+/** O texto do ícone (dica ao passar o mouse): quantos fluxos estão ligados e, se houver, quantos agentes seguem abertos. */
+export function textoDaBandeja(ligados: number, agentes = 0): string {
+  const abertos = textoDosAgentesAbertos(agentes)
+  return `Orkester · ${ligados} ${ligados === 1 ? 'fluxo ligado' : 'fluxos ligados'}${abertos ? ` · ${abertos}` : ''}`
 }
 
 export const BALAO_DA_BANDEJA = {
   titulo: 'O Orkester continua aberto',
   texto: 'Há fluxos ligados, então os agentes seguem rodando aqui na bandeja. Clique no ícone para abrir; "Sair" encerra tudo.'
+}
+
+/** O balão da 1ª vez: diz quantos agentes seguem abertos quando se sabe; sem a conta, o texto de sempre. */
+export function textoDoBalao(agentes = 0): string {
+  const abertos = textoDosAgentesAbertos(agentes)
+  return abertos ? `Há fluxos ligados: ${abertos} aqui na bandeja. Clique no ícone para abrir; "Sair" encerra tudo.` : BALAO_DA_BANDEJA.texto
 }
 
 /** De quanto em quanto a bandeja reconta os ligados (o ícone e a saída sozinha não dependem de quem desligou). */
@@ -40,6 +54,8 @@ export interface IconeDaBandeja {
 export interface DependenciasDaBandeja {
   /** Quantos fluxos ligados há em todos os espaços (o motor: `fluxosLigados()`). Pode lançar: aí conta como erro. */
   contar(): number
+  /** Quantos agentes (não shell) estão vivos agora. Opcional; se faltar ou lançar, a bandeja só não fala deles. */
+  agentes?(): number
   /**
    * Cria o ícone com o texto e o menu (Abrir / Sair). Lança se não conseguir; devolver `null` também é falha.
    * `aoAbrir` e `aoSair` são os itens do menu (e o clique no ícone é Abrir).
@@ -93,6 +109,15 @@ export function criarBandeja(d: DependenciasDaBandeja): Bandeja {
     }
   }
 
+  const contarAgentes = (): number => {
+    try {
+      const n = d.agentes ? d.agentes() : 0
+      return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
+    } catch {
+      return 0
+    }
+  }
+
   function soltarIcone(): void {
     pararRelogio?.()
     pararRelogio = null
@@ -125,7 +150,7 @@ export function criarBandeja(d: DependenciasDaBandeja): Bandeja {
   function garantirIcone(ligados: number): boolean {
     if (icone) return true
     try {
-      const texto = textoDaBandeja(ligados)
+      const texto = textoDaBandeja(ligados, contarAgentes())
       icone = d.criarIcone(texto, abrir, sairDeVez)
       ultimoTexto = icone ? texto : ''
     } catch {
@@ -149,7 +174,7 @@ export function criarBandeja(d: DependenciasDaBandeja): Bandeja {
       sairDeVez()
       return
     }
-    const texto = textoDaBandeja(ligados)
+    const texto = textoDaBandeja(ligados, contarAgentes())
     if (icone && texto !== ultimoTexto) {
       try {
         icone.mudarTexto(texto)
@@ -179,7 +204,7 @@ export function criarBandeja(d: DependenciasDaBandeja): Bandeja {
       if (!jaMostrouBalao) {
         jaMostrouBalao = true
         try {
-          icone?.balao(BALAO_DA_BANDEJA.titulo, BALAO_DA_BANDEJA.texto)
+          icone?.balao(BALAO_DA_BANDEJA.titulo, textoDoBalao(contarAgentes()))
         } catch {
           /* o balão é só aviso */
         }

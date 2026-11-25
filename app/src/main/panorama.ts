@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { modeloEfetivo } from '../shared/modelos'
 import { CANAIS_PANORAMA, type AcaoNaRotina, type AgenteDoPanorama, type Panorama, type RotinaDoPanorama } from '../shared/api'
+import { lerPadraoDoMotor } from './modelos'
 import { idsDosEspacos, rotinasSalvas } from './dados'
 import { caixa, situacaoNaTela } from './espera'
 import { tarefasDosAgentesDo } from './kanban'
@@ -27,6 +28,7 @@ async function agentes(): Promise<AgenteDoPanorama[]> {
       agente: s.espec.agente,
       // o que o processo roda (campos do cartão por cima do comando), não só os campos; vazio = padrão do motor
       ...modeloEfetivo(s.espec.agente, s.espec.comando, s.espec.modelo, s.espec.esforco),
+      padraoDoMotor: lerPadraoDoMotor(s.espec.agente),
       situacao: situacaoNaTela(s, await telaDe(s, 80)),
       fila: caixa.resumo(s.id).fila,
       tarefas: tarefas.get(s.espacoId)?.[s.id] ?? []

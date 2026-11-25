@@ -117,6 +117,19 @@ export function resolverTexto(texto: string, json: unknown, limpar?: (valor: str
 }
 
 /**
+ * (1.9.7, D5) As expressões do texto que vieram vazias neste item, como o usuário escreveu (`{{ a.b }}`), sem repetir.
+ * Vazio = caminho ausente, `null` ou texto vazio. Expressão inválida não entra (o validador já a recusa).
+ */
+export function expressoesVazias(texto: string, json: unknown): string[] {
+  const achadas: string[] = []
+  for (const p of partes(texto)) {
+    if (p.tipo !== 'expressao' || !p.caminho) continue
+    if (emTexto(valorNoCaminho(json, p.caminho)) === '' && !achadas.includes(p.bruto)) achadas.push(p.bruto)
+  }
+  return achadas
+}
+
+/**
  * Para o Se e o Definir, que guardam o tipo: o texto que é **só** uma expressão (`{{ a }}`, com espaço em volta)
  * devolve o valor como está (número, lista, objeto; ausente = `undefined`). Qualquer outro texto vira `resolverTexto`.
  */

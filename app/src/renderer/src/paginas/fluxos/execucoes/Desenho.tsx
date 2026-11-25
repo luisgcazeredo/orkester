@@ -1,7 +1,7 @@
 import { X } from 'lucide-react'
 import type { Execucao, Ligacao, NoDoFluxo } from '../../../../../shared/fluxos/tipos'
 import { portaDeEntrada, portaDeSaida } from '../editor/geometria'
-import { duracaoEmTexto, marcasDosNos, motivoDaExecucao, quandoFoi, resumoDosNos, rotuloDaLigacao, textoDoResultado } from './textos'
+import { duracaoEmTexto, frasesDasVazias, marcasDosNos, motivoDaExecucao, quandoFoi, resumoDosNos, rotuloDaLigacao, textoDoResultado, vaziasDaExecucao } from './textos'
 import '../../../estilos/fluxos-execucoes.css'
 
 // O que o editor precisa para mostrar uma execução aberta (F3), em duas peças:
@@ -46,6 +46,7 @@ export function FaixaDaExecucao({ execucao, nomesDosNos, aoFechar }: { execucao:
   const res = textoDoResultado(execucao.resultado)
   const nos = resumoDosNos(execucao)
   const marcas = marcasDosNos(execucao)
+  const vazias = vaziasDaExecucao(execucao, nomesDosNos)
   const noComErro = execucao.caminho.find((id) => execucao.nos[id]?.estado === 'erro')
   const motivo = motivoDaExecucao({ resultado: execucao.resultado, detalhe: execucao.detalhe, erro: noComErro ? execucao.nos[noComErro]?.erro : undefined, noComErro }, nomesDosNos)
   return (
@@ -61,6 +62,11 @@ export function FaixaDaExecucao({ execucao, nomesDosNos, aoFechar }: { execucao:
         {marcas.comLog ? ` · ${marcas.comLog} com log` : ''}
       </span>
       {motivo && <span className={`exec-motivo ${res.tom}`}>{motivo}</span>}
+      {vazias.length > 0 && (
+        <span className="exec-motivo atencao" title="Estas {{ }} não acharam valor no item que chegou ao nó" data-expressoes-vazias>
+          {frasesDasVazias(vazias).join(' · ')}
+        </span>
+      )}
       <span className="exec-flex" />
       <button type="button" className="exec-fechar" onClick={aoFechar} data-fechar-execucao>
         <X size={14} /> Voltar a editar

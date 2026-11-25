@@ -28,7 +28,7 @@ import {
   type AvisoJanelas,
   type MudancaArquivo,
   type ApiOrkester,
-  type PedidoDoAgente, CANAIS_CHAVES, type ApiChaves, CANAIS_PORTAIS, type ApiPortais, CANAIS_TEMAS, type ApiTemas, CANAIS_KANBAN, type ApiKanban, CANAIS_FLUXOS, type ApiFluxos, CANAIS_CREDENCIAIS, type ApiCredenciais, type ResumoDaCaixa, type RespostaAoFechar, CANAIS_PAGINAS, type ApiPaginas } from '../shared/api'
+  type PedidoDoAgente, CANAIS_CHAVES, type ApiChaves, CANAIS_PORTAIS, type ApiPortais, CANAIS_TEMAS, type ApiTemas, CANAIS_KANBAN, type ApiKanban, CANAIS_FLUXOS, type ApiFluxos, CANAIS_CREDENCIAIS, type ApiCredenciais, type ResumoDaCaixa, type RespostaAoFechar, CANAIS_PAGINAS, type ApiPaginas, CANAIS_MCP_FORA, type ApiMcpFora } from '../shared/api'
 
 /** Cada canal vira uma função que chama o processo principal e devolve a resposta. */
 function chamadas<T>(canais: Record<string, string>): T {
@@ -186,6 +186,9 @@ const paginas: ApiPaginas = {
   tema: (tokens) => ipcRenderer.send(canalDoTema, tokens)
 }
 
+// Servidores MCP de fora (1.9.7): só a janela do app cadastra; o main é o dono do registro, do cofre e dos processos.
+const mcpFora = chamadas<ApiMcpFora>(CANAIS_MCP_FORA)
+
 // A janela não tem acesso ao Node: só a estas funções, nesta forma.
 const api: ApiOrkester = {
   terminal: {
@@ -232,6 +235,7 @@ const api: ApiOrkester = {
   fluxos,
   credenciais,
   paginas,
+  mcpFora,
   andares,
   area,
   janelas,

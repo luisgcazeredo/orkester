@@ -318,6 +318,18 @@ export function criarServicoDeFluxos(d: DependenciasDoServico) {
     return texto
   }
 
+  /** Os fluxos (ligados ou não) que usam a coluna, cada um uma vez: a tela do kanban lista antes de apagar (D1). */
+  function quemUsaColuna(espaco: string, colunaId: string): { id: string; nome: string }[] {
+    const vistos = new Set<string>()
+    const usam: { id: string; nome: string }[] = []
+    for (const f of d.disco.listar(espaco).fluxos) {
+      if (vistos.has(f.id) || !f.nos.some((n) => usaColuna(n, colunaId))) continue
+      vistos.add(f.id)
+      usam.push({ id: f.id, nome: nomeNoCabecalho(f.nome) })
+    }
+    return usam
+  }
+
   /** Motor: guarda a execução, avisa as janelas e, se um fluxo ligado falhou, avisa o usuário (1 vez a cada 10 min). */
   function registrar(espaco: string, execucao: Execucao, detalhe?: string): void {
     const e: Execucao = { ...execucao, resultado: resultadoParaGuardar(execucao), ...(detalhe ? { detalhe } : {}) }
@@ -358,6 +370,7 @@ export function criarServicoDeFluxos(d: DependenciasDoServico) {
     execucao: (espaco: string, id: string, execId: string) => d.disco.execucao(espaco, id, execId),
     desligar,
     colunasSairam,
+    quemUsaColuna,
     registrar,
     falhou
   }

@@ -4,19 +4,23 @@ import { comecoParaTela, configuracoesDoMcp, type ComandoDoMcp, type Configuraco
 import { listarFerramentas } from '../../../../shared/ferramentasMcp'
 import type { ResumoDePortal } from '../../../../shared/portais'
 import { avisar, confirmar } from '../../ui/Perguntas'
+import type { AcessosDaPagina as AcessosDaPaginaTipo, PedidoDaPagina } from '../../../../shared/api'
+import { bloqueioDasFichas } from '../../../../shared/paginasAcessos'
+import { AcessosDaPagina, usarFontesDosAcessos } from '../extra/AcessosDaPagina'
 import { exigirOk, mensagemDeErro as mensagemDeErroDaPagina, type ApiPaginas, type PaginaInstalada } from '../extra/contrato'
 import { abrirProposta } from '../extra/DialogoAceite'
 import { alternarChaveDasPaginas, apiPaginas, iniciarEstadoDasPaginas, recarregarPaginas, usarPaginas } from '../extra/estado'
 import { IconeDaPagina } from '../extra/Icone'
 import { LigarAgente } from '../extra/LigarAgente'
 import { abrirPainelDePaginas } from '../extra/PainelMais'
-import { linhasDePermissao, motivoDaQueda, SEMPRE, textoDePendencia, textoDeDesligada } from '../extra/textos'
+import { acessosParaEnviar, faltaNosAcessos, linhasDePermissao, mesmosAcessos, motivoDaQueda, SEMPRE, textoDePendencia, textoDeDesligada, textoDoPedidoDaPagina } from '../extra/textos'
 import { aoPedirAbaDeConexoes, pegarAbaDeConexoes, type AbaDeConexoes } from './aba'
 import { Credenciais } from './Credenciais'
+import { ServidoresDeFora } from './ServidoresDeFora'
 import '../../estilos/conexoes.css'
 
 // Conexões (página geral): tudo o que liga o Orkester ao que está fora dele. Desde a 1.9.5 (S6) é organizada em abas
-// (Chaves · MCP · Páginas · Credenciais · Portais), cada uma com uma frase do que é e cartões com título, selo de estado e as ações
+// (Chaves · MCP · Páginas · APIs · Portais; a aba APIs era Credenciais até a 1.9.7 e o id dela continua `credenciais`), cada uma com uma frase do que é e cartões com título, selo de estado e as ações
 // à vista. Só mostra e organiza o que já existe: o cofre de chaves é main/chaves.ts, a lista das ferramentas sai do
 // registro do servidor (shared/ferramentasMcp.ts), os portais são a partição do Electron (main/portais.ts) e as páginas
 // "+" são do registro do main (main/paginas.ts).
@@ -321,7 +325,7 @@ function ServidorMcp({ mcp, chavesVivas, irParaChaves }: { mcp: EstadoMcp; chave
     <Secao
       id="mcp"
       icone={<Plug size={16} />}
-      titulo="MCP do Orkester"
+      titulo="Ligar programas ao Orkester"
       frase="O MCP é a porta pela qual o seu Claude ou o Codex conversa com o Orkester: lê o quadro, abre agentes, mexe no kanban."
     >
       <Cartao titulo="Ligar ao seu programa" selo={selo} data-mcp-ligar>
@@ -440,10 +444,123 @@ function seloDaPagina(p: PaginaInstalada): { tom: Tom; texto: string } {
   return { tom: 'vivo', texto: 'Ligada' }
 }
 
-/** Uma página extra instalada: situação, permissões (Revogar / Permitir de novo), ligações, Atualizar e Remover. */
-function PaginaInstaladaNaLista({ p, acao }: { p: PaginaInstalada; acao: (fazer: (api: ApiPaginas) => Promise<unknown>) => Promise<void> }) {
+/** Devolve `true` se a ação deu certo (o erro, se houver, fica à vista no topo da lista de Páginas). */
+type Acao = (fazer: (api: ApiPaginas) => Promise<unknown>) => Promise<boolean>
+
+/** Registro dos últimos pedidos da página (só em memória no main: some ao fechar o app). Sem corpo e sem cabeçalho. */
+function RegistroDaPagina({ id }: { id: string }) {
+  const [lista, setLista] = useState<PedidoDaPagina[] | null>(null)
+  const [erro, setErro] = useState('')
+  const ler = useCallback(async (): Promise<void> => {
+    try {
+      setLista(await apiPaginas()!.pedidos(id))
+      setErro('')
+    } catch (e) {
+      setErro(mensagemDeErroDaPagina(e))
+    }
+  }, [id])
+  useEffect(() => {
+    void ler()
+  }, [ler])
+  return (
+    <div className="conexoes-registro-caixa" data-registro-da-pagina={id}>
+      <div className="conexoes-acoes">
+        <span className="suave conexoes-detalhe">Os últimos 100 pedidos, do mais novo. Só ficam até fechar o Orkester; não guardam corpo nem cabeçalho.</span>
+        <span className="espaco-flex" />
+        <button type="button" onClick={() => void ler()}>
+          <RefreshCw size={13} /> Atualizar
+        </button>
+      </div>
+      {erro && (
+        <p className="conexoes-erro" role="alert">
+          {erro}
+        </p>
+      )}
+      {lista && !lista.length && <p className="suave conexoes-vazio">Nenhum pedido ainda.</p>}
+      {!!lista?.length && (
+        <ol className="conexoes-registro">
+          {lista.map((r, i) => (
+            <li key={`${r.em}-${i}`} className={r.status === null || r.status === 0 || r.status >= 400 ? 'falhou' : ''}>
+              <span>{new Date(r.em).toLocaleTimeString('pt-BR')}</span>
+              <span>{r.metodo}</span>
+              <span className="conexoes-registro-caminho" title={`${r.nome} ${r.caminho}`}>
+                {r.nome} {r.caminho}
+              </span>
+              <span className="conexoes-registro-status">{textoDoPedidoDaPagina(r)}</span>
+              <span className="suave">{r.ms} ms</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  )
+}
+
+/**
+ * (1.9.7, F1) "APIs e MCPs" de uma página instalada: as mesmas duas seções do aceite (AcessosDaPagina), com Guardar e
+ * Desfazer. API ou servidor apagado aparece "sumiu", para desmarcar. Guardar chama `definirAcessos` (o main confere,
+ * corta os pedidos em curso e recarrega a página aberta). O Registro de pedidos fica aqui também.
+ */
+function AcessosNoCartao({ p, acao }: { p: PaginaInstalada; acao: Acao }) {
+  const [acessos, setAcessos] = useState<AcessosDaPaginaTipo>(p.acessos ?? {})
+  const [registro, setRegistro] = useState(false)
+  const [criandoApi, setCriandoApi] = useState(false)
+  const fontes = usarFontesDosAcessos(acessos)
+  const semAcessos = bloqueioDasFichas(p.pedidas)
+  // a lista de páginas é relida depois de cada ação: o que veio do main passa a ser a base
+  const base = JSON.stringify(p.acessos ?? {})
+  useEffect(() => setAcessos(p.acessos ?? {}), [base])
+  // compara o que iria ao main (sem a ferramenta que o servidor não tem) com o que está guardado
+  const mudou = !mesmosAcessos(acessosParaEnviar(acessos, fontes.ferramentas), p.acessos)
+  // "Criar API" aberto: Guardar espera terminar ou fechar a API nova (senão o que foi digitado se perde)
+  const falta = faltaNosAcessos(acessos, fontes.lendo) || (criandoApi ? 'termine ou feche a API nova' : '')
+  const temAlgo = !!(p.acessos?.api?.length || p.acessos?.mcp?.length)
+  return (
+    <div className="conexoes-pagina-bloco conexoes-pagina-acessos" data-acessos-no-cartao={p.id}>
+      <span className="conexoes-pagina-rotulo">APIs e MCPs</span>
+      <AcessosDaPagina acessos={acessos} mudar={(f) => setAcessos(f)} sugestoes={p.sugestoes ?? []} semAcessos={semAcessos} fontes={fontes} aoFormularioAberto={setCriandoApi} />
+      <div className="conexoes-acoes conexoes-acoes-quebra">
+        {!semAcessos && (
+          <>
+            <button
+              type="button"
+              className="primario"
+              disabled={!mudou || !!falta}
+              title={falta ? `Antes: ${falta}` : mudou ? 'A página aberta recarrega com o que você marcou' : 'Nada mudou'}
+              onClick={() => void acao((api) => api.definirAcessos(p.id, acessosParaEnviar(acessos, fontes.ferramentas)))}
+              data-guardar-acessos={p.id}
+            >
+              Guardar APIs e MCPs
+            </button>
+            <button type="button" disabled={!mudou} onClick={() => setAcessos(p.acessos ?? {})} data-desfazer-acessos={p.id}>
+              Desfazer
+            </button>
+            {mudou && falta && <span className="extra-falta-no-cartao" data-falta-no-cartao>{falta}</span>}
+          </>
+        )}
+        <span className="espaco-flex" />
+        {(temAlgo || registro) && (
+          <button type="button" onClick={() => setRegistro(!registro)} aria-expanded={registro} data-abrir-registro={p.id}>
+            {registro ? 'Fechar o registro' : 'Registro de pedidos'}
+          </button>
+        )}
+      </div>
+      {registro && <RegistroDaPagina id={p.id} />}
+    </div>
+  )
+}
+
+/** Uma página extra instalada: situação, permissões (Revogar / Permitir de novo), API, ligações, Atualizar e Remover. */
+function PaginaInstaladaNaLista({
+  p, acao
+}: {
+  p: PaginaInstalada
+  acao: Acao
+}) {
   const pendencia = textoDePendencia(p.pendente)
+  // as fichas `api` aparecem no bloco API, por encaixe
   const linhas = linhasDePermissao(p)
+  const temApi = !!(p.acessos?.api?.length || p.acessos?.mcp?.length)
   const selo = seloDaPagina(p)
   async function remover(): Promise<void> {
     const r = await confirmar({
@@ -520,7 +637,7 @@ function PaginaInstaladaNaLista({ p, acao }: { p: PaginaInstalada; acao: (fazer:
               </div>
             ))
           ) : (
-            <p className="suave conexoes-vazio">Nenhuma além do básico: {SEMPRE[0]}.</p>
+            <p className="suave conexoes-vazio">{temApi ? 'Nenhuma além das APIs e dos MCPs, abaixo.' : `Nenhuma além do básico: ${SEMPRE[0]}.`}</p>
           )}
         </div>
 
@@ -540,6 +657,7 @@ function PaginaInstaladaNaLista({ p, acao }: { p: PaginaInstalada; acao: (fazer:
           <LigarAgente pagina={p} />
         </div>
       </div>
+      <AcessosNoCartao p={p} acao={acao} />
     </div>
   )
 }
@@ -548,16 +666,19 @@ function Paginas() {
   const { lista, erro: erroDaLista } = usarPaginas()
   const [erro, setErro] = useState('')
 
-  const acao = useCallback(async (fazer: (api: ApiPaginas) => Promise<unknown>): Promise<void> => {
+  const acao = useCallback(async (fazer: (api: ApiPaginas) => Promise<unknown>): Promise<boolean> => {
     const atual = apiPaginas()
-    if (!atual) return
+    if (!atual) return false
     setErro('')
+    let ok = true
     try {
       exigirOk(await fazer(atual))
     } catch (e) {
+      ok = false
       setErro(mensagemDeErroDaPagina(e))
     }
     await recarregarPaginas()
+    return ok
   }, [])
 
   const ligadas = lista?.ligadas === true
@@ -679,7 +800,7 @@ export function Conexoes() {
     ...(temPaginas
       ? [{ id: 'paginas' as const, titulo: 'Páginas', icone: <AppWindow size={14} />, contagem: lista ? (lista.ligadas ? String(lista.paginas.length) : 'desligadas') : null }]
       : []),
-    { id: 'credenciais', titulo: 'Credenciais', icone: <Lock size={14} />, contagem: null },
+    { id: 'credenciais', titulo: 'APIs', icone: <Lock size={14} />, contagem: null },
     { id: 'portais', titulo: 'Portais', icone: <Globe size={14} />, contagem: comLogin ? String(comLogin) : null }
   ]
   const atual = aba === 'paginas' && !temPaginas ? 'chaves' : aba
@@ -708,7 +829,12 @@ export function Conexoes() {
       </header>
       <div className="conexoes-corpo" role="tabpanel">
         {atual === 'chaves' && <Chaves mcp={mcp} chaves={chaves} recarregar={recarregarChaves} nova={nova} definirNova={definirNova} />}
-        {atual === 'mcp' && <ServidorMcp mcp={mcp} chavesVivas={vivas} irParaChaves={() => setAba('chaves')} />}
+        {atual === 'mcp' && (
+          <>
+            <ServidorMcp mcp={mcp} chavesVivas={vivas} irParaChaves={() => setAba('chaves')} />
+            <ServidoresDeFora />
+          </>
+        )}
         {atual === 'paginas' && <Paginas />}
         {atual === 'credenciais' && <Credenciais />}
         {atual === 'portais' && <Portais portais={portais} recarregar={recarregarPortais} />}

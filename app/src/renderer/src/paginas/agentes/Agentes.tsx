@@ -96,7 +96,7 @@ function CartaoAgente({ ag, cor }: { ag: AgenteDoPanorama; cor: string }) {
           {Icone && <Icone size={13} style={{ color: COR_AGENTE[ag.agente] }} aria-hidden />}
           {MOTOR[ag.agente] ?? ag.agente}
         </Campo>
-        <Campo rotulo="Modelo · esforço" classe={modelo && modelo !== TEXTO_PADRAO ? 'agente-modelo' : 'agente-modelo suave'}>
+        <Campo rotulo="Modelo · esforço" classe={modelo && !modelo.startsWith(TEXTO_PADRAO) ? 'agente-modelo' : 'agente-modelo suave'}>
           {modelo || TEXTO_PADRAO}
         </Campo>
         <Campo rotulo="Caixa" classe={ag.fila ? 'agente-caixa com-recado' : 'agente-caixa suave'}>

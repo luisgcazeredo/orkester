@@ -15,7 +15,7 @@ import type {
 import type { PedidoNoQuadro } from './quadro/agente'
 import type { FichaDeCatalogo } from './catalogo'
 import type { PreferenciasParciais } from './preferencias'
-import type { Esforco } from './modelos'
+import type { Esforco, PadraoDoMotor } from './modelos'
 import type { TarefaDoAgente } from './kanban'
 
 /** O que o processo principal precisa para manter o processo de um cartão de terminal. */
@@ -245,6 +245,8 @@ export interface AgenteDoPanorama {
   agente: Agente
   modelo?: string
   esforco?: Esforco
+  /** O que o motor roda quando o cartão não diz (config dele); vazio = não deu para ler. */
+  padraoDoMotor?: PadraoDoMotor
   situacao: ResumoContextoTerminal['situacao']
   /** Recados esperando na caixa de entrada dele. */
   fila: number
@@ -564,6 +566,10 @@ export interface ApiTemas {
 export interface ApiKanban {
   /** O arquivo, os agentes do espaço com situação e fila, e `soLeitura` se o arquivo é de uma versão mais nova. */
   ler(espacoId: string): Promise<import('./kanban').LeituraDoKanban>
+  /**
+   * Organizar em pastas (1.9.7) também passa por aqui: a operação `organizar` que shared/kanbanOrganizar.ts monta, só
+   * do usuário; o resultado traz `antes` para o Desfazer.
+   */
   aplicar(espacoId: string, operacao: import('./kanban').OperacaoDoKanban): Promise<import('./kanban').ResultadoDoKanban>
 }
 
@@ -590,6 +596,74 @@ export interface PropostaDePagina {
   /** `atualizacao`: a versão instalada; `rever` por mudança fora do app: true */
   versaoAntes?: string
   mudouFora?: boolean
+  /** (1.9.7) O que o manifesto sugere (`api`/`mcp`): só pré-marca e preenche `atende` no aceite. Nunca concede. */
+  sugestoes?: SugestaoDePagina[]
+  /** (1.9.7) Em `atualizacao`/`rever`: os acessos que a página já tem (o diálogo parte deles). */
+  acessosAntes?: AcessosDaPagina
+  /**
+   * (1.9.7) Presente quando a página não pode enxergar APIs nem MCPs (pede `rede` ou `local`): o motivo, para o
+   * diálogo mostrar as duas seções desligadas. Acessos que havia antes saem no aceite.
+   */
+  semAcessos?: string
+}
+
+/**
+ * (1.9.7) Uma API (credencial) que a página enxerga, por id. `escrita`: o Luís deixou a página escrever; só vale se a
+ * API também permite (escrita efetiva = página E API; sem ela, só GET e HEAD). `atende`: nomes de encaixe do manifesto
+ * que esta API atende (`pedir("eco")` acha a API por aqui).
+ */
+export interface AcessoApi {
+  apiId: string
+  escrita: boolean
+  atende?: string[]
+}
+
+/** (1.9.7) Um servidor MCP de fora que a página enxerga, por id, e as ferramentas marcadas (só elas são chamáveis). */
+export interface AcessoMcp {
+  servidorId: string
+  ferramentas: string[]
+  atende?: string[]
+}
+
+/** (1.9.7) Mora em `paginas.json`, no registro da página (fora do manifesto e das fichas). Só o Luís concede. */
+export interface AcessosDaPagina {
+  api?: AcessoApi[]
+  mcp?: AcessoMcp[]
+}
+
+/** (1.9.7) O que o manifesto sugere. `encaixe` é o nome que a página usa; `hosts` pode vir vazio. */
+export type SugestaoDePagina =
+  | { tipo: 'api'; encaixe: string; hosts: string[]; escrita: boolean }
+  | { tipo: 'mcp'; encaixe: string; ferramentas: string[] }
+
+/** (1.9.7) Um acesso com o nome vindo do main (moldura, cartão). `perigo`: escrita, ou ferramenta que pode mudar coisas. */
+export interface UsoDaPagina {
+  tipo: 'api' | 'mcp'
+  id: string
+  nome: string
+  perigo: boolean
+  /** a API/servidor foi apagado: o acesso fica para o Luís desmarcar; o pedido dá erro claro */
+  sumiu?: boolean
+}
+
+/**
+ * (1.9.7) Uma linha do registro de pedidos da página (os últimos 100, `api` e `mcp` juntos). Sem corpo e sem
+ * cabeçalho. `caminho`: em `api`, o caminho sem a consulta; em `mcp`, o nome da ferramenta.
+ */
+export interface PedidoDaPagina {
+  /** epoch ms */
+  em: number
+  tipo: 'api' | 'mcp'
+  /** o nome da API/servidor (o do cadastro, não o que a página mandou) */
+  nome: string
+  /** `GET`, `POST`… em `api`; `MCP` em `mcp` */
+  metodo: string
+  caminho: string
+  /** status HTTP; em `mcp`, 200 ok e 0 erro. `null`: não saiu (recusado antes, prazo, rede) */
+  status: number | null
+  ms: number
+  /** motivo curto quando não saiu ou foi recusado (sem segredo) */
+  erro?: string
 }
 
 export type RespostaDaProposta = { ok: true; proposta: PropostaDePagina } | { ok: false; erro: string; cancelado?: boolean }
@@ -611,6 +685,12 @@ export interface ResumoDePagina {
   desligada?: { motivo: 'usuario' | 'quedas'; em: number }
   cordas: Array<{ espacoId: string; espacoNome: string; cartaoId: string; cartaoNome: string }>
   ultimaQueda?: import('./paginas').QuedaDePagina
+  /** (1.9.7) As APIs e os MCPs que a página enxerga, por id. */
+  acessos?: AcessosDaPagina
+  /** (1.9.7) Os mesmos acessos com nome (moldura e cartão); `sumiu` quando a API/servidor foi apagado. */
+  usos?: UsoDaPagina[]
+  /** (R5 S2) O que o manifesto da cópia aceita sugere (`api`/`mcp`), para o cartão dar `atende` ao marcar. Só sugere. */
+  sugestoes?: SugestaoDePagina[]
 }
 
 export interface ApiPaginas {
@@ -619,8 +699,16 @@ export interface ApiPaginas {
   escolherPasta(): Promise<RespostaDaProposta>
   /** Um exemplo embutido no app, pelo nome (`resumo-do-espaco`): mesma varredura e proposta do `escolherPasta`. */
   adicionarExemplo(nome: string): Promise<RespostaDaProposta>
-  /** Copia (nova/atualização) ou reconfirma a cópia (rever), e aceita todas as `novas`. */
-  aceitar(token: string): Promise<ResultadoDePaginas & { id?: string }>
+  /**
+   * Copia (nova/atualização) ou reconfirma a cópia (rever), e aceita todas as `novas`. (1.9.7) `acessos`: as APIs e os
+   * MCPs que a página enxerga. Ausente em `atualizacao`/`rever` = mantém os de antes; em `nova` = nenhum.
+   */
+  aceitar(token: string, acessos?: AcessosDaPagina): Promise<ResultadoDePaginas & { id?: string }>
+  /**
+   * (1.9.7) Troca os acessos da página instalada (cartão em Conexões › Páginas). Corta os pedidos em curso e recarrega
+   * a página aberta. Recusado se a página pede `rede`/`local`.
+   */
+  definirAcessos(id: string, acessos: AcessosDaPagina): Promise<ResultadoDePaginas>
   recusar(token: string): Promise<void>
   /** Proposta para reaceitar uma página pendente (mudou fora do app / pede permissão nova). */
   rever(id: string): Promise<RespostaDaProposta>
@@ -636,6 +724,8 @@ export interface ApiPaginas {
   remover(id: string): Promise<ResultadoDePaginas>
   /** Relê a pasta de origem: proposta de atualização (aceite direto se `novas` vier vazio). */
   atualizar(id: string): Promise<RespostaDaProposta>
+  /** (1.9.7) O registro: os últimos 100 pedidos `api`/`mcp` da página, do mais novo para o mais velho. */
+  pedidos(id: string): Promise<PedidoDaPagina[]>
   /** As cores do tema atual desta janela (`--x: valor`), para o evento `tema` das páginas abertas nela. */
   tema(tokens: Record<string, string>): void
 }
@@ -657,6 +747,8 @@ export const CANAIS_PAGINAS = {
   desligar: 'paginas:desligar',
   remover: 'paginas:remover',
   atualizar: 'paginas:atualizar',
+  definirAcessos: 'paginas:definir-acessos',
+  pedidos: 'paginas:pedidos',
   tema: 'paginas:tema'
 } as const
 
@@ -673,7 +765,74 @@ export interface ApiOrkPagina {
     chaves(): Promise<string[]>
   }
   local: { ler(caminho: string): Promise<{ status: number; tipo: string; texto: string }> }
+  /**
+   * (1.9.7) As APIs que a página enxerga e pedidos a elas pelo app; a chave é posta no main e nunca volta. `nome`: o da
+   * API (comparado sem caixa, acento e espaço) ou um de `atende`.
+   */
+  api: {
+    disponiveis(): Promise<ApiDisponivelParaPagina[]>
+    pedir(nome: string, pedido: PedidoDeApiDaPagina): Promise<RespostaDeApiDaPagina>
+  }
+  /** (1.9.7) Os servidores MCP de fora que a página enxerga: só as ferramentas marcadas. `nome` como em `api`. */
+  mcp: {
+    disponiveis(): Promise<McpDisponivelParaPagina[]>
+    ferramentas(nome: string): Promise<FerramentaMcpParaPagina[]>
+    chamar(nome: string, ferramenta: string, argumentos?: Record<string, unknown>): Promise<ResultadoMcpParaPagina>
+  }
   ao<E extends keyof EventosDaPagina>(evento: E, fn: (dados: EventosDaPagina[E]) => void): () => void
+}
+
+/** (1.9.7) Uma API que a página enxerga, como ela a vê: sem id, sem fim da chave, sem valor. `escrita` = página E API. */
+export interface ApiDisponivelParaPagina {
+  nome: string
+  dominios: string[]
+  escrita: boolean
+  atende?: string[]
+}
+
+/** (1.9.7) Um servidor MCP que a página enxerga, com as ferramentas marcadas. */
+export interface McpDisponivelParaPagina {
+  nome: string
+  atende?: string[]
+  ferramentas: FerramentaMcpParaPagina[]
+}
+
+export type MetodoDeApi = 'GET' | 'HEAD' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+
+/**
+ * (1.9.7) O pedido da página. `caminho` começa com `/` (sem `//`, barra invertida, `@` nem `..`). `host`: opcional
+ * (até 253), tem de estar nos domínios da API; sem ele vai o 1º domínio sem curinga (API só com curinga exige `host`). `corpo`: texto vai como está; outro valor vai como JSON. Até 100 KB (conferido no preload antes do IPC).
+ */
+export interface PedidoDeApiDaPagina {
+  metodo: MetodoDeApi
+  caminho: string
+  consulta?: Record<string, string | number | boolean>
+  corpo?: unknown
+  host?: string
+}
+
+/** (1.9.7) A resposta, sem authorization nem set-cookie, com o valor da credencial trocado por •••. Até 2 MB. */
+export interface RespostaDeApiDaPagina {
+  status: number
+  /** content-type */
+  tipo: string
+  corpo: string
+}
+
+export interface FerramentaMcpParaPagina {
+  nome: string
+  descricao: string
+  /** o `inputSchema` do servidor */
+  esquema: unknown
+  /** `readOnlyHint` do servidor: só um rótulo ("palavra do servidor"), nunca libera nada */
+  dizQueSoLe: boolean
+}
+
+/** (1.9.7) Só texto e conteúdo estruturado, até 2 MB. `erro`: a ferramenta respondeu com erro (`isError`). */
+export interface ResultadoMcpParaPagina {
+  texto: string
+  estruturado?: unknown
+  erro: boolean
 }
 
 export interface AgenteParaPagina {
@@ -696,6 +855,18 @@ export interface EventosDaPagina {
   quadro: ResumoDoQuadroParaPagina
   tema: { tokens: Record<string, string> }
 }
+
+/**
+ * (1.9.7) Os `metodo` novos de `pagina:chamar` (o preload confere os tetos antes do IPC; o main confere tudo). Os
+ * antigos (`eu`, `recado`, `dados-ler`…) seguem como texto em preload/pagina.ts e main/paginas.ts.
+ */
+export const METODOS_API_MCP_DA_PAGINA = {
+  apiDisponiveis: 'api-disponiveis',
+  mcpDisponiveis: 'mcp-disponiveis',
+  apiPedir: 'api-pedir',
+  mcpFerramentas: 'mcp-ferramentas',
+  mcpChamar: 'mcp-chamar'
+} as const
 
 /** Canais da página (preload/pagina.ts) — só existem no `guest.ipc` de cada página, nunca no ipcMain. */
 export const CANAIS_ORK_PAGINA = {
@@ -723,6 +894,7 @@ export interface ApiOrkester {
   fluxos: ApiFluxos
   credenciais: ApiCredenciais
   paginas: ApiPaginas
+  mcpFora: ApiMcpFora
   /**
    * Chamado quando a janela vai fechar; `salvar` diz se gravou. `false` = a gravação falhou; o rascunho do editor de
    * Fluxos responde com o motivo (e o nome do fluxo). Nos dois casos o app pergunta antes de fechar.
@@ -776,6 +948,7 @@ export const CANAIS_FLUXOS = {
   rodar: 'fluxos:rodar',
   execucoes: 'fluxos:execucoes',
   execucao: 'fluxos:execucao',
+  quemUsaColuna: 'fluxos:quem-usa-coluna',
   /** principal → janelas: (espacoId, aviso?). A página relê; `aviso` é a frase pronta para o canto da janela. */
   mudou: 'fluxos:mudou',
   /** principal → janelas: (espacoId, fluxoId, execId). Uma execução terminou. */
@@ -818,6 +991,11 @@ export interface ListaDeFluxos {
 }
 
 export type ResultadoDeFluxo = { ok: true } | { ok: false; erro: string }
+/** (1.9.7, D1) Um fluxo que usa algo (uma coluna do kanban): o nome aparece uma vez, e o id serve ao "Ver". */
+export interface FluxoQueUsa {
+  id: string
+  nome: string
+}
 /** `desligado`: o gravar desligou o fluxo que estava ligado, e por quê ("desligado: um nó sensível mudou; …", D8). */
 export type FluxoGravadoOk = { ok: true; id: string; desligado?: string } | { ok: false; erro: string }
 export type FluxoRodado = { ok: true; execucao: string } | { ok: false; erro: string }
@@ -849,6 +1027,8 @@ export interface ApiFluxos {
   /** Da mais nova para a mais antiga, no máximo 50. */
   execucoes(espaco: string, id: string, limite?: number): Promise<import('./fluxos/tipos').ResumoDaExecucao[]>
   execucao(espaco: string, id: string, execId: string): Promise<import('./fluxos/tipos').Execucao | null>
+  /** (1.9.7, D1) Os fluxos do espaço que citam a coluna do kanban (gatilho ou nó), para confirmar antes de apagá-la. */
+  quemUsaColuna(espaco: string, colunaId: string): Promise<FluxoQueUsa[]>
   /** Devolve como soltar o ouvinte. */
   aoMudar(ouvinte: AoMudarFluxos): () => void
   aoMudarExecucao(ouvinte: (espacoId: string, fluxoId: string, execId: string) => void): () => void
@@ -863,7 +1043,8 @@ export const CANAIS_CREDENCIAIS = {
   criar: 'credenciais:criar',
   trocarValor: 'credenciais:trocar-valor',
   editar: 'credenciais:editar',
-  apagar: 'credenciais:apagar'
+  apagar: 'credenciais:apagar',
+  quemUsa: 'credenciais:quem-usa'
 } as const
 
 export interface ApiCredenciais {
@@ -875,6 +1056,138 @@ export interface ApiCredenciais {
   editar(id: string, mudancas: import('./fluxos/credenciais').MudancasDaCredencial): Promise<import('./fluxos/credenciais').ResultadoDaCredencial>
   /** Os fluxos que a citam não mudam; `usadaEm` diz quais, e o próximo pedido deles dá "credencial X não existe". */
   apagar(id: string): Promise<import('./fluxos/credenciais').ResultadoDoApagar>
+  /** (1.9.7) Quem cita a credencial agora (fluxos, páginas, servidores); não muda nada. A confirmação de apagar e o editar listam antes. */
+  quemUsa(id: string): Promise<import('./fluxos/credenciais').ResultadoDoApagar>
+}
+
+// ---------------------------------------------------------------- MCP de fora (1.9.7, C)
+// Servidores MCP de terceiros que fluxos e páginas usam. O cadastro é só da janela do app (sem `ork`, sem MCP do
+// Orkester, sem página): os canais passam pela guarda do ipcSeguro. Segredos ficam no cofre, como credenciais (por id).
+
+/** Canais da janela para o main. `testar` sobe o servidor e lista as ferramentas (não chama nenhuma). */
+export const CANAIS_MCP_FORA = {
+  listar: 'mcp-fora:listar',
+  criar: 'mcp-fora:criar',
+  editar: 'mcp-fora:editar',
+  remover: 'mcp-fora:remover',
+  pausar: 'mcp-fora:pausar',
+  testar: 'mcp-fora:testar',
+  ferramentas: 'mcp-fora:ferramentas',
+  reverFerramentas: 'mcp-fora:rever-ferramentas',
+  lerImportacao: 'mcp-fora:ler-importacao',
+  importar: 'mcp-fora:importar'
+} as const
+
+export type TransporteMcp = 'stdio' | 'http'
+
+/**
+ * O que a janela manda para criar ou editar. Segredo nunca vai em texto aqui: `envCredencial` e `cabecalhos` citam
+ * credenciais por id (env: credencial do tipo Segredo; cabeçalho: credencial com domínio que cubra o host).
+ */
+export type PedidoDeServidorMcp =
+  | {
+      transporte: 'stdio'
+      nome: string
+      comando: string
+      args: string[]
+      /** pasta de trabalho; ausente = a pasta do usuário */
+      pasta?: string
+      /** variável → valor em texto (não secreto) */
+      envTexto?: Record<string, string>
+      /** variável → id da credencial */
+      envCredencial?: Record<string, string>
+    }
+  | {
+      transporte: 'http'
+      nome: string
+      /** https, host por nome (não IP nem nome local) */
+      url: string
+      /** cabeçalho → id da credencial */
+      cabecalhos?: Record<string, string>
+    }
+
+export type SituacaoDoServidorMcp = 'parado' | 'subindo' | 'vivo' | 'pausado' | 'precisa-login' | 'erro'
+
+/** Uma linha da lista (sem segredo: só ids de credencial). */
+export type ResumoDeServidorMcp = PedidoDeServidorMcp & {
+  id: string
+  criadoEm: string
+  situacao: SituacaoDoServidorMcp
+  /** pausado pelo usuário ou por quedas (3 em 10 min) */
+  pausado?: { motivo: 'usuario' | 'quedas'; em: number }
+  /** ferramentas cuja impressão mudou desde a última revisão (bloqueadas até `reverFerramentas`) */
+  mudadas: string[]
+  /** última falha, curta e sem segredo */
+  erro?: string
+}
+
+export interface FerramentaMcp {
+  nome: string
+  descricao: string
+  /** `inputSchema` */
+  esquema: unknown
+  /** `annotations` como vieram (só rótulo; `readOnlyHint` nunca libera nada) */
+  anotacoes?: Record<string, unknown>
+  /** hash de nome, descrição, esquema e anotações */
+  impressao: string
+  /** a impressão mudou desde a revisão: bloqueada nos fluxos e nas páginas */
+  bloqueada: boolean
+}
+
+/** Uma ferramenta revista: o nome e a impressão que a tela mostrou. */
+export interface FerramentaRevistaMcp {
+  nome: string
+  impressao: string
+}
+
+export type ResultadoDeServidorMcp = { ok: true; id?: string } | { ok: false; erro: string }
+export type ResultadoDoTesteMcp = { ok: true; ferramentas: FerramentaMcp[] } | { ok: false; erro: string }
+
+/** De onde importar: o `~/.claude.json` (usuário e projetos) ou um `.mcp.json` escolhido no diálogo do sistema. */
+export type OrigemDaImportacaoMcp = { de: 'claude' } | { de: 'arquivo' }
+
+/** Um servidor achado na importação. `secretos` diz o que vira credencial cifrada (nomes, nunca valores). */
+export interface ServidorParaImportar {
+  /** chave estável dentro da leitura, para o `importar` */
+  chave: string
+  nome: string
+  /** onde estava (`usuário`, o caminho do projeto, ou o arquivo) */
+  onde: string
+  transporte: TransporteMcp
+  /** o comando inteiro (stdio) ou a URL (http), para mostrar */
+  resumo: string
+  secretos: string[]
+  /** http sem cabeçalho: "precisa de login (1.9.8)" */
+  precisaLogin?: boolean
+  /** já existe um cadastrado com este nome */
+  jaExiste?: boolean
+}
+
+/** `token` vale para um `importar`; nada da leitura é gravado antes disso. Cancelou o diálogo: `cancelado`. */
+export type LeituraDaImportacaoMcp =
+  | { ok: true; token: string; servidores: ServidorParaImportar[] }
+  | { ok: false; erro: string; cancelado?: boolean }
+
+export type ResultadoDaImportacaoMcp = { ok: true; criados: string[]; avisos: string[] } | { ok: false; erro: string }
+
+export interface ApiMcpFora {
+  listar(): Promise<ResumoDeServidorMcp[]>
+  criar(pedido: PedidoDeServidorMcp): Promise<ResultadoDeServidorMcp>
+  editar(id: string, pedido: PedidoDeServidorMcp): Promise<ResultadoDeServidorMcp>
+  /** Os fluxos e páginas que o usam não mudam: o próximo uso dá "servidor não existe". */
+  remover(id: string): Promise<ResultadoDeServidorMcp>
+  /** `pausar: false` religa (zera as quedas). */
+  pausar(id: string, pausar: boolean): Promise<ResultadoDeServidorMcp>
+  testar(id: string): Promise<ResultadoDoTesteMcp>
+  /** As ferramentas conhecidas (da última conexão), sem subir o servidor. */
+  ferramentas(id: string): Promise<FerramentaMcp[]>
+  /**
+   * Aceita as ferramentas que o usuário VIU, cada uma com a impressão mostrada (`FerramentaMcp.impressao`). Só aprova
+   * se a impressão atual ainda é a mostrada; se alguma mudou de novo, não aprova nenhuma e devolve "mudou de novo, releia".
+   */
+  reverFerramentas(id: string, vistas: FerramentaRevistaMcp[]): Promise<ResultadoDeServidorMcp>
+  lerImportacao(origem: OrigemDaImportacaoMcp): Promise<LeituraDaImportacaoMcp>
+  importar(token: string, chaves: string[]): Promise<ResultadoDaImportacaoMcp>
 }
 
 export const CANAIS = {

@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState, type MouseEvent as EventoDeMouse } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent as EventoDeMouse } from 'react'
 import { ArchiveRestore, Crosshair, Pencil, Send, Trash2, X } from 'lucide-react'
 import type { AgenteDoKanban, ArquivoDoKanban, OperacaoDoKanban, Quem, ResultadoDoKanban, Tarefa } from '../../../../shared/kanban'
 import { renderizarMarkdown } from '../../../../shared/markdown'
-import { TEXTO_DA_SITUACAO, chipDe, chipsDaTarefa, colunaDoPapel, type Chip } from './filtros'
+import { pastaParaGravar, separarEtiquetas } from './etiquetas'
+import { TEXTO_DA_SITUACAO, chipDe, chipsDaTarefa, colunaDoPapel, etiquetasEmUso, type Chip } from './filtros'
 import { ChipDeAgente } from './TarefaNoKanban'
 
 // Painel à direita com a tarefa inteira: título, coluna (a alternativa ao arrasto pelo teclado), "Delegar ao Maestro"
@@ -34,14 +35,18 @@ interface Props {
   aplicar: (op: OperacaoDoKanban) => Promise<ResultadoDoKanban>
   fechar: () => void
   irAoCartao: (id: string) => void
+  /** As pastas que já existem no kanban: as sugestões do campo Pasta (1.9.7). */
+  pastas?: readonly string[]
 }
 
-export function PainelDaTarefa({ tarefa: t, arquivo, agentes, podeEditar, aplicar, fechar, irAoCartao }: Props) {
+export function PainelDaTarefa({ tarefa: t, arquivo, agentes, podeEditar, aplicar, fechar, irAoCartao, pastas = [] }: Props) {
   const [titulo, setTitulo] = useState(t.titulo)
   const [editandoDescricao, setEditandoDescricao] = useState(false)
   const [descricao, setDescricao] = useState(t.descricao)
   const [comentario, setComentario] = useState('')
   const [etiqueta, setEtiqueta] = useState('')
+  const [avisoDaEtiqueta, setAvisoDaEtiqueta] = useState<string | null>(null)
+  const [pasta, setPasta] = useState(t.pasta ?? '')
   const [erro, setErro] = useState<string | null>(null)
 
   // outra tarefa, ou a mesma mudada por fora (agente, MCP): os campos que a pessoa não está editando acompanham
@@ -52,9 +57,13 @@ export function PainelDaTarefa({ tarefa: t, arquivo, agentes, podeEditar, aplica
     if (!editandoDescricao) setDescricao(t.descricao)
   }, [t.numero, t.descricao, editandoDescricao])
   useEffect(() => {
+    if (!document.activeElement?.closest('.kanban-painel-pasta')) setPasta(t.pasta ?? '')
+  }, [t.numero, t.pasta])
+  useEffect(() => {
     setEditandoDescricao(false)
     setComentario('')
     setEtiqueta('')
+    setAvisoDaEtiqueta(null)
     setErro(null)
   }, [t.numero])
 
@@ -63,16 +72,48 @@ export function PainelDaTarefa({ tarefa: t, arquivo, agentes, podeEditar, aplica
     setErro(r.ok ? null : r.erro)
     return r.ok
   }
+  // o título também grava no Enter (direto, sem depender do blur); `tituloEnviado` segura o 2º envio do mesmo valor
+  const tituloEnviado = useRef<string | null>(null)
   const salvarTitulo = (): void => {
-    if (titulo.trim() && titulo.trim() !== t.titulo) void pedir({ tipo: 'editar', numero: t.numero, titulo: titulo.trim() })
-    else setTitulo(t.titulo)
+    const novo = titulo.trim()
+    if (novo === tituloEnviado.current) return
+    if (!novo || novo === t.titulo) return setTitulo(t.titulo)
+    tituloEnviado.current = novo
+    void pedir({ tipo: 'editar', numero: t.numero, titulo: novo }).then(() => (tituloEnviado.current = null))
+  }
+  // a pasta grava no Enter (direto, sem depender do blur: com a janela sem foco do sistema o blur pode nem vir) e ao
+  // sair do campo; `pastaEnviada` segura o 2º envio do mesmo valor (Enter e, logo depois, o blur)
+  const pastaEnviada = useRef<string | null>(null)
+  const salvarPasta = (): void => {
+    const nova = pastaParaGravar(pasta, t.pasta, pastaEnviada.current)
+    if (nova === undefined) return
+    pastaEnviada.current = nova ?? ''
+    const antes = t.pasta ?? ''
+    // null tira a tarefa da pasta; sem ok, o erro aparece no painel e o campo volta ao que estava
+    void pedir({ tipo: 'editar', numero: t.numero, pasta: nova }).then((ok) => {
+      pastaEnviada.current = null
+      if (!ok) setPasta(antes)
+    })
   }
   const comentar = async (): Promise<void> => {
     if (comentario.trim() && (await pedir({ tipo: 'comentar', numero: t.numero, texto: comentario }))) setComentario('')
   }
+  // 1.9.7: `a, b, c` de uma vez (separa pela vírgula, respeita 8 e 24); o aviso diz o que ficou de fora ou foi cortado
   const porEtiqueta = async (): Promise<void> => {
-    if (etiqueta.trim() && (await pedir({ tipo: 'editar', numero: t.numero, etiquetasMais: [etiqueta.trim()] }))) setEtiqueta('')
+    const { novas, aviso } = separarEtiquetas(etiqueta, t.etiquetas)
+    if (!novas.length) return setAvisoDaEtiqueta(aviso)
+    if (await pedir({ tipo: 'editar', numero: t.numero, etiquetasMais: novas })) {
+      setEtiqueta('')
+      setAvisoDaEtiqueta(aviso)
+    }
   }
+  // as sugestões: as etiquetas em uso no espaço que a tarefa ainda não tem nem já foram digitadas; com vírgula, a
+  // sugestão completa só o último pedaço (o valor da opção leva o que já está antes da última vírgula)
+  const emUso = useMemo(() => etiquetasEmUso(arquivo), [arquivo])
+  const corte = etiqueta.lastIndexOf(',')
+  const prefixo = corte < 0 ? '' : `${etiqueta.slice(0, corte + 1).trimEnd()} `
+  const jaTem = [...t.etiquetas, ...etiqueta.slice(0, Math.max(corte, 0)).split(',')].map((e) => e.trim().toLocaleLowerCase('pt-BR'))
+  const sugestoes = emUso.filter((e) => !jaTem.includes(e.toLocaleLowerCase('pt-BR'))).slice(0, 50)
 
   const candidatos = agentes.filter((a) => a.agente !== 'shell' && !t.trabalhando.some((p) => p.id === a.id))
   const chips = chipsDaTarefa(t, agentes)
@@ -116,7 +157,10 @@ export function PainelDaTarefa({ tarefa: t, arquivo, agentes, podeEditar, aplica
           onChange={(e) => setTitulo(e.target.value)}
           onBlur={salvarTitulo}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            if (e.key !== 'Enter') return
+            e.preventDefault()
+            salvarTitulo()
+            ;(e.target as HTMLInputElement).blur()
           }}
         />
 
@@ -170,6 +214,33 @@ export function PainelDaTarefa({ tarefa: t, arquivo, agentes, podeEditar, aplica
           )}
         </section>
 
+        <section className="kanban-painel-secao kanban-painel-pasta">
+          <h4>Pasta</h4>
+          <input
+            className="kanban-pasta-campo"
+            list={`kanban-pastas-${t.numero}`}
+            value={pasta}
+            maxLength={40}
+            disabled={!podeEditar}
+            placeholder="sem pasta (escolha ou digite + Enter)"
+            aria-label="Pasta"
+            data-campo="pasta"
+            onChange={(e) => setPasta(e.target.value)}
+            onBlur={salvarPasta}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              e.preventDefault()
+              salvarPasta()
+              ;(e.target as HTMLInputElement).blur()
+            }}
+          />
+          <datalist id={`kanban-pastas-${t.numero}`}>
+            {pastas.map((p) => (
+              <option key={p} value={p} />
+            ))}
+          </datalist>
+        </section>
+
         <section className="kanban-painel-secao">
           <h4>Etiquetas</h4>
           <ul className="kanban-etiquetas">
@@ -186,17 +257,34 @@ export function PainelDaTarefa({ tarefa: t, arquivo, agentes, podeEditar, aplica
             {!t.etiquetas.length && <li className="suave kanban-dica">nenhuma</li>}
           </ul>
           {podeEditar && t.etiquetas.length < 8 && (
-            <input
-              className="kanban-etiqueta-nova"
-              value={etiqueta}
-              maxLength={24}
-              placeholder="nova etiqueta + Enter"
-              aria-label="Nova etiqueta"
-              onChange={(e) => setEtiqueta(e.target.value.replace(/,/g, ''))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void porEtiqueta()
-              }}
-            />
+            <>
+              <input
+                className="kanban-etiqueta-nova"
+                list={`kanban-etiquetas-${t.numero}`}
+                value={etiqueta}
+                maxLength={8 * 26}
+                placeholder="nova etiqueta + Enter (várias: a, b)"
+                aria-label="Nova etiqueta (várias separadas por vírgula)"
+                data-campo="etiquetas"
+                onChange={(e) => {
+                  setEtiqueta(e.target.value)
+                  setAvisoDaEtiqueta(null)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void porEtiqueta()
+                }}
+              />
+              <datalist id={`kanban-etiquetas-${t.numero}`}>
+                {sugestoes.map((e) => (
+                  <option key={e} value={prefixo + e} />
+                ))}
+              </datalist>
+            </>
+          )}
+          {avisoDaEtiqueta && (
+            <p className="kanban-dica suave" data-aviso-etiquetas>
+              {avisoDaEtiqueta}
+            </p>
           )}
         </section>
 

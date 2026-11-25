@@ -178,17 +178,24 @@ goes into each task's history.
 | Command | What it does |
 |---|---|
 | `ork kanban [ver] [--coluna C] [--para Name\|eu\|ninguem] [--etiqueta e]` | the tasks by column, with who works on each; `ork kanban ver 12` shows #12 in full |
-| `ork kanban criar "Title" [--descricao T \| --arquivo f.md] [--coluna C] [--para Name] [--etiqueta a,b]` | creates a task; without `--coluna`, it starts in Fazendo (Demandas belongs to the user) |
+| `ork kanban criar "Title" [--descricao T \| --arquivo f.md] [--coluna C] [--para Name] [--etiqueta a,b] [--pasta P]` | creates a task; without `--coluna`, it starts in Fazendo (Demandas belongs to the user); with `--pasta`, it starts inside a folder of the column |
 | `ork kanban pegar <n>` | you join the list of who works on it; from Demandas or Com o Maestro it moves to Fazendo |
 | `ork kanban soltar <n> [Name]` | you leave the list (removing someone else: only the Maestro and the user) |
 | `ork kanban mover <n> "Column" [--posicao topo\|fim\|N]` | moves it to another column; Com o Maestro belongs to the user, the final column to the user and the Maestro |
-| `ork kanban editar <n> [--titulo T] [--descricao T \| --arquivo f.md] [--etiqueta +a,-b]` | changes title, description or labels |
+| `ork kanban editar <n> [--titulo T] [--descricao T \| --arquivo f.md] [--etiqueta +a,-b] [--pasta P\|-]` | changes title, description, labels or folder (`--pasta -` takes it out of its folder) |
+| `ork kanban pasta <n> ["name"]` | puts the task in a folder of its column (up to 40 characters); without the name, takes it out. If a folder with the same name already exists, ignoring case and accents, its spelling wins |
 | `ork kanban atribuir <n> Name\|eu\|ninguem` | puts the agent on the list and tells it in its inbox (`ninguem` empties it) |
 | `ork kanban comentar <n> "text"` | comments (also `--arquivo f.md`) |
 | `ork kanban apagar <n> --confirmar` | sends it to the bin (the page restores it) |
 | `ork kanban coluna criar "Name"` | also `renomear "Old" "New"` and `apagar "Name"` |
 
 `ork abrir --tarefa N` and `ork pedir --tarefa N` put the agent to work on task #N and quote the task in the request.
+
+**Folders (1.9.7).** Each column can group its tasks into collapsible folders (one per version, for example). An agent
+puts a task into a folder with `ork kanban pasta` or `--pasta`. A task without a folder that reaches the final column
+with a version label (`1.9.7`, `v2.0`) goes into that version's folder on its own; the user turns this off on the page.
+Organizing many tasks at once (by version or by label) belongs to the user, through the column's ⋯ menu on the Kanban
+page: there is no `ork` verb or MCP tool for it.
 
 The `--arquivo` file may carry a UTF-8 BOM (Windows PowerShell's `Set-Content -Encoding utf8` writes one): `ork` strips it when reading, in every command.
 

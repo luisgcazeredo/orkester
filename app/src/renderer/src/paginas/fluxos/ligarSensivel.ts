@@ -1,4 +1,4 @@
-// Ligar um fluxo sensível (Código, HTTP ou comando): o que a confirmação mostra, nó por nó, e o que mudou desde a última
+// Ligar um fluxo sensível (Código, HTTP, MCP ou comando): o que a confirmação mostra, nó por nó, e o que mudou desde a última
 // aprovação (plano §3, "regra de sensível"). Parte pura da `ConfirmarLigar.tsx`: roda no Node, sem React e sem DOM.
 //
 // O main guarda, em `aprovado.nos`, o hash de `assinaturaDoNo` de cada nó sensível que o usuário aprovou. A tela refaz o
@@ -18,7 +18,12 @@ export interface BlocoDoNo {
   texto: string
   /** Pintar como código (monoespaçado, com rolagem). */
   codigo?: boolean
+  /** Um alerta em vermelho sobre este bloco (o que o nó diz não bate com o cadastro). */
+  perigo?: string
 }
+
+/** Os servidores MCP do cadastro (Conexões › MCP): o que a confirmação usa para conferir o nome do nó pelo id. `null` = não deu para ler. */
+export type CadastroDeServidores = readonly { id: string; nome: string }[] | null
 
 export interface NoParaConfirmar {
   id: string
@@ -42,7 +47,7 @@ export const sha256Hex: FazerHash = async (texto) => {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-const TITULOS: Record<string, string> = { 'fora.codigo': 'Código', 'fora.http': 'Pedido HTTP', 'orkester.comando': 'Comando no shell' }
+const TITULOS: Record<string, string> = { 'fora.codigo': 'Código', 'fora.http': 'Pedido HTTP', 'orkester.comando': 'Comando no shell', 'fora.mcp': 'Ferramenta MCP' }
 
 const txt = (v: unknown): string => (typeof v === 'string' ? v : '')
 const objeto = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {})
@@ -54,7 +59,27 @@ const paresEmTexto = (v: unknown): string =>
     .join('\n')
 
 /** Tudo o que o nó faz, por inteiro (sem cortar): é isto que o usuário aprova. */
-export function blocosDoNo(no: Pick<NoDoFluxo, 'tipo' | 'ajustes'>): BlocoDoNo[] {
+const semCaixa = (t: string): string => t.trim().toLocaleLowerCase('pt-BR')
+
+/**
+ * O bloco Servidor de um nó MCP. O motor chama o servidor PELO ID, então o nome mostrado é o do cadastro; o nome gravado no
+ * nó (que um agente pode escrever como quiser) só entra para avisar, em vermelho, quando é outro ou quando o id não existe.
+ */
+function blocoDoServidor(servidor: Record<string, unknown>, cadastro: CadastroDeServidores | undefined): BlocoDoNo {
+  const id = txt(servidor.id)
+  const gravado = txt(servidor.nome)
+  if (!id) return { rotulo: 'Servidor', texto: '(escolha o servidor)', perigo: 'O nó ainda não aponta para um servidor do cadastro.' }
+  if (!cadastro) return { rotulo: 'Servidor', texto: `${gravado || '(sem nome)'} · id ${id}`, perigo: 'Não consegui ler o cadastro: o nome acima é o que está gravado no nó, e quem manda é o id.' }
+  const do_cadastro = cadastro.find((s) => s.id === id)
+  if (!do_cadastro) return { rotulo: 'Servidor', texto: `(não existe no cadastro) · id ${id}`, perigo: `O id deste nó não existe em Conexões › MCP${gravado ? ` (o nó diz “${gravado}”)` : ''}. Ele vai dar erro ao rodar.` }
+  // (1.9.7) o id é ruído para quem lê: só aparece quando o nome do nó e o do cadastro divergem (o caso que já fica vermelho)
+  const bate = semCaixa(gravado) === semCaixa(do_cadastro.nome)
+  const bloco: BlocoDoNo = { rotulo: 'Servidor', texto: bate ? do_cadastro.nome : `${do_cadastro.nome} · id ${id}` }
+  if (!bate) bloco.perigo = `O nó diz “${gravado || '(sem nome)'}”, mas o servidor com este id é “${do_cadastro.nome}”. Vale o do cadastro.`
+  return bloco
+}
+
+export function blocosDoNo(no: Pick<NoDoFluxo, 'tipo' | 'ajustes'>, cadastro?: CadastroDeServidores): BlocoDoNo[] {
   const a = no.ajustes
   if (no.tipo === 'fora.codigo') return [{ rotulo: 'JavaScript', texto: txt(a.codigo), codigo: true }]
   if (no.tipo === 'orkester.comando') {
@@ -75,6 +100,14 @@ export function blocosDoNo(no: Pick<NoDoFluxo, 'tipo' | 'ajustes'>): BlocoDoNo[]
     lista.push({ rotulo: 'Credencial', texto: txt(a.credencial) ? `${txt(a.credencial)} (só o nome; o valor fica no cofre)` : 'nenhuma' })
     return lista
   }
+  if (no.tipo === 'fora.mcp') {
+    const servidor = objeto(a.servidor)
+    return [
+      blocoDoServidor(servidor, cadastro),
+      { rotulo: 'Ferramenta', texto: txt(a.ferramenta) || '(escolha a ferramenta)', codigo: true },
+      { rotulo: 'Argumentos', texto: txt(a.argumentos) || '{}', codigo: true }
+    ]
+  }
   return []
 }
 
@@ -82,7 +115,7 @@ export function blocosDoNo(no: Pick<NoDoFluxo, 'tipo' | 'ajustes'>): BlocoDoNo[]
  * Os nós sensíveis do fluxo salvo, cada um com o que mostrar e a situação diante do que o usuário aprovou antes.
  * `hash` é injetável para a prova; na tela é o `sha256Hex`.
  */
-export async function descreverNosSensiveis(fluxo: FluxoGravado, hash: FazerHash = sha256Hex): Promise<NoParaConfirmar[]> {
+export async function descreverNosSensiveis(fluxo: FluxoGravado, hash: FazerHash = sha256Hex, cadastro?: CadastroDeServidores): Promise<NoParaConfirmar[]> {
   const aprovados = fluxo.aprovado?.nos ?? {}
   const agente = fluxo.editadoPor?.id ? fluxo.editadoPor.nome || 'um agente' : null
   const criouAgente = fluxo.criadoPor?.id ? fluxo.criadoPor.nome || 'um agente' : null
@@ -99,7 +132,7 @@ export async function descreverNosSensiveis(fluxo: FluxoGravado, hash: FazerHash
       porAgente = agente ?? (estado === 'novo' ? criouAgente : null)
       if (porAgente) marcas.push(agente ? `Mexido pelo agente ${porAgente}.` : `Criado pelo agente ${porAgente}.`)
     }
-    saida.push({ id: no.id, nome: no.nome, tipo: no.tipo, titulo: TITULOS[no.tipo] ?? no.tipo, estado, marcas, porAgente, blocos: blocosDoNo(no) })
+    saida.push({ id: no.id, nome: no.nome, tipo: no.tipo, titulo: TITULOS[no.tipo] ?? no.tipo, estado, marcas, porAgente, blocos: blocosDoNo(no, cadastro) })
   }
   return saida
 }
@@ -112,13 +145,13 @@ export function textosDaConfirmacao(modo: ModoDaConfirmacao, nome: string): { ti
   if (modo === 'rodar')
     return {
       titulo: `Rodar “${nome}” agora?`,
-      abertura: 'Este fluxo tem nós que rodam código, falam com a internet ou digitam num shell. Confira cada um:',
+      abertura: 'Este fluxo tem nós que rodam código, falam com a internet, chamam ferramentas de servidores MCP ou digitam num shell. Confira cada um:',
       li: 'Li o que cada nó acima faz e quero rodar este fluxo uma vez.',
       botao: 'Aprovar e rodar uma vez'
     }
   return {
     titulo: `Ligar “${nome}”?`,
-    abertura: 'Este fluxo tem nós que rodam código, falam com a internet ou digitam num shell. Ligado, ele faz isso sozinho, sem perguntar de novo. Confira cada um:',
+    abertura: 'Este fluxo tem nós que rodam código, falam com a internet, chamam ferramentas de servidores MCP ou digitam num shell. Ligado, ele faz isso sozinho, sem perguntar de novo. Confira cada um:',
     li: 'Li o que cada nó acima faz e quero ligar este fluxo.',
     botao: 'Ligar o fluxo'
   }

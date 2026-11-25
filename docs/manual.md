@@ -2,7 +2,7 @@
 
 English · [Português](manual.pt-BR.md)
 
-[//]: # "Manual checked against the code of 1.9.6 (base 0278334 + A2 Configurações + Fluxos), on 23/11/2026. Each section cites where it came from, in a comment like this one, invisible on GitHub and in the app's Leitor. An HTML comment would show as text in the Leitor, hence this form. Paths relative to app/src/."
+[//]: # "Manual checked against the code of 1.9.6 (base 0278334 + A2 Configurações + Fluxos), on 23/11/2026, and updated with the 1.9.7 deliveries (API and MCP in pages, external MCP servers, Kanban folders, D1 to D6) on 24/11/2026. Each section cites where it came from, in a comment like this one, invisible on GitHub and in the app's Leitor. An HTML comment would show as text in the Leitor, hence this form. Paths relative to app/src/."
 
 This manual is for someone who has never seen Orkester. It explains every page, button, menu and shortcut, in the
 order you will run into them. The technical references live in other files: the agents' command in
@@ -519,7 +519,10 @@ Four tabs: **Agentes**, **Funções**, **Presets**, **Partituras**.
 
 **Agentes**: every live agent of every space, read-only ("daqui não se comanda agente nenhum", no agent is
 commanded from here). Filters by **Espaço**, **Situação** (free, busy, at a question, finished) and **Motor**;
-**Recolher todos / Abrir todos**. Each card shows role, engine, model · effort (`padrão` when none was chosen), inbox ("N recados esperando") and
+**Recolher todos / Abrir todos**. Each card shows role, engine, model · effort (`padrão` when none was chosen; since
+1.9.7, with what the engine's config says in parentheses, in soft text, like "padrão (gpt-5.6-terra · high)", read
+only from the model and effort keys of `~/.claude/settings.json` or `~/.codex/config.toml`; when it cannot be read,
+just `padrão`), inbox ("N recados esperando") and
 the Kanban tasks (clicking opens the task, switching the window to its space). Updates every 3 s.
 
 **Funções**: each role has a name, **modelo**, **esforço**, folder (empty = the space's) and the prompt ("O que ele
@@ -552,7 +555,9 @@ Demandas, Com o Maestro and Revisão can be renamed but not deleted.
 
 **Top**: the space list (switching there switches the window's space); **+ Demanda**; **⋯** with **Nova
 coluna…**, **Renomear coluna**, **Apagar coluna** (empty only; if a flow uses the
-column, the app tells you which ones, and the enabled ones turn off) and **Lixeira (N)**. Filters: search ("título,
+column, the app asks for confirmation first, listing the flows with **Ver o fluxo**, see the flow; the enabled ones
+turn off when you delete) and **Lixeira (N)**. Each column has its own **⋯** in the header, with Organizar (see
+[Folders](#folders-and-organizar) below). Filters: search ("título,
 descrição ou #número", key **/**), **Quem trabalha**, **Etiqueta**, **Esconder concluídas há mais de 7 dias**
 (comes ticked) and **Limpar filtros**.
 
@@ -564,7 +569,10 @@ next one. **Com o Maestro** shows who the Maestro is and whether it is free, or 
 
 **Task**: number, title, tags, comments and a chip for each agent working on it (with its state). Click opens the
 **panel** on the right: editable title, column, **Delegar ao Maestro** (in Demandas), **Trabalhando nela** (Ir ao
-cartão, remove, **+ pôr um agente**, which notifies its inbox), tags (up to 8), description in Markdown (pencil to
+cartão, remove, **+ pôr um agente**, which notifies its inbox), tags (up to 8, up to 24 characters each; you can type
+several at once separated by commas, `cliente-a, 1.9.7`, and Enter; a repeated one goes in once, a longer one is cut
+at 24 and one past 8 is left out, and the notice says which; the field suggests the tags in use in the space; creating
+a task takes only the title: tags go in afterwards, in the panel), description in Markdown (pencil to
 edit), **Comentários** (Ctrl+Enter sends) and **Apagar (vai para a lixeira)**.
 
 **Dragging**: move the task between columns (Esc cancels). **Dropping on "Com o Maestro" = delegating**: the
@@ -581,6 +589,48 @@ agent. The **#N** badge on the agent's card shows its task.
 **Lixeira** (bin): **Restaurar** (what was with the Maestro goes back to Demandas) and **Esvaziar a lixeira**.
 
 Limits: 500 tasks, title 120 characters, description 8 KB, 12 columns, bin of 50.
+
+### Folders and Organizar
+
+[//]: # "paginas/kanban/{Coluna,pastas,PainelDaTarefa,filtros}.ts(x), shared/kanban.ts, shared/kanbanOrganizar.ts, main/kanban.ts (1.9.7, K1, K2 and simple Organizar)"
+
+Since 1.9.7 each column groups its tasks into **collapsible folders** (*pastas*; one per version, for example), so
+Feito does not become an endless list. It works for any space: folders come from the tasks' **labels**.
+
+- **In the column**: tasks without a folder stay at the top; then the folders, newest to oldest. Click a folder's
+  header to open or collapse it; what stays collapsed is kept on this machine, per space. In **Feito**, only the
+  current version's folder starts open.
+- **One task**: its panel has the **Pasta** (folder) field, with suggestions from the existing folders; type and Enter
+  changes it, clear and Enter removes it. Dragging a card into a folder also puts it there. A folder with the same name
+  ignoring case and accents becomes the same one (no "geral" next to "Geral"). Names up to 40 characters.
+- **Filter and search**: there is a **Pasta** filter; the search also matches the folder name and opens the folders
+  that have results.
+- **A version label** is one that looks like a version: `1.9.6`, `v2.0` (`2024` and `fluxos` do not count).
+- **Automatic**: a task without a folder that **reaches Feito** with a version label goes into that version's folder
+  on its own, and its history says "Organizar automático". A task already in Feito whose folder you removed does not
+  go back. It comes on; in the final column's **⋯** menu, the item reads **Organizar sozinho por versão: ligado
+  (desligar)** (organize by version on its own: on, turn off) or **…: desligado (ligar)** (off, turn on), and only you
+  change it.
+- **First opening in 1.9.7**: once per space, if Feito has tasks without a folder that carry a version label, the page
+  puts them into the version folders and shows "Feito organizado por versão · **Desfazer**" (Feito organized by
+  version · Undo). A space with no version label: nothing happens, not even a notice.
+- **Organizing a column**: in the **⋯** menu of each column's header (there is no button at the top):
+  - **Organizar por versão** (by version; only shows if the column has a version label);
+  - **Uma pasta para cada etiqueta** (one folder per label; disabled if no task without a folder has a label): each
+    task goes into the folder of one of its labels. With several, the version label wins; without one, the label most
+    used in that column; on a tie, the first in alphabetical order. The task stays in one folder only, and its other
+    labels stay on it;
+  - **Juntar numa pasta ▸** (gather into a folder): pick one of the column's labels, with how many tasks **without a
+    folder** have it (`cliente-a (3)`); only those go into the folder of the same name. A label whose tasks are all in
+    folders already shows disabled, "(já em pastas)" (already in folders).
+
+  It applies at once, with no preview, and only to tasks **without a folder** (a task with a folder is never touched
+  by anything automatic). Then the notice says where they went, with **Desfazer** (undo): `2 tarefas → pasta "1.9.7"`
+  or `5 tarefas → 3 pastas`, and the target folder opens and the column scrolls to it. With nothing to change, "Nada a
+  organizar em <coluna>: …" (nothing to organize) and nothing is saved. If someone touched one of those tasks
+  afterwards, Undo skips it. With a read-only kanban, none of this is active.
+- **From agents**: `ork kanban pasta` and `--pasta` on create and edit (see [`ork.md`](ork.md#kanban)); through MCP,
+  `pasta` in `kanban_criar`/`kanban_editar`. Organizing many tasks at once is always yours, on the page.
 
 ## The Fluxos page
 
@@ -604,7 +654,7 @@ expressions, Code, HTTP, credentials, limits and recipes) is in [`fluxos.md`](fl
 - **Each flow**: the switch (**Ligado: clique para desligar** / **Desligado: clique para ligar**, on / off), the name
   (click opens the editor), the triggers, how many nodes, the cap ("até 6/hora", up to 6 per hour), the folder, who
   created and who edited it, and the last firing ("hoje 14:03" with **ok**, **erro**, **barrado: laço**, **barrado:
-  excesso** or **sem destino**; or "nunca disparou", never fired). Badges: **Código, HTTP ou comando** (it is
+  excesso** or **sem destino**; or "nunca disparou", never fired). Badges: **Código, HTTP, MCP ou comando** (it is
   sensitive), **criado por agente**, **editado por agente** and the reason for an automatic switch-off (**desligado por
   excesso de disparos**, **desligado: um cartão saiu do quadro**, **desligado: uma coluna saiu do kanban**, **desligado: mudou sem a sua
   aprovação**). The bin
@@ -626,7 +676,9 @@ expressions, Code, HTTP, credentials, limits and recipes) is in [`fluxos.md`](fl
   (outside Orkester).
 - **Link**: drag from a node's output dot to another node. Dropping on empty space opens the search for the next node
   ("Que nó vem depois?"), already linked. The **Se** (If) node has two outputs, true and false. A trigger takes no
-  incoming link.
+  incoming link: coming from an output (or with a node selected), the search shows the triggers at the end, in a group
+  of their own with the note "gatilho entra solto" (a trigger comes in unlinked), and the trigger you pick is born
+  without a link.
 - **Keys**: **Del** deletes the selection (nodes or the clicked link); **Ctrl+Z** undoes, **Ctrl+Y** or
   **Ctrl+Shift+Z** redoes; **Ctrl+A** selects all; **F2** renames the node; **Enter** opens the node panel; **Esc**
   closes the search or the panel.
@@ -659,11 +711,12 @@ expressions, Code, HTTP, credentials, limits and recipes) is in [`fluxos.md`](fl
 | Logic | **Se** | splits the items into true and false, by conditions |
 | | **Definir campos** | sets or replaces fields on the items |
 | Outside Orkester | **Código** | isolated JavaScript, no disk and no network, 5 seconds. **Sensitive** |
-| | **HTTP** | calls an API on the internet, with a credential if needed. **Sensitive** |
+| | **HTTP** | calls an API on the internet, with the key of an API from Conexões › APIs if needed (the **API** field lists only the ones that cover the URL's host; **Criar API** opens the form with the host already filled in). With a "só lê" (read only) API, a writing method is flagged on screen and refused before it goes out. **Sensitive** |
+| | **Ferramenta MCP** | calls a tool of a server in Conexões › MCP › Servidores de fora: pick the server and the tool, and the fields come from its schema (1.9.7). A tool that changed is blocked until you review it. **Sensitive** |
 
 **Turning on**. With the switch in the list or in the editor. It needs at least one trigger and no card or column "a
-escolher". A flow with a **sensitive** node (Code, HTTP or Shell command) first opens a confirmation showing each of
-those nodes in full, marked **igual ao que você aprovou** (same as you approved), **mudou** (changed) or **novo**
+escolher". A flow with a **sensitive** node (Code, HTTP, MCP tool or Shell command) first opens a confirmation showing
+each of those nodes in full (for the MCP tool: the server, the tool and the arguments), marked **igual ao que você aprovou** (same as you approved), **mudou** (changed) or **novo**
 (new), plus the agent that touched it, if any. Only you can turn on a sensitive flow: an agent cannot. Changing a
 sensitive node later turns the flow off until you confirm again. Once on, the flow fires by itself, with guards
 against loops and excess (in the [guide](fluxos.md#guards-and-limits)).
@@ -688,14 +741,16 @@ approves the nodes, but does **not** turn the flow on. The run opens by itself o
 and the reason for an error or a block. Click one to see it on the drawing: green nodes ran, red failed, grey did not
 run, and each link shows how many items went through. The banner at the top sums up the run and closes to go back to
 editing. In the node panel, that run's Input and Output (up to about 10 KB per node; beyond that, **Cortado**, cut,
-shows). No credential ever shows in a run.
+shows). No credential ever shows in a run. If any `{{ }}` came out empty, the top strip lists which one and in which
+node ("`{{ x }}` veio vazio em <node>").
 
 **Notices**. What an agent does with flows ("Revisor criou o fluxo …") and the failure of an enabled flow show in the
 window corner; without a window, in a Windows notification (failures: at most one notice every 10 minutes per flow).
 
 **Tray: with a flow on, closing the window does not quit.** If at least one flow is on in any space, closing the last
-window leaves Orkester running in the Windows tray (by the clock), with the icon "Orkester · N fluxos ligados": the
-agents stay alive and the flows keep firing. The first time, a balloon explains it. Click the icon (or **Abrir** in its
+window leaves Orkester running in the Windows tray (by the clock), with the icon "Orkester · N fluxos ligados" (and,
+since 1.9.7, "· N agentes seguem abertos", N agents still open, when there are live agents): the agents stay alive
+and the flows keep firing. The first time, a balloon explains it, also saying how many agents are still open. Click the icon (or **Abrir** in its
 menu) to reopen the windows; opening the Orkester shortcut also reopens them. **To quit for good, use Sair on the tray
 icon.** If the last enabled flow is turned off while the app is in the tray, it quits by itself. With no flow on,
 closing the last window quits the app as always.
@@ -744,7 +799,8 @@ Up to 50 themes and 30 plugins; `.css` file up to 64 KB.
 
 [//]: # "paginas/conexoes/Conexoes.tsx, paginas/conexoes/Credenciais.tsx, shared/chaves.ts, shared/ferramentasMcp.ts, shared/fluxos/credenciais.ts, main/portais.ts"
 
-What ties Orkester to what is outside it, in five tabs: **Chaves**, **MCP**, **Páginas**, **Credenciais** and **Portais**.
+What ties Orkester to what is outside it, in five tabs: **Chaves**, **MCP**, **Páginas**, **APIs** (it was
+**Credenciais** up to 1.9.6) and **Portais**.
 
 **Chaves** (keys): for an outside program (your Claude, Codex) to work on the canvas as you. Give it a name
 ("Claude Desktop", "notebook") → **Gerar chave**. The key appears **once** ("Copie agora", copy it now), with the
@@ -752,22 +808,56 @@ configuration block ready in tabs (**Claude Code**, **Claude Desktop**, **.mcp.j
 **Já copiei** closes. Under **Suas chaves**, each one shows whether it is in use, its beginning, the date and the
 last use, and **Revogar** (immediate, no way back). Up to 20 keys.
 
-**MCP**: the step by step to connect your program (have a key, choose where to paste, replace
-`COLE_AQUI_SUA_CHAVE` with the key) and **Baixar a lista (.md)** of the 26 tools. Details in [`mcp.md`](mcp.md).
+**MCP**, in two parts:
+
+- **Ligar programas ao Orkester** (connect programs to Orkester): the step by step to connect your program (have a
+  key, choose where to paste, replace `COLE_AQUI_SUA_CHAVE` with the key) and **Baixar a lista (.md)** of the tools.
+- **Servidores de fora** (external servers, 1.9.7): the MCP servers Orkester uses in the flows' **Ferramenta MCP** node
+  and in the "+" pages where you tick the server. **Adicionar servidor** (stdio: the command, arguments, folder and
+  variables, each as text or as a **Segredo**, with **Criar segredo** right there; or http: the URL and a header from
+  an API of **APIs**, https only), **Importar do Claude Code** and **Importar de um arquivo…** (reads `mcpServers`;
+  what is secret becomes an encrypted credential; you tick which ones come in; a server with a key in its arguments or
+  URL is not offered, and the warning says where it is so you move it to an environment variable or a header). Each card shows the status, the full
+  command with the warning "roda no seu PC com os seus poderes" (runs on your PC with your powers), and the buttons
+  **Testar** (lists the tools: "diz que só lê", says it only reads, or, in red, "pode mudar coisas", may change
+  things), **Rever ferramentas mudadas** (shows when a tool changed: it stays blocked until you accept), **Editar**,
+  **Pausar / Religar** and **Remover**. An HTTP server that signs in through a login (ClickUp's) gets the **Precisa de
+  login (chega na 1.9.8)** badge.
+- **Segredos dos servidores** (server secrets, 1.9.7): the value of an environment variable a stdio server reads. It
+  has no domain and never goes in a header or an HTTP request. **Guardar o valor de uma variável de ambiente** (save the
+  value of an environment variable) opens the form; each secret has the same card as the APIs (**Trocar o valor**,
+  **Editar**, **Apagar**, which asks `Apagar o segredo "Nome"?` and lists the servers that use it); the form's button
+  is **Guardar o segredo** (save the secret). The server cites the secret by id, so renaming does not break it. Same vault and same file
+  as the APIs; up to 1.9.6 it showed in the Credenciais tab.
+
+Details in [`mcp.md`](mcp.md) (both parts).
 
 **Páginas**: the master switch **Ligar páginas próprias (experimental)**, **Adicionar página…** and one card per
 installed page (see [Own pages](#own-pages-)).
 
-**Credenciais** (credentials): passwords, tokens and API keys that the **HTTP** node of the [flows](#the-fluxos-page)
-carries without the value entering the flow. **Guardar uma credencial** (save a credential): **Nome** (how flows will
-cite it, "Quotes API"), **Tipo** (**Token (Bearer)**, **Cabeçalho próprio** — a custom header — with its **Nome do
-cabeçalho**, or **Usuário e senha (Basic)**), **Domínios** (where it may go, one per line; `*.exemplo.org` covers the
-subdomains, not `exemplo.org` itself) and the value → **Guardar cifrada** (save encrypted). Under **Suas credenciais**, each one shows its type,
-its domains and only the last 4 characters, with **Trocar o valor** (replace the value), **Editar** and **Apagar** (the
-flows that cite it do not change: their next request fails, and the app tells you which ones). They work in every
-space, only go over https and only to the domains you marked, and are encrypted by the Windows vault; without the vault
-the tab is **Só leitura** (read-only) and saves nothing. The value never comes back to the screen, nor to `ork`, MCP or
-the Code node. Up to 100 credentials. Details in the [flows guide](fluxos.md#credentials).
+**APIs** (it was **Credenciais** up to 1.9.6): the key of each API that [own pages](#own-pages-), the **HTTP** node of
+the [flows](#the-fluxos-page) and the header of an http MCP server use without the value showing. Pages and flows call
+the API by its **name**. **Guardar uma API** (save an API): **Nome** (how pages and flows will call it, "ClickUp"),
+**Tipo** (**Token (Bearer)**, **Cabeçalho próprio** — a custom header — with its **Nome do cabeçalho**, or **Usuário e
+senha (Basic)**), **Domínios onde ela pode ir** (where it may go, one per line; `*.exemplo.org` covers the subdomains,
+not `exemplo.org` itself), the value and **O que ela pode fazer** (what it can do): **Só lê (GET, HEAD)** (read only)
+or **Lê e escreve** (reads and writes, in red). A "só lê" API lets pages and flows only query: a POST, PUT, PATCH or
+DELETE is refused before it goes out. In an MCP server's header this does not apply (MCP always POSTs, and what
+changes things is chosen per tool). A new API starts as "só lê"; the ones saved in 1.9.6 count as "lê e escreve". →
+**Guardar a API** (save the API, encrypted). With at least one API saved, the form sits behind the **+ Nova API** (new
+API) button. Under **Suas APIs**, each one shows its type, its domains, the **só lê** or **lê e
+escreve** (red) badge and only the last 4 characters, with **Trocar o valor** (replace the value), **Editar** and
+**Apagar**. **Editar** warns when you change the name: "Vão parar até você ajustar: …" (they will stop until you adjust
+them; amber, with the list), or "Nada usa esta API agora: mudar o nome não quebra nada." (nothing uses it now); after
+saving, the app says who cited the old name. **Apagar** (delete) asks first, `Apagar a API "Nome"?`: the value is gone
+for good, and the dialog lists who uses it ("Nada usa agora.", or the flows, pages and servers, which are not touched:
+their next request fails), with **Apagar assim mesmo** (delete anyway) when something uses it. If it cannot check who
+uses it, it does not delete. You can also create an API without coming here: the **Criar
+API** button is in a page's acceptance and in the HTTP node, with the domain already filled in. The MCP servers'
+secrets (environment variables) live in the **MCP** tab. They work in every space, only go over https and only to the
+domains you marked, and are encrypted by the Windows vault; without the vault the tab is **Só leitura** (read-only) and
+saves nothing. The value never comes back to the screen, nor to `ork`, MCP or the Code node. Up to 100 (APIs and
+secrets added up). Details in the [flows guide](fluxos.md#credentials).
 
 **Portais**: the stored sign-in of the portal cards' browser ("Login guardado" or "Sem login", on how many sites)
 and **Limpar login**. The cookie values never appear.
@@ -786,15 +876,32 @@ building one is in [`paginas.md`](paginas.md)**, and also inside the app: **+** 
 
 - **Turning them on**: they come off because they run outside code (isolated from your PC). Turn them on in
   Configurações › Conexões › **Páginas**, or with **+** → **Ligar páginas**.
-- **Adding** (**+** button): **Resumo do espaço** (a ready example), **Escolher pasta…** (a folder of yours) or
-  **Pedir a um agente para criar** (becomes a demand in the Kanban, handed to the Maestro). The app reads the folder
-  without running anything and shows the accept dialog with each permission; **Adicionar e permitir** copies the
-  page and puts the icon on the bar.
-- **On the page**: the app's frame shows the name, the version, what it is linked to, **Ligar a agente…** (so it
-  can send messages to that agent), **Recarregar a página** and **Permissões e ligações (Configurações › Conexões › Páginas)**.
+- **Adding** (**+** button): the ready examples **Resumo do espaço** and **Eco de API** (1.9.7; tests a request to an
+  API through the app with httpbin.org, a public test service, and an API with a made-up value), **Escolher pasta…** (a
+  folder of yours) or **Pedir a um agente para criar** (becomes a demand in the Kanban, handed to the Maestro; below
+  the description, tick **APIs que ela vai usar** and **MCPs que ela vai usar**, the APIs and MCPs it will use: the
+  demand carries only names, domains and "read only / writes", never the key). The app reads the
+  folder without running anything and shows the accept dialog with each permission; **Adicionar e permitir** copies
+  the page and puts the icon on the bar.
+- **APIs and MCPs the page sees (1.9.7)**: you decide, not the manifest. The acceptance has two
+  sections: **APIs que esta página enxerga** (all your APIs from Conexões › APIs, one box each; ticked, **também
+  escreve**, also writes, shows in red, only if the API "lê e escreve"; with no API, **Criar API** with the domain
+  already filled in) and **MCPs que esta página enxerga** (the servers of Conexões › MCP, except the ones that need login; ticking one opens its tools,
+  each with a box and the label "diz que só lê" or, in red, "pode mudar coisas", with **marcar as que dizem só ler** and
+  **marcar todas**). The page's manifest only **suggests**: the API or server that serves it comes ticked, with "a
+  página chama de '…'" (the page calls it '…'). A page with `rede` or `local` sees no API or MCP (the sections show
+  disabled). Updating the page never changes what you ticked. The page sees only name, domains and "writes or not" of
+  what you ticked, never the key. Details in the [pages guide](paginas.md#apis-and-mcps-the-page-sees).
+- **On the page**: the app's frame shows the name, the version, what it is linked to, "usa: ClickUp, Eco de teste"
+  (the APIs and servers it sees; red if one writes or has an MCP tool that may change things),
+  **Ligar a agente…** (so it can send messages to that agent), **Recarregar a página** and **Permissões, APIs e MCPs
+  (Configurações › Conexões › Páginas)**.
 - **In Configurações › Conexões › Páginas**, each page has: **Rever** (when it asks for a new permission or changed outside the
   app), **Desligar / Religar**, **Atualizar da pasta**, **Remover**, **Revogar / Permitir de novo** per permission,
-  and the **Ligada a** list.
+  the **Ligada a** list, the same two sections as the acceptance (**APIs e MCPs que esta página enxerga**, with
+  **Guardar** and **Desfazer**; a deleted API or server shows "sumiu", gone, to untick) and the
+  **Registro de pedidos** with the last 100, gone when the app closes. Switching off, removing or unticking cuts any
+  request the page has in flight.
 - A page that hangs or eats memory is closed on its own; three crashes in 10 minutes turn it off until you turn it
   back on.
 
@@ -836,7 +943,9 @@ The full reference, with the thirty or so verbs, is in [`ork.md`](ork.md).
 `ork` is for the agents inside the canvas. To work on the canvas **from outside** (your Claude Code, Claude
 Desktop, Codex), generate a key in Configurações › Conexões › **Chaves** and paste the block the app gives you. The client can then
 read the canvas, open agents, raise scores, switch models, work on the Kanban and the flows, as if it were you (a flow with
-Code, HTTP or a command only you turn on, on the page). Orkester needs to be open. Everything in [`mcp.md`](mcp.md).
+Code, HTTP, an MCP tool or a command only you turn on, on the page). Orkester needs to be open. Everything in
+[`mcp.md`](mcp.md). The other way round (Orkester using someone else's MCP server) is in [Conexões](#conexões), **MCP**
+tab, **Servidores de fora** part.
 
 ## Where the data lives
 
@@ -853,7 +962,8 @@ does not delete it.
 | Kanban | `espacos/<id>/kanban.json` |
 | the space's flows (one `.json` per flow, plus `indice.json` with folders and order) | `espacos/<id>/fluxos/` |
 | flow runs (the last 50 of each) | `espacos/<id>/fluxos/execucoes/` |
-| flow credentials (each value encrypted by the Windows vault) | `credenciais.json` |
+| APIs and MCP servers' secrets (from Conexões › APIs and › MCP; each value encrypted by the Windows vault) | `credenciais.json` |
+| external MCP servers (credential ids only, no value) | `mcp-servidores.json` |
 | key of the seal that approves sensitive nodes (encrypted) | `fluxos-selo.json` |
 | presets, roles, scores, theme base and accent, the Leitor's pinned folders | `preferencias.json` |
 | your themes and CSS plugins | `temas.json` |
@@ -886,8 +996,8 @@ Unreadable files are not deleted: the app keeps a `.ruim` copy beside them befor
 - **I closed the window and Orkester is still open.** A flow is on: the app went to the Windows tray, with the
   agents alive. To close it for good (for example, before installing a new version), use **Sair** on the tray icon.
 - **The flow does not fire, or does not turn on.** Check the editor's **Execuções** tab and the list's badges. To turn
-  on, it needs a trigger and no card or column "a escolher" (to choose); with Code, HTTP or a command, only you turn it
-  on. More in [`fluxos.md`](fluxos.md#when-something-goes-wrong).
+  on, it needs a trigger and no card, column or server "a escolher" (to choose); with Code, HTTP, an MCP tool or a
+  command, only you turn it on. More in [`fluxos.md`](fluxos.md#when-something-goes-wrong).
 - **I cannot drop on "Com o Maestro".** Open a Claude or Codex agent with the **Maestro** role in the space.
 - **The space does not open in this window.** It is already open in another one; the app takes you to it.
 - **"Juntar ao principal" refused.** Commit (or discard) the changes on the floor and on the ground floor, and

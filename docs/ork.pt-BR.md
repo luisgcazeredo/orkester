@@ -176,17 +176,24 @@ no histórico de cada tarefa.
 | Comando | O que faz |
 |---|---|
 | `ork kanban [ver] [--coluna C] [--para Nome\|eu\|ninguem] [--etiqueta e]` | as tarefas por coluna, com quem trabalha em cada uma; `ork kanban ver 12` mostra a #12 inteira |
-| `ork kanban criar "Título" [--descricao T \| --arquivo f.md] [--coluna C] [--para Nome] [--etiqueta a,b]` | cria uma tarefa; sem `--coluna`, nasce em Fazendo (Demandas é do usuário) |
+| `ork kanban criar "Título" [--descricao T \| --arquivo f.md] [--coluna C] [--para Nome] [--etiqueta a,b] [--pasta P]` | cria uma tarefa; sem `--coluna`, nasce em Fazendo (Demandas é do usuário); com `--pasta`, já nasce numa pasta da coluna |
 | `ork kanban pegar <n>` | você entra na lista de quem trabalha nela; de Demandas ou Com o Maestro ela vai para Fazendo |
 | `ork kanban soltar <n> [Nome]` | você sai da lista (tirar outro: só o Maestro e o usuário) |
 | `ork kanban mover <n> "Coluna" [--posicao topo\|fim\|N]` | muda de coluna; Com o Maestro é do usuário, a coluna final do usuário e do Maestro |
-| `ork kanban editar <n> [--titulo T] [--descricao T \| --arquivo f.md] [--etiqueta +a,-b]` | troca título, descrição ou etiquetas |
+| `ork kanban editar <n> [--titulo T] [--descricao T \| --arquivo f.md] [--etiqueta +a,-b] [--pasta P\|-]` | troca título, descrição, etiquetas ou pasta (`--pasta -` tira da pasta) |
+| `ork kanban pasta <n> ["nome"]` | põe a tarefa numa pasta da coluna (até 40 letras); sem o nome, tira. Se já existe uma pasta com o mesmo nome sem contar maiúsculas e acentos, vale a grafia dela |
 | `ork kanban atribuir <n> Nome\|eu\|ninguem` | põe na lista e avisa o agente na caixa dele (`ninguem` esvazia) |
 | `ork kanban comentar <n> "texto"` | comenta (também `--arquivo f.md`) |
 | `ork kanban apagar <n> --confirmar` | manda para a lixeira (a página recupera) |
 | `ork kanban coluna criar "Nome"` | também `renomear "Velho" "Novo"` e `apagar "Nome"` |
 
 `ork abrir --tarefa N` e `ork pedir --tarefa N` põem o agente trabalhando na tarefa #N e citam a tarefa no pedido.
+
+**Pastas (1.9.7).** Cada coluna pode agrupar as tarefas em pastas recolhíveis (uma por versão, por exemplo). O agente
+põe uma tarefa numa pasta com `ork kanban pasta` ou `--pasta`. Uma tarefa sem pasta que chega na coluna final com uma
+etiqueta de versão (`1.9.7`, `v2.0`) entra sozinha na pasta da versão; o usuário desliga isso na página. Organizar
+muitas tarefas de uma vez (por versão ou por etiqueta) é só do usuário, pelo menu ⋯ da coluna na página Kanban: não há
+verbo `ork` nem ferramenta MCP para isso.
 
 O `--arquivo` pode vir com BOM do UTF-8 (o `Set-Content -Encoding utf8` do Windows PowerShell grava um): o `ork` tira ao ler, em todos os comandos.
 

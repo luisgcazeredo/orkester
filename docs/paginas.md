@@ -2,12 +2,13 @@
 
 English · [Português](paginas.pt-BR.md)
 
-[//]: # (Sources: app/src/shared/paginas.ts, app/src/main/paginas.ts, app/src/preload/pagina.ts, app/src/preload/conferirDaPagina.ts, app/src/renderer/src/paginas/extra/*, app/exemplos/paginas/resumo-do-espaco/. This file shows up inside the app at "+" → "Guia completo", through the Reader's Markdown, which shows raw HTML as text: no HTML comments here, use this form.)
+[//]: # (Sources: app/src/shared/paginas.ts, app/src/shared/paginasApi.ts, app/src/main/paginasApi.ts, app/src/main/paginas.ts, app/src/preload/pagina.ts, app/src/preload/conferirDaPagina.ts, app/src/renderer/src/paginas/extra/*, app/exemplos/paginas/resumo-do-espaco/. This file shows up inside the app at "+" → "Guia completo", through the Reader's Markdown, which shows raw HTML as text: no HTML comments here, use this form.)
 
 An **own page** is a folder with a web screen (HTML, CSS and JavaScript) that enters Orkester's page bar on the left
 through the **+** button and opens right there, next to the app's pages. It can show the space's agents live, send
-notes to agents you linked to it, keep data of its own, talk to sites it declares or read a service on your own PC,
-always only with what you allowed. It runs isolated: it does not read your files, does not open programs, does not
+notes to agents you linked to it, keep data of its own, talk to sites it declares, read a service on your own PC,
+call the APIs you ticked for it (without seeing the token) or use the MCP tools you ticked, always only with what you
+allowed. It runs isolated: it does not read your files, does not open programs, does not
 see the terminals' screens.
 
 This guide is the whole contract: the language, the folder, the manifest, the `window.orkPagina` API, the
@@ -30,14 +31,16 @@ one.
 10. [Saving data](#saving-data)
 11. [Network, CORS and the `null` origin](#network-cors-and-the-null-origin)
 12. [Reading a service on your PC (`local`)](#reading-a-service-on-your-pc-local)
-13. [Talking to an agent](#talking-to-an-agent)
-14. [All the limits in one table](#all-the-limits-in-one-table)
-15. [What you cannot do, and why](#what-you-cannot-do-and-why)
-16. [Recipes](#recipes)
-17. [Debugging](#debugging)
-18. [Updating, switching off and removing](#updating-switching-off-and-removing)
-19. [Asking an agent to build one](#asking-an-agent-to-build-one)
-20. [How the app isolates the page](#how-the-app-isolates-the-page)
+13. [APIs and MCPs the page sees](#apis-and-mcps-the-page-sees)
+14. [Talking to an agent](#talking-to-an-agent)
+15. [All the limits in one table](#all-the-limits-in-one-table)
+16. [What you cannot do, and why](#what-you-cannot-do-and-why)
+17. [Recipes](#recipes)
+18. [Debugging](#debugging)
+19. [Updating, switching off and removing](#updating-switching-off-and-removing)
+20. [Asking an agent to build one](#asking-an-agent-to-build-one)
+21. [How the app isolates the page](#how-the-app-isolates-the-page)
+22. [Try the example](#try-the-example)
 
 ## What you can do
 
@@ -52,6 +55,11 @@ Ideas that fit the contract:
 - **Showing data from a public API or your own** (deploy status, open issues, exchange rates, weather), as long as
   the server accepts CORS (`rede` permission).
 - **Reading a service that runs on your PC** (a dev server, a metrics collector), read-only (`local` permission).
+- **Using an API that wants a token** (ClickUp, GitHub, your own): you register the API in Conexões › APIs and
+  tick, at acceptance or on the page's card, which ones it sees; the app makes the call, the token never enters the
+  page and the server's CORS does not matter.
+- **Using tools of an MCP server** registered in Conexões › MCP (n8n-mcp, a spreadsheet one), only the ones you tick
+  for the page.
 - **Combining the above**: a panel that shows the team and sends a request to the right agent.
 
 What you **cannot** do (read files, run commands, see the terminals' screens, open windows, download) is in
@@ -224,7 +232,7 @@ will be served). A `dist/` or `pagina/` folder inside the project does the job.
 | `versao` | yes | `N.N.N`, digits only (`1.0.0`, `2.13.4`) |
 | `descricao` | no | up to 200 characters. Shown in the accept dialog and in Configurações › Conexões |
 | `icone` | no | `lucide:<Name>` from the list below, or a `.svg`/`.png` from the folder up to 32 KB. Empty: the initial of the name. An SVG is shown as an image, so a script inside it never runs |
-| `permissoes` | no | object with `quadro`, `recado`, `rede`, `local` (see [Permissions](#permissions)). Without it, the page asks for nothing |
+| `permissoes` | no | object with `quadro`, `recado`, `rede`, `local`, `api`, `mcp` (see [Permissions](#permissions)). Without it, the page asks for nothing |
 
 Accepted `lucide:` icons: `LayoutDashboard` `Gauge` `ListChecks` `ListTodo` `Kanban` `Calendar` `CalendarDays`
 `Clock` `Timer` `Bell` `Inbox` `Mail` `MessageSquare` `MessagesSquare` `Notebook` `NotebookPen` `BookOpen` `FileText`
@@ -243,6 +251,9 @@ or **Cancelar**); each one can be revoked later.
 | `"recado": true` | see the agents **you** linked to it, send them notes and receive the answers. The agents may act on what they read | mandar recados aos agentes que você ligar a ela — eles podem trabalhar a partir disso |
 | `"rede": ["api.exemplo.com"]` | talk to those hosts over `https` and `wss` (up to 5) | falar com api.exemplo.com: o que ela mostra pode vir de lá e o que ela guarda pode ir para lá |
 | `"local": { "porta": 7788, "caminhos": ["/api/dados"] }` | make a read-only `GET` on `http://127.0.0.1:<porta>` at those paths (1 to 5), through the app. **Shown in red** | ler 127.0.0.1:7788/api/dados… deste PC, só leitura |
+| `"api": [{ "encaixe": "tarefas", "hosts": ["api.exemplo.com"], "escrita": true }]` | **only suggests.** Grants nothing: it says the name the page will call and the hosts it expects, so the acceptance can pre-tick the right API. What the page sees is what **you** tick (see [APIs and MCPs the page sees](#apis-and-mcps-the-page-sees)) | the line "a página chama de 'tarefas'" (the page calls it 'tarefas') next to the API that serves it |
+| `"mcp": [{ "encaixe": "planilhas", "ferramentas": ["ler_planilha"] }]` | **only suggests** the server and the tools, so the acceptance can pre-tick them. What counts is what you tick | the line "a página chama de 'planilhas'" next to the server, and the suggested tools already ticked |
+
 
 Always, whatever it asks: **1 MB of its own data**. Never: read files, open programs, camera, microphone, location,
 notifications, clipboard, USB, screen capture, downloads, new windows.
@@ -259,6 +270,25 @@ everything below it). Point it only at routes that **change nothing**.
 **`local` and `rede` do not go together.** A page that reads something from your PC must have no way to send it to
 the internet. A manifest with both is refused.
 
+**`api` and `mcp` in the manifest are suggestions (1.9.7).** They ask for no permission, do not show in the
+permissions list and never grant anything. They let the acceptance pre-tick the right API or server and keep the name
+the page uses. A page with no `api` or `mcp` can still see APIs and MCPs: you just tick them.
+
+**`api` rules.** 1 to 5 suggestions. Each one: `encaixe` (the name the page will call, `a–z 0–9 _ -`, starting with a
+letter, up to 40), `hosts` (**optional**, 0 to 5, with the same rules as `rede`; they help find the candidate API) and
+`escrita` (optional, `true` says the page wants to write; the "também escreve" box **never** comes ticked by a
+suggestion: only you tick it). Extra keys and
+repeated names are refused.
+
+**`mcp` rules.** 1 to 5 suggestions. Each one: `encaixe` (same name rule) and `ferramentas` (1 to 20, no repeats; the
+name as the server shows it, up to 128, with letters, digits, `_`, `-` and `.`). The suggested tools come ticked at
+acceptance; the server's other tools, unticked.
+
+**Combinations.** `api` and `mcp` go together, and with `quadro` and `recado`. **`api` or `mcp` with `rede` or `local`
+is refused** (a page that talks through the app must not have a second way out). For the same reason, a page with
+`rede` or `local` sees no API or MCP, even without suggesting one: the acceptance shows both sections disabled. A
+suggestion name does not repeat between `api` and `mcp`. The registry keeps at most 60 grants per page.
+
 ### When the manifest changes
 
 On every load, the app compares the copy with what you accepted:
@@ -271,9 +301,12 @@ On every load, the app compares the copy with what you accepted:
 - **It asks for less** than before → it loads, and the accepted list shrinks.
 - **A revoked permission** stays revoked: the page does not ask for it again on every load. It comes back only with
   **Permitir de novo** (allow again) in Configurações › Conexões.
+- **A new or changed `api`/`mcp` suggestion** never leaves the page pending and never removes an access: the APIs
+  and MCPs you ticked stay the same after an update.
 
 In Configurações › Conexões › Páginas, each page lists its permissions with **Revogar** (revoke) and **Permitir de novo**. It takes effect on
-the next call (for `rede`, the connection is cut at once), and the open page is reloaded.
+the next call (for `rede`, the connection is cut at once), and the open page is reloaded. The APIs and MCPs it sees
+have sections of their own on the card: see [Updating, switching off and removing](#updating-switching-off-and-removing).
 
 ## The `window.orkPagina` API
 
@@ -384,6 +417,59 @@ const r = await orkPagina.local.ler('/api/dados?janela=24h')
 if (r.status === 200) mostrar(JSON.parse(r.texto))
 ```
 
+### `api.disponiveis()` — the APIs the page sees
+
+Needs no permission in the manifest: it returns the APIs **you** ticked for this page (an empty list if none). Each
+comes as `{ nome, dominios, escrita, atende? }`: the name as it is in Conexões › APIs, its domains, `escrita` (`true`
+only if you ticked "também escreve" **and** the API allows writing) and `atende` (the manifest names it serves, when it
+came from a suggestion). Never an id, the key's last characters or its value. Details in
+[APIs and MCPs the page sees](#apis-and-mcps-the-page-sees).
+
+```js
+const apis = await orkPagina.api.disponiveis()
+// [{ nome: 'ClickUp', dominios: ['api.clickup.com'], escrita: false, atende: ['clickup'] }]
+if (!apis.length) warn('Tick an API for this page in Configurações › Conexões › Páginas.')
+```
+
+### `api.pedir(nome, pedido)` — calling an API through the app
+
+The app makes the request, with the API's key. `nome` is the API's name (`"ClickUp"`) or the name the page uses in the
+manifest (`"clickup"`); case, accents and spaces do not count (`"Eco de teste"` = `"eco de teste"` = `"ecodeteste"`).
+
+```js
+const r = await orkPagina.api.pedir('ClickUp', { metodo: 'GET', caminho: '/api/v2/team' })
+// { status: 200, tipo: 'application/json', corpo: '{"teams":[…]}' }
+if (r.status === 200) show(JSON.parse(r.corpo))
+```
+
+- `metodo`: `GET` (default), `HEAD`, `POST`, `PUT`, `PATCH` or `DELETE`. The last four need "também escreve" ticked
+  and an API that "lê e escreve" (reads and writes).
+- `caminho`: starts with `/`, up to 2048. No `?` or `#` (the query goes in `consulta`), no raw space (use `%20`), no
+  `//`, `\`, `@`, `.` or `..`.
+- `consulta`: an object of text, numbers or booleans, up to 8 KB.
+- `corpo`: text goes as it is; any other value goes as JSON. Up to 100 KB. `GET` and `HEAD` take no body.
+- `host` (optional): one of the API's domains. Without it, the first domain without a wildcard is used; an API with
+  only wildcards (`*.exemplo.com`) requires `host`.
+- The answer is only `{ status, tipo, corpo }` (the body always as text). **No header comes back.** A non-2xx status
+  comes back as an answer, not as an error.
+
+### `mcp.disponiveis()`, `mcp.ferramentas(nome)` and `mcp.chamar(nome, ferramenta, argumentos)` — using an MCP server
+
+`disponiveis` returns the servers you ticked for the page: `[{ nome, atende?, ferramentas }]`, with the ticked tools
+the server had at its last connection that are not blocked (it does not start the server). `ferramentas(nome)` reads
+the list from the server again and returns only the ticked, unblocked ones: `[{ nome, descricao, esquema, dizQueSoLe }]`
+(`dizQueSoLe`, "says it only reads", is the server's word, not a guarantee). `chamar` runs one of them. `nome` follows
+the same rule as `api`: the server's name or the manifest's.
+
+```js
+const r = await orkPagina.mcp.chamar('planilhas', 'ler_planilha', { planilha: 'ID', intervalo: 'A1:C20' })
+// { texto: '…', estruturado: { … }, erro: false }
+if (r.erro) warn(r.texto)   // the tool answered, but said it failed
+```
+
+`argumentos` is an object (default `{}`), up to 100 KB. A tool you did not tick is refused before reaching
+the server. Images and files do not come back, only text and structured content.
+
 ### `ao(evento, fn)` — listening
 
 Subscribes to an event and returns the function that cancels it. An unknown event **throws at once** (it is not a
@@ -412,6 +498,18 @@ parar()
 | `o caminho "…" não está entre os aceitos` | the `local.ler` path is not in the manifest |
 | `o serviço local não respondeu em 5 s` | the service is stopped or slow |
 | `a página precisa ser revista` / `a página está desligada` | sort it out in Configurações › Conexões (Rever, Religar) |
+| `a página não enxerga a API "x": marque em Conexões › Páginas` (or `o servidor MCP "x"`) | no ticked API (or server) has that name, or serves that manifest name. Check with `api.disponiveis()` |
+| `a API que atendia "x" foi apagada: marque outra em Conexões › Páginas` (or `o servidor MCP`) | the API was deleted in Conexões › APIs; the page's card shows "sumiu" (gone) |
+| `"x" serve a mais de uma API que a página enxerga: renomeie uma em Conexões › APIs` | two names that differ only in case, accents or spaces; the app does not pick for you |
+| `a página só lê nesta API: POST precisa de "também escreve" em Conexões › Páginas` | tick "também escreve" (also writes) for that API on the page's card |
+| `a API x só lê: mude em Conexões › APIs` | the API itself is "só lê" (read only); "também escreve" on the page does not override it |
+| `host fora da API x: use um destes domínios: …` / `a API x só tem domínio com curinga: diga o host no pedido` | follow the `host` rule |
+| `caminho inválido` | follow the `caminho` rule (the query goes in `consulta`) |
+| `no máximo 60 pedidos por minuto: espere um pouco` | `api` and `mcp` share one bucket |
+| `a ferramenta "x" de y não está marcada para esta página: marque em Conexões › Páginas` | tick the tool on the page's card |
+| `… está bloqueada: reveja em Conexões › MCP` | the tool changed on the server; you review it in Conexões › MCP |
+| `não deu para conferir a ferramenta x antes de chamar…` | the server did not return its list; try again |
+| `a página fechou antes da resposta` | the page was reloaded, switched off, removed or had a permission revoked mid-request |
 
 ## Events
 
@@ -511,6 +609,90 @@ API needs a key, ask for it on screen and keep it in `orkPagina.dados` (it stays
 Cookies are not kept (opaque origin, storage in memory only), so cookie login to another site does not work: use a
 token in the `Authorization` header.
 
+**With a ticked API, CORS stops mattering.** The request does not leave from the page: it leaves from the app, which
+is not a browser, so the server does not need to accept `Origin: null`. And the token stays with the app, in an API of
+Conexões › APIs (encrypted), instead of sitting in `orkPagina.dados`. For an API that wants a key, prefer `api.pedir`
+to `rede`.
+
+## APIs and MCPs the page sees
+
+**You decide, not the manifest.** An API (registered in Configurações › Conexões › **APIs**) or an MCP server
+(Conexões › **MCP**) reaches the page only if you tick it, at acceptance or later on its card. The manifest may
+**suggest** (`api` and `mcp`, see [Permissions](#permissions)); a suggestion only pre-ticks the box and keeps the name
+the page uses. The page never sees the token, the id or the server's configuration.
+
+**Read only or read and write: two ceilings.** Each API says in Conexões › APIs what it can do: **Só lê** (read only:
+`GET` and `HEAD`) or **Lê e escreve** (reads and writes, red badge). A new API starts as "só lê"; an API created in
+1.9.6 counts as "lê e escreve". On the page, the "também escreve" box (also writes, red) only shows for an API that
+writes. The page writes only with both: the API allows it **and** you ticked "também escreve".
+
+**Acceptance.** The dialog has two sections:
+
+- **APIs que esta página enxerga** (APIs this page sees): all your APIs, one box each, with the domains and the grey
+  ceiling badge, "teto: só lê" (ceiling: read only) or "teto: lê e escreve" (ceiling: reads and writes). Ticking an API
+  that writes shows the box "também escreve: pode criar, mudar e apagar (POST, PUT, PATCH, DELETE)" (also writes); the
+  red is only on it, when ticked. If the page suggests writing, a grey note says "a página sugere também escrever" (the
+  page also suggests writing; the box stays unticked). **Criar API** (create API) opens the embedded form (**Guardar a
+  API** or **Não criar**, don't create) with the suggestion's domain filled in, and the new one comes ticked; it only
+  opens on its own when the page suggests an API and you have none. While it is open, the acceptance button stays
+  off: "termine ou feche a API nova" (finish or close the new API).
+- **MCPs que esta página enxerga** (MCPs this page sees): the servers of Conexões › MCP. One that needs login shows
+  disabled, "(precisa de login: ainda não dá para usar)"; a paused one can be ticked. Ticking a server opens its tools, each with a box and a label: "diz
+  que só lê (palavra do servidor)" (says it only reads, the server's word) or, in red, "pode mudar coisas" (may change
+  things). None comes ticked except the suggested ones; there are **marcar as que dizem só ler** (tick the ones that
+  say they only read), **marcar todas** (tick all) and **desmarcar todas** (untick all). A suggested tool the server
+  does not have shows with no box and out of the count: "a página pede, mas o servidor não tem: fica de fora" (the
+  page asks for it, but the server does not have it: left out); if it has not listed any yet, use
+  **Testar** in Conexões › MCP. The acceptance waits until each ticked server's tool list has been read.
+- **Manifest suggestions**: next to the API or server that serves one, the line "a página chama de 'eco'" (the page
+  calls it 'eco'). A single candidate (same name, an API whose domains cover the suggested hosts, or the only ticked
+  server) comes ticked, for reading only: "também escreve" never comes ticked, not even when the suggestion asks to
+  write. Two ticked for the same suggestion: the acceptance button turns off, with "marque só uma para 'eco'" (tick only one for 'eco'). A suggestion no API serves: an amber warning "a página vai receber erro ao
+  chamar 'eco'" (the page will get an error when calling 'eco'), and acceptance goes on.
+- A page with `rede` or `local`: both sections show disabled, "esta página usa a rede direta: não pode enxergar APIs
+  nem MCPs" (this page uses the network directly: it cannot see APIs or MCPs).
+- A page with `quadro` and an API with writing: "O que ela lê do quadro pode ir para <API>." (what it reads from the
+  board may go to <API>).
+- **Updating or reviewing** only opens the dialog if there is a new permission, the page changed outside the app, or a
+  suggestion is not yet served by what you ticked. It starts from what you had ticked; with no dialog, nothing changes.
+
+**How the page calls.** By the API's or server's name, or by the name it uses in the manifest (`atende`), ignoring
+case, accents and spaces. The order: (1) the ticked API with the same name; (2) the ticked one that serves that name.
+Nothing: the error "a página não enxerga a API 'x'" (the page does not see API 'x'). Two names that collide: an error,
+the app does not pick. Start with `api.disponiveis()` / `mcp.disponiveis()` to show on screen what the page sees.
+
+**The `api` request.**
+- It goes out only over **https** (port 443), to the requested `host` (which must be among the API's domains) or to
+  its first domain without a wildcard, with the IP checked first (nothing on the local network).
+- The key goes only if the API's domains cover the target, and only with a method the API allows (double lock, on
+  every hop).
+- In the answer, the key's value becomes `•••` (in the body, the type and the error messages), also in the forms a
+  server tends to echo it in: `%XX`-escaped (any case, even partly), form-encoded (`+` for space), with JSON escapes
+  (`\/`, `\"`, `\uXXXX`), base64 and base64url. Any other transformation (a hash, a cipher, the whole token in
+  lowercase) is not covered: pick a service you trust.
+- **Switching off or removing** the page, **unticking** the API, reloading or closing the page **cuts the request in
+  flight**: the page gets "a página fechou antes da resposta" (the page closed before the answer). The cut does not
+  undo what the server had already written before it.
+- A **redirect** is followed only to https, on the default port, to a domain **of the same API**; elsewhere, the page
+  gets the 3xx and the app does not go. When the host changes, the key is dropped.
+- Limits: 60 requests per minute per page (`api` and `mcp` added up), 20 s per request, answers up to 2 MB.
+
+**The `mcp` call.** It goes to the server you ticked, through the same registry as flows: the same fingerprint rules
+(a tool that changed stays out until you review it in Conexões › MCP), the same time limits and the server's secrets
+as `•••`. Only the ticked tools. It counts in the same 60-per-minute bucket.
+
+**In the frame**, "usa: ClickUp, Eco de teste" (uses) shows the APIs and servers the page sees, by name. It turns red
+when one of them can write or a tool "pode mudar coisas" (may change things).
+
+**The log.** Configurações › Conexões › Páginas › **Registro de pedidos** (request log) shows the page's last 100
+requests (time, API or server name, method, path without the query, status and duration; for `mcp` calls, the method
+is `MCP` and the path is the tool's name, or `(lista)` for `mcp.ferramentas()`). Refused ones show as "não saiu" (did
+not go out). It keeps no body or header, and only lasts until the app closes.
+
+**Deleting or renaming an API.** Deleting an API some page sees leaves its card with "sumiu" (gone; untick it), and the
+request fails with a clear error. Renaming warns: pages and flows that call it by name stop until you adjust them (a
+page that calls it by the manifest name keeps working, because `atende` stays).
+
 ## Reading a service on your PC (`local`)
 
 For what runs on your machine (a dev server, a metrics collector, a script of yours), the page does not talk
@@ -592,6 +774,13 @@ Write the request so the agent knows how to answer: say in the text itself "answ
 | Agent answer | 64 KB; up to 20 kept (256 KB) while the page is closed |
 | Data | 256 KB per key; 1 MB and 200 keys in total |
 | `local.ler` | 5 s; 1 MB answer |
+| `api` / `mcp` suggestions in the manifest | 5 each; `api`: 0 to 5 hosts; `mcp`: 1 to 20 tools |
+| APIs / MCP servers the page sees | 10 APIs; 5 servers, up to 20 tools each |
+| Grants per page | 60 |
+| `api.pedir` + `mcp.chamar` + `mcp.ferramentas` | 60 per minute, added up |
+| `api.pedir` | 20 s; answer up to 2 MB; body up to 100 KB; query up to 8 KB; path up to 2048 |
+| `mcp.chamar` | arguments up to 100 KB; up to 60 s for the server to start (if it is not up yet), 30 s to check the tool list and 30 s for the call; result up to 2 MB |
+| Request log | the last 100, in memory only |
 | Page memory | 400 MB (above that, it is closed) |
 | CPU | above 90% for 30 s, it is closed |
 | Frozen | not answering for 5 s, it is closed |
@@ -615,6 +804,12 @@ Write the request so the agent knows how to answer: say in the text itself "answ
 | WebRTC | it would go around the network rules; the `RTC…` interfaces are removed before your script runs |
 | `http:`, IP, `localhost` directly | only `https`/`wss` to declared hosts; for your PC use `local`, which goes through the app |
 | `rede` and `local` together | what the page reads from your PC must have no way out |
+| `api` or `mcp` together with `rede` or `local` | a page that talks through the app must not have a second way out |
+| Seeing the APIs and servers you did not tick, or the key of the ticked ones | the page only sees name, domains and "writes or not" of what you ticked (`disponiveis()`); you are the one who ticks |
+| Ticking an API or an MCP by itself | there is no `orkPagina` method, `ork` verb or MCP tool for that: only you, in the app's window |
+| OAuth login (a service's "Sign in with…") | does not exist in the app yet; use a personal token in an API of Conexões › APIs. MCP HTTP with login arrives in 1.9.8 |
+| `wss` with a key | `api.pedir` is HTTP requests only; WebSocket with a token is left for 1.9.8 |
+| Reading the headers of an `api.pedir` answer | only `status`, `tipo` and `corpo` come back: headers may carry cookies and tokens |
 | An agent installing or accepting the page | only you add and accept, through the app's native dialog |
 
 ## Recipes
@@ -952,6 +1147,125 @@ async function iniciar() {
 iniciar().catch((e) => { $('aviso').textContent = e.message })
 ```
 
+### 7. A page that uses an API with a key
+
+Lists the tasks of a ClickUp list. The token lives in an API of yours in Configurações › Conexões › **APIs** (name
+"ClickUp", domain `api.clickup.com`, type **Cabeçalho próprio**, custom header, with the `Authorization` header, **Só
+lê**). The page calls it by name and never sees the token. The manifest only **suggests** the API, so the acceptance
+comes with it ticked.
+
+```json
+{ "formato": 1, "id": "tarefas-clickup", "nome": "Tarefas do ClickUp", "versao": "1.0.0", "icone": "lucide:ListTodo",
+  "permissoes": { "api": [{ "encaixe": "clickup", "hosts": ["api.clickup.com"] }] } }
+```
+
+```html
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="estilo.css"></head>
+<body>
+  <p id="enxerga"></p>
+  <input id="lista" placeholder="List number" inputmode="numeric">
+  <button type="button" id="ler">Read</button>
+  <ul id="tarefas"></ul>
+  <p id="situacao" role="status"></p>
+  <script src="app.js"></script>
+</body></html>
+```
+
+```js
+const $ = (id) => document.getElementById(id)
+
+async function showWhatItSees() {
+  const apis = await orkPagina.api.disponiveis()
+  $('enxerga').textContent = apis.length
+    ? `I see: ${apis.map((a) => a.nome).join(', ')}`
+    : 'No API ticked: tick ClickUp in Configurações › Conexões › Páginas.'
+}
+
+async function ler() {
+  const lista = $('lista').value.trim()
+  if (!/^\d+$/.test(lista)) { $('situacao').textContent = 'Type the list number.'; return }
+  await orkPagina.dados.gravar('lista', lista)
+  try {
+    // "clickup" is the manifest name; "ClickUp", the API's name, works too
+    const r = await orkPagina.api.pedir('clickup', { caminho: `/api/v2/list/${lista}/task`, consulta: { archived: false } })
+    if (r.status !== 200) { $('situacao').textContent = `ClickUp answered ${r.status}.`; return }
+    const tarefas = JSON.parse(r.corpo).tasks ?? []
+    $('tarefas').replaceChildren(...tarefas.map((t) => {
+      const li = document.createElement('li')
+      li.textContent = `${t.name} · ${t.status?.status ?? 'no status'}`
+      return li
+    }))
+    $('situacao').textContent = `${tarefas.length} tasks.`
+  } catch (e) {
+    $('situacao').textContent = e.message   // e.g. a página não enxerga a API "clickup"
+  }
+}
+
+$('ler').addEventListener('click', () => void ler())
+void showWhatItSees()
+orkPagina.dados.ler('lista').then((v) => { if (v) { $('lista').value = v; void ler() } })
+```
+
+At acceptance, the "ClickUp" API already comes ticked, with "a página chama de 'clickup'" (its domains cover the
+suggested host). To create tasks too, the API must be **Lê e escreve** in Conexões › APIs and you tick "também
+escreve" at acceptance or on the page's card; then use `metodo: 'POST'`. The frame's "usa:" then turns red.
+
+### 8. A page that uses an MCP
+
+Reads a range of a spreadsheet through an MCP server registered in Conexões › MCP. The Google login stays with the
+server; the page only knows the name and the tool (the tool's name changes from server to server; here,
+`ler_planilha`). The manifest suggests the tool, so it comes ticked at acceptance.
+
+```json
+{ "formato": 1, "id": "planilha", "nome": "Planilha", "versao": "1.0.0", "icone": "lucide:Database",
+  "permissoes": { "mcp": [{ "encaixe": "planilhas", "ferramentas": ["ler_planilha"] }] } }
+```
+
+```html
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><link rel="stylesheet" href="estilo.css"></head>
+<body>
+  <input id="planilha" placeholder="Spreadsheet id">
+  <input id="intervalo" value="A1:C20">
+  <button type="button" id="ler">Read</button>
+  <pre id="resultado"></pre>
+  <p id="situacao" role="status"></p>
+  <script src="app.js"></script>
+</body></html>
+```
+
+```js
+const $ = (id) => document.getElementById(id)
+
+async function iniciar() {
+  // checks that the tool is available (ticked, not blocked, server up)
+  const ferramentas = await orkPagina.mcp.ferramentas('planilhas')
+  if (!ferramentas.some((f) => f.nome === 'ler_planilha')) {
+    $('situacao').textContent = 'The tool is not available: see Configurações › Conexões › Páginas and › MCP.'
+    $('ler').disabled = true
+  }
+}
+
+$('ler').addEventListener('click', async () => {
+  try {
+    const r = await orkPagina.mcp.chamar('planilhas', 'ler_planilha', {
+      planilha: $('planilha').value.trim(), intervalo: $('intervalo').value.trim()
+    })
+    $('resultado').textContent = r.estruturado ? JSON.stringify(r.estruturado, null, 2) : r.texto
+    $('situacao').textContent = r.erro ? 'The tool said it failed.' : ''
+  } catch (e) {
+    $('situacao').textContent = e.message
+  }
+})
+
+iniciar().catch((e) => { $('situacao').textContent = e.message })
+```
+
+At acceptance, tick the server in the **MCPs que esta página enxerga** section: `ler_planilha` already comes ticked,
+and the line "a página chama de 'planilhas'" links the name. If the server changes the tool later, it disappears from
+`ferramentas()` until you review it in Conexões › MCP.
+
 ## Debugging
 
 There are no DevTools for pages: the app has no menu or shortcut that opens them, and `console.log` shows up nowhere.
@@ -1003,16 +1317,22 @@ What works:
 All on the page's card, in **Configurações** › **Conexões** › **Páginas** tab:
 
 - **Atualizar da pasta**: reads again the folder the page came from and shows what changed. If the new version asks
-  for no new permission, it is applied at once and open pages reload; otherwise, the dialog shows only the new ones.
+  for no new permission, it is applied at once and open pages reload; otherwise, the dialog shows only the new ones. The APIs and MCPs it sees stay the same (a new suggestion in the manifest asks for nothing and removes nothing).
   The same `id` coming from the same folder is an update; coming from another folder it is refused ("remova-a
   antes", remove it first). Changing the `id` in the manifest and updating is also refused. Bumping `versao` is not
   required, but it helps (the dialog shows "Versão 1.0.0 → 1.1.0").
 - **Always edit the original folder.** Touching the copy (`~/.orkester/paginas/<id>/`) makes the page "change outside
   Orkester", and it only comes back with **Rever**.
 - **Desligar / Religar** (switch off / back on): takes it off the bar and stops loading it, without deleting anything.
-- **Remover** (remove; with confirmation): deletes the copy, the data, the browser state and the links. The original
+- **Remover** (remove; with confirmation): deletes the copy, the data, the browser state, the links and what it saw. The original
   folder is not touched.
-- **Revogar / Permitir de novo**: per permission, in the card's **Permissões** list.
+- **Revogar / Permitir de novo**: per permission (`quadro`, `recado`, `rede`, `local`), in the card's **Permissões** list.
+- **APIs e MCPs que esta página enxerga** (APIs and MCPs this page sees): the same two sections as
+  the acceptance, with **Guardar APIs e MCPs** (save APIs and MCPs) and **Desfazer** (undo). Ticking, unticking, turning "também escreve" on or
+  off and ticking tools take effect on the next call, and the open page is reloaded. The card also shows the
+  manifest's suggestions: ticking an API or a server here gives it `atende` as in the acceptance ("a página chama de
+  …"). An API that was already ticked only gets `atende` if you untick it and tick it again. A deleted API or server shows as
+  "sumiu" (gone), to untick. Below, **Registro de pedidos** (request log).
 - Turning off the master switch takes every page off the bar at once; nothing loads until it is turned on again.
 
 The page **unloads when you leave it**: clicking another page in the bar closes yours, and coming back loads it from
@@ -1039,6 +1359,18 @@ permissions it uses. Rules: manifesto.json and index.html at the root; JS and CS
 own files (inline script does not run); no CDN, eval, localStorage or innerHTML with outside
 data; only accepted extensions. Do not install or accept the page: tell me the folder path.
 ```
+
+**APIs and MCPs in the request.** Below the description, the **+** panel has **APIs que ela vai usar** (APIs it will
+use) and **MCPs que ela vai usar** (MCPs it will use), with a box for each API of Conexões › APIs and each server (and
+its tools). The demand carries only the name, the domains and "read only / writes" of each ticked API, and the names
+of the server and the tools: never an id, the key's last characters or its value. The instructions teach the agent to
+call `orkPagina.api.disponiveis()` and `api.pedir("Name", …)` (or `mcp.chamar`), to put the suggestion in the
+manifest and never to put a token in the files. Ticking here grants nothing; the panel reminds you: "O agente recebe só os nomes, nunca a chave. Quem libera é você,
+no aceite." (the agent gets only the names, never the key; you grant it, at acceptance).
+
+When asking directly in a terminal, give the API's name as it is in Conexões › APIs (and whether it needs to write) or
+the server and the tools, for example: "call the `ClickUp` API with `orkPagina.api.pedir('ClickUp', …)`, read-only,
+and suggest `api: [{ encaixe: 'clickup', hosts: ['api.clickup.com'] }]` in the manifest".
 
 The agent cannot add or accept the page: that is yours alone, through the app's dialog. If it touches the copy
 already installed, the page stops loading until you **Rever**.
@@ -1081,6 +1413,9 @@ For those who want to know what happens underneath:
 - **Watchdog.** Every 5 s the app checks each open page: no answer to a probe for 5 s ("travou"), memory above
   400 MB, CPU above 90% for 30 s, or a process crash → the page is closed and the app carries on. Three crashes within
   10 minutes switch the page off until you use **Religar**.
+- **APIs and MCPs leave through the app, not the page.** The page's policy does not change with them (no new host in
+  `connect-src`): the request goes through the `orkPagina` bridge, checked by the app on every call (what you ticked,
+  the page's and the API's writing, the domain, the rate), and only `{ status, tipo, corpo }` or `{ texto, estruturado?, erro }` come back.
 - **The frame belongs to the app.** The name, the version and the buttons above the page are drawn by the window,
   outside the `<webview>`: the page cannot imitate them.
 
@@ -1092,3 +1427,23 @@ For those who want to know what happens underneath:
    good starting point to copy.
 3. In the page's frame, **Ligar a agente…** → pick a Claude or Codex agent of the space.
 4. Write a note and send it; ask the agent to answer with `ork pagina responder "Resumo do espaço" "…"`.
+
+**Eco de API** (API echo, 1.9.7). Shows a request through the app without needing any account: it uses httpbin.org, a
+public test service that sends back what it gets. The code is in
+[`app/exemplos/paginas/eco-de-api/`](../app/exemplos/paginas/eco-de-api/). The manifest suggests an API called `eco`
+for `httpbin.org`, with writing.
+
+1. First, create the API in Configurações › Conexões › **APIs**: name "Eco de teste", domain `httpbin.org`, type
+   **Token (Bearer)**, a **made-up** value (`eco-token-de-teste-123`: httpbin only echoes) and **Lê e escreve**. (If
+   you skip this step, the acceptance offers **Criar API** with `httpbin.org` already filled in.)
+2. **+** → **Eco de API** → **Adicionar** (add). In the **APIs que esta página enxerga** section, "Eco de teste"
+   already comes ticked, with "a página chama de 'eco'", for reading only. Tick **também escreve** (red) and
+   **Adicionar e permitir**.
+3. On the page: it shows what it sees (`api.disponiveis()`); **Ler (GET)** shows the echoed query; **Escrever (POST)**
+   shows the text you sent, sent back; **Ver os cabeçalhos** shows `Bearer •••` (the value never comes back); **Pedir o
+   redirecionamento** returns 302 and the app does not follow it to the other site.
+4. In Configurações › Conexões › Páginas: the card with "Eco de teste" ticked, the **Registro de pedidos** with the 4
+   requests, and unticking **também escreve** + **Guardar** (the POST starts being refused and shows as "não saiu").
+
+If httpbin.org is down, swap the host for `postman-echo.com` in your copy's manifest and in the API's domains: the
+paths are the same.

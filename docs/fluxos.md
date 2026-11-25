@@ -2,11 +2,11 @@
 
 English · [Português](fluxos.pt-BR.md)
 
-[//]: # "Guide checked against the 1.9.6 code on 2026-11-23. Sources (relative to app/src/): shared/fluxos/{tipos,formato,nos,fichas,expressoes,executor,rede,credenciais,exemplos}.ts, main/fluxos/{servico,verbos,codigo,http,credenciais,alcance,selo,index,consulta}.ts, main/motorDeAutomacoes.ts, shared/automacoes.ts (guards), main/regrasDaBandeja.ts."
+[//]: # "Guide checked against the 1.9.6 code on 2026-11-23 and updated with the 1.9.7 deliveries on 2026-11-24 (fora.mcp node: shared/fluxos/nos.ts, main/fluxos/mcp.ts, main/mcpFora/; D1, D3 and D5). Sources (relative to app/src/): shared/fluxos/{tipos,formato,nos,fichas,expressoes,executor,rede,credenciais,exemplos}.ts, main/fluxos/{servico,verbos,codigo,http,credenciais,alcance,selo,index,consulta}.ts, main/motorDeAutomacoes.ts, shared/automacoes.ts (guards), main/regrasDaBandeja.ts."
 
 A **flow** (*fluxo*) is an automation drawn as nodes: a **trigger** (a task that changes column, a delivery, an agent
 that stopped, the clock, or the **Rodar fluxo** button) followed by what to do (send a message, create a task, notify
-you, decide, change the data, run JavaScript, call an API). Each space has its own flows.
+you, decide, change the data, run JavaScript, call an API or a tool on an MCP server). Each space has its own flows.
 
 The app's interface is in Portuguese. Labels appear here in **bold Portuguese**, often with a translation. Node types,
 setting names and output fields are the exact keys of the JSON format, also in Portuguese.
@@ -40,16 +40,22 @@ through the screen, from nothing to a flow that is on:
 2. **First node.** Click the **+** in the middle (**Adicionar o primeiro nó**, add the first node) and pick a
    trigger. To test by hand, start with **Manual**.
 3. **Next nodes.** Drag from a node's output dot and drop it on empty space: the search opens and the node you pick is
-   already linked. Dropping on another node links the two. **+ Nó**, **Tab** or **N** also open the search.
+   already linked. Dropping on another node links the two. **+ Nó**, **Tab** or **N** also open the search. Coming
+   from an output (or with a node selected), the search shows the triggers in a group of their own, at the end, with
+   the note "gatilho entra solto" (a trigger comes in unlinked): the trigger you pick is born without a link, because
+   it is the start of a flow. Searching "Manual" finds it.
 4. **Set it up.** Double-click a node to open its panel in three columns: **Entrada** (input, what arrived),
    **Ajustes** (settings, what it does) and **Saída** (output, what leaves). The panel's **Documentação** button shows
    this guide's section on that node.
 5. **Test.** Click **Salvar** (save, Ctrl+S) and then **Rodar fluxo** (run flow). It runs what is saved once, through
    the Manual trigger, even when the flow is off.
 6. **See what happened.** The run opens on the drawing: green ran, red failed, gray did not run. The **Execuções**
-   (runs) tab keeps the last 50; open a node to see its input and output for that run.
+   (runs) tab keeps the last 50; open a node to see its input and output for that run. If any `{{ }}` came out empty,
+   the run's top strip says which one and in which node ("`{{ x }}` veio vazio em Recado ao Maestro", came out empty
+   in…).
 7. **Turn it on.** The **Ligado/Desligado** (on/off) switch, in the editor or the list, makes the flow fire on its
-   own. Every flow starts off. A **sensitive** node (Code, HTTP or Comando no shell) asks for your confirmation first,
+   own. Every flow starts off. A **sensitive** node (Code, HTTP, Ferramenta MCP or Comando no shell) asks for your
+   confirmation first,
    node by node, and only you can turn on a flow that has one.
 
 More things that help:
@@ -74,7 +80,7 @@ To start from a ready example: [Finished task notifies the Maestro](#1-finished-
   leading to the same node). Branches are not merged: each arrival runs the node again, only with the items that came
   through it. Cycles are not allowed.
 - **Per item or all at once.** If and Set handle each item. Code runs once, with all of them. HTTP makes one request
-  per item (up to 20). Message, Task, Command, Notify and Query act once per item (up to 5); with more, the node fails and asks
+  per item (up to 20), and the MCP tool one call per item (up to 10 in the whole run). Message, Task, Command, Notify and Query act once per item (up to 5); with more, the node fails and asks
   you to merge the items first, in a Code node. That way no flow sends 50 messages at once.
 - **The first error stops everything.** The failed node turns red, the ones that did not run turn grey, and there is
   no retry. The run keeps the error message.
@@ -182,6 +188,7 @@ or by name only (see [The JSON format](#the-json-format)).
 | | [Definir campos](#definir-campos--logicadefinir) (set fields) | `logica.definir` |
 | Outside Orkester | [Código](#código--foracodigo) (code, sensitive) | `fora.codigo` |
 | | [HTTP](#http--forahttp) (sensitive) | `fora.http` |
+| | [Ferramenta MCP](#ferramenta-mcp--foramcp) (MCP tool, sensitive) | `fora.mcp` |
 
 A trigger takes no incoming link: it is the start of the flow, and the item it emits is the event. The other nodes
 take items and emit items.
@@ -633,7 +640,7 @@ no network, 5 seconds. **Sensitive**: only you turn the flow on. The whole API i
 
 ### HTTP · `fora.http`
 
-**What it does.** Makes an HTTP request to an API on the internet, with a [credential](#credentials) if needed. One
+**What it does.** Makes an HTTP request to an API on the internet, with the key of an [API](#credentials) if needed. One
 request per item, up to 20. **Sensitive**: only you turn the flow on. Network, time limits and what is stored are in
 [The HTTP node and the network](#the-http-node-and-the-network).
 
@@ -646,7 +653,7 @@ request per item, up to 20. **Sensitive**: only you turn the flow on. Network, t
 | `consulta` | `{ "nome", "valor" }` pairs after the `?`, up to 30. The app encodes name and value: write plain text (`a b`, not `a%20b`) | yes, in the value | none |
 | `cabecalhos` | `{ "nome", "valor" }` pairs, up to 30. Protocol headers (`Host`, `Content-Length`…) belong to the app | yes, in the value | none |
 | `corpo` | `{ "tipo": "nenhum" \| "json" \| "texto" \| "formulario", "valor": "…" }`, up to 20,000 characters. `GET` and `HEAD` take no body | yes, in the value | `nenhum` |
-| `credencial` | the **name** of a credential saved in Configurações › Conexões › Credenciais | no | none |
+| `credencial` | the **name** of an API saved in Configurações › Conexões › APIs. On screen the field is called **API** and lists only the APIs whose domains cover the URL's host (all of them if the URL has `{{ }}`) | no | none |
 
 **Output.** One item per request, with `status`, `cabecalhos` (the response's), `corpo` (already an object when the
 response is JSON; text otherwise) and `url` (only after a redirect: the final address).
@@ -662,16 +669,78 @@ response is JSON; text otherwise) and `url` (only after a redirect: the final ad
 - After the node: `{{ corpo.items[0].name }}`, `{{ status }}`
 
 **Common errors.**
-- "X respondeu 401 …" (X answered 401, or any non-2xx code) → the API refused; check the credential, the URL and the
+- "X respondeu 401 …" (X answered 401, or any non-2xx code) → the API refused; check the API's key, the URL and the
   body.
+- "a API X só lê: mude em Conexões › APIs" (API X only reads: change it in Conexões › APIs) → the method is `POST`,
+  `PUT`, `PATCH` or `DELETE` and the API is set to **Só lê** (read only). The screen already warns in red on the
+  node; the request does not even go out. If the flow needs to write, switch the API to **Lê e escreve** (reads and
+  writes).
 - "X é desta máquina ou da rede local; permita este endereço…" (is on this machine or the local network; allow this
   address…) → if that is on purpose, open the node and click **Permitir X neste fluxo**
   ([The HTTP node and the network](#the-http-node-and-the-network)). "… não pode ser usado: …" (cannot be used) → that
   address is never allowed; the reason says what to use instead.
 - "credencial X: só vai por https" / "não está nos domínios dela" / "credencial X não existe" (https only / not in its
-  domains / does not exist) → check the URL, the credential's domains and its name.
+  domains / does not exist) → check the URL, the API's domains and its name (renaming an API in Conexões › APIs
+  breaks the nodes that cite the old name).
 - "chegaram N itens e o HTTP faz no máximo 20 pedidos" / "o pedido passou de 30 s" (at most 20 requests / over 30 s)
   → merge the items first; check whether the API is up.
+
+### Ferramenta MCP · `fora.mcp`
+
+**What it does.** Calls a tool on an **external MCP server** (a program you registered in Configurações › Conexões ›
+MCP › **Servidores de fora**, by hand or imported from Claude Code; see [`mcp.md`](mcp.md#external-servers)). One call
+per item, at most 10 per run (adding up every time the node runs in it). **Sensitive**: only you turn the flow on, and
+the confirmation shows the server, the tool and the full arguments. The value of the server's credentials never enters
+the flow. Before each call, the app reads the server's tool list again: a tool that changed after it was registered is
+**blocked** until you review it, and if the list cannot be read, the call is refused.
+
+**Settings.**
+
+| Field | What it is | takes `{{ }}` | Default |
+|---|---|---|---|
+| `servidor` | the registered server, `{ "id", "nome" }`. It may come by name only (`"servidor": "n8n"`): then it is **a escolher** (to choose), and you pick it in the node before turning the flow on | no | to choose |
+| `ferramenta` | the tool's name as the server shows it (letters, digits and `_ - . /`, up to 128) | no | none |
+| `argumentos` | a **JSON object**, as text, up to 20,000 characters. Empty means `{}`. A list or a bare value is refused | yes | `{}` |
+
+On screen, you pick the server and then the tool (the list is the one the app already knows; **Atualizar** (refresh)
+starts the server and reads it again). The fields come from the tool's schema: text, number, yes/no, choice and list
+(one per line) become fields; the rest goes into a JSON field. The descriptions of the tool and its fields show as
+`o servidor diz: "…"` (the server says): they are the server's word. The form writes the `argumentos` text, which you can see
+under **Ver o texto dos argumentos** (see the arguments text).
+
+**Output.** One item per call: `texto` (what the tool returned as text), `estruturado` (only if it returned structured
+content), `erro` (`true` when the **tool** said it failed) and `omitidos` (only when it sent an image or a file, which
+are left out). With `erro: true` the node does not turn red: the flow goes on, and you decide in an **If**. The
+server's secrets come out as `•••`.
+
+```json
+{ "texto": "3 linhas lidas", "estruturado": { "linhas": 3 }, "erro": false }
+```
+
+**Useful expressions.**
+- Arguments: `{ "planilha": "{{ id }}", "limite": {{ quantidade }} }` (inside quotes it goes in as escaped text;
+  outside, as a JSON value; empty becomes `null`)
+- After the node: `{{ texto }}`, `{{ estruturado.linhas }}`; in an If, `{{ erro }}` with the `verdadeiro` operator
+  separates the calls where the tool failed
+
+**Common errors.**
+- "escolha o servidor MCP no nó (o "X" não está ligado a um cadastro…)" (choose the MCP server) → the agent sent only
+  the name: open the node and pick the server. Until then, the flow does not turn on.
+- "X: … está bloqueada: reveja em Conexões › MCP" (blocked: review it) → the tool changed (name, description, schema or
+  annotations) since you approved it. Open Conexões › MCP, click **Rever ferramentas mudadas** (review changed tools)
+  and accept; the other tools keep running.
+- "este servidor precisa de login (OAuth), que chega na 1.9.8; ou edite-o e ponha um cabeçalho com credencial" (this
+  server needs an OAuth login, arriving in 1.9.8; or edit it and add a credential header) → the HTTP server signs in
+  through OAuth, which the app does not have yet; or give it a credential header.
+- "pausado" (paused) → the server crashed 3 times in 10 minutes, or you paused it: **Religar** (turn back on) in
+  Conexões › MCP.
+- "os argumentos precisam ser um objeto JSON ({ ... })" (arguments must be a JSON object) → check the text under
+  **Ver o texto dos argumentos**.
+- "não deu para conferir a ferramenta X antes de chamar (…); a chamada foi recusada" (could not check the tool before
+  calling; refused) → the server did not return its tool list (it crashed, it was slow); check its card in
+  Conexões › MCP and run again.
+- "nesta execução a Ferramenta MCP já fez N chamadas…" (in this run the MCP tool already made N calls) / time limit →
+  at most 10 calls per run, each up to 30 s, within the run's 60 s: merge the items first.
 
 ## Standard fields (fichas)
 
@@ -792,8 +861,10 @@ entered {{ paraColunaNome }}`.
 - **No math, functions or references to other nodes.** `{{ a + 1 }}` or `{{ titulo.toUpperCase() }}` are refused on
   save, with a message saying where. Logic goes in a Code node before.
 - A path that does not exist becomes empty text. Objects and lists become JSON. A `{{` without `}}` stays as text.
+  Each `{{ }}` that came out empty is noted on the node, and the open run lists them all in its top strip ("`{{ x }}`
+  veio vazio em <node>"): the fastest way to find a field with the wrong name.
 - **Where they work:** Message text; Task title and description; Notify text; If value and compare; Set value; HTTP
-  URL, query and header values and body.
+  URL, query and header values and body; MCP tool arguments (escaped like the HTTP JSON body, right below).
 - **Where they do not:** in the Command (fixed text, on purpose: nothing from outside becomes a command), in field
   names, in triggers.
 - **In an HTTP JSON body**, the expression comes out escaped the right way: inside quotes (`"hi {{ nome }}"`) it goes in
@@ -877,13 +948,31 @@ different: they only work if you allow them, one by one, in each flow.
 ## Credentials
 
 A credential is a password, token or API key that the HTTP node carries **without the value entering the flow**.
+Since 1.9.7 the screen calls them **APIs** (the Credenciais tab became **APIs**), and the MCP servers' secrets live in
+Conexões › MCP. The same APIs serve the "+" pages you tick them for and the header of http MCP servers.
 
-- **Where:** Configurações › Conexões › **Credenciais** → **Guardar uma credencial** (save a credential): the name flows
-  will use for it ("Quotes API"), the type, the domains and the value → **Guardar cifrada** (save encrypted).
+- **Where:** Configurações › Conexões › **APIs** → **Guardar uma API** (save an API): the name flows and pages will
+  call it by ("ClickUp"), the type, the domains, the value and **O que ela pode fazer** (what it can do) → **Guardar a
+  API** (save the API, encrypted). With at least one API, the form opens with the **+ Nova API** (new API) button.
+- **Read only or read and write** (1.9.7): a **Só lê** (read only) API lets the HTTP node do only `GET` and `HEAD`;
+  with `POST`, `PUT`, `PATCH` or `DELETE`, the screen warns in red and the core refuses before it goes out ("a API X
+  só lê: mude em Conexões › APIs"). **Lê e escreve** (reads and writes) shows with a red badge. A new API starts as
+  "só lê"; the ones saved in 1.9.6 count as "lê e escreve", so no flow that already ran stops. There is no per-flow
+  grant: what protects you is the sensitive-node badge and only you switching the flow on. In an http MCP server's
+  header this does not apply (MCP always POSTs).
 - **Types:**
   - **Token (Bearer):** goes in `Authorization: Bearer <token>`. Paste only the token, without the word Bearer.
   - **Cabeçalho próprio** (custom header): goes in a header with the name the API asks for (e.g. `X-Api-Key`).
   - **Usuário e senha (Basic)** (user and password): goes in `Authorization`, encoded the way HTTP Basic requires.
+  - **Segredo, sem domínio** (secret, no domain; 1.9.7): only for an environment variable of an external MCP server
+    that runs on your PC (the n8n-mcp key, for example). It has no domain and **never goes in a header**: the HTTP node
+    does not list it and the app refuses to use it in a request. It is not an API: it is saved and listed in Conexões ›
+    MCP › **Segredos dos servidores** (server secrets). When you import servers from Claude Code, the secret variables
+    become secrets.
+- **In the node:** the **Cabeçalhos** (headers) field reminds you "Senha e token vão numa API (abaixo), nunca aqui."
+  (password and token go in an API, below, never here).
+- **Create it right there:** the HTTP node has a **Criar API** (create API) button, which opens the form with the
+  URL's host already in the domains; the new one is already picked in the node.
 - **Domains:** where it may go, one per line, up to 20: `api.example.com`, or `*.example.com` for subdomains. The wildcard does
   not cover `example.com` itself: if you need it, list both. No IPs,
   `localhost` or internal networks.
@@ -896,25 +985,30 @@ A credential is a password, token or API key that the HTTP node carries **withou
   Without the vault available, the tab is read-only and saves nothing: the app never writes the value as plain text.
 - **They never leave:** not to the screen, not to `ork`, not to MCP, not to the Code node. The flow, the export and the
   run only carry the **name**. Any text equal to the value that shows up in a run becomes `•••`.
-- **Deleting** a credential in use does not touch the flows: their next request fails with `credencial X não existe`.
-  When you delete, the app says which flows cited it. Renaming has the same effect: edit the HTTP nodes that cite the
-  old name.
+- **Deleting** an API in use does not touch the flows: their next request fails with `credencial X não existe`.
+  When you delete, the app says who used it: the flows, the "+" pages and the external MCP servers. **Renaming** has
+  the same effect on flows: the form warns first, and after saving the app says who cited the old name. Edit the HTTP
+  nodes that cite that name. Two names that differ only in case, accents or spaces cannot coexist.
 
-> **Use a credential, not a hand-written header.** A token put straight into `cabecalhos` (or into the URL) is part of
+> **Use an API, not a hand-written header.** A token put straight into `cabecalhos` (or into the URL) is part of
 > the flow: it goes whole into Ctrl+C, into `ork fluxo ver --json`, into what an agent reads from the flow and into the
-> file on disk. With a credential, none of these carries the value. The editor warns when a header or query parameter
+> file on disk. With an API, none of these carries the value. The editor warns when a header or query parameter
 > name looks like a secret (`token`, `api-key`, `password`…).
 
 ## Sensitive nodes: who turns them on
 
-Code, HTTP and Shell command are **sensitive**: they run code, talk to the internet or type into a terminal. A flow with
-any of them follows these rules:
+Code, HTTP, MCP tool and Shell command are **sensitive**: they run code, talk to the internet, call an outside program
+or type into a terminal. A flow with any of them follows these rules:
 
 - **Agents and MCP clients can create and edit, but not turn on.** The sensitive flow they save stays off, and
   `ork fluxo ligar` (or `fluxo_ligar`) on it is refused.
 - **Only you turn it on, seeing the nodes.** Turning it on opens a confirmation with each sensitive node **in full**
-  (the code, the URL, the command). Each one is marked: **igual ao que você aprovou** (same as you approved), **mudou**
-  (changed) or **novo** (new), plus the name of the agent that created or touched it, if one did.
+  (the code, the URL, the command; for the MCP tool, the server, the tool and the full arguments text). The server
+  shows **by its registration** (the name its id has in Conexões › MCP); in red when the name saved in the node is
+  different ("vale o do cadastro", the registration wins), when the id does not exist or when the node has no server.
+  Each one is marked: **igual ao que você aprovou** (same as you approved), **mudou** (changed) or **novo** (new), plus the name of
+  the agent that created or touched it, if one did. The confirmation opens for any sensitive node in the catalog, even
+  when the MCP tool is the only one.
 - **Changed after approval, it turns off.** Saving a change to a sensitive node of an enabled flow turns it off, even
   when you made the change: turn it on again to approve what changed. Name, position and notes do not count as changes.
 - **Local network addresses too.** The list of addresses on your computer or network that HTTP may call is part of
@@ -947,7 +1041,7 @@ any of them follows these rules:
 | folders | 100, up to 3 levels |
 | nodes / links per flow | 60 / 120 |
 | one run | 50 steps, 60 seconds, 1000 items and 5 MB per list |
-| items per node | Message, Task, Command, Notify and Query: 5 coming in (Query emits up to 100). HTTP: 20 |
+| items per node | Message, Task, Command, Notify and Query: 5 coming in (Query emits up to 100). HTTP: 20. MCP tool: 10 calls per run, adding up the arrivals (each call up to 30 s) |
 | runs kept | the last 50 of each flow |
 | input and output kept per node | ~10 KB (beyond that, "Cortado" shows; the counts stay right) |
 | If conditions / Set fields | 10 / 30 |
@@ -1024,12 +1118,12 @@ A delivery that mentions "blocked" or "error" becomes a task with its text. The 
 
 Output `1` of the If node (false) is not linked: deliveries without a problem stop there.
 
-### 5. Open GitHub issues to the Maestro (HTTP, credential and Code)
+### 5. Open GitHub issues to the Maestro (HTTP, API and Code)
 
 Every morning, fetch the open issues of a repository, join them into a list and send it to the Maestro.
 
-1. In Configurações › Conexões › Credenciais, save a credential named **GitHub**, type **Token (Bearer)**, domain
-   `api.github.com`, with a token of yours.
+1. In Configurações › Conexões › APIs, save an API named **GitHub**, type **Token (Bearer)**, domain
+   `api.github.com`, with a token of yours, **Só lê** (read only: the flow only does GET).
 2. Paste the flow below, replace `dono/repo` with your repository and save.
 3. Turn it on: since it has HTTP and Code, the confirmation shows both nodes in full.
 
@@ -1164,6 +1258,69 @@ nothing is sent.
 Replace `"Revisão"` with your column's name, if it differs. To test before turning it on, add a **Manual** trigger
 linked to the Query node and use **Rodar fluxo**.
 
+### 7. ClickUp tasks in a message to the Maestro (HTTP and API)
+
+Every morning, reads the tasks of a ClickUp list and sends the Maestro one line per task, with its status. It does not
+need the ClickUp MCP (which signs in through a login and only arrives in 1.9.8): the REST API takes the personal token.
+
+1. In ClickUp, generate your personal token (Settings › Apps). In Configurações › Conexões › APIs, save a
+   **ClickUp** API, **Só lê**, type **Cabeçalho próprio** (custom header), header `Authorization`, domain
+   `api.clickup.com`, with the token (the ClickUp API wants the bare token in that header, without "Bearer").
+2. Get the list number (it is in the list's address, in the browser).
+3. Build: **Relógio** (daily, 9:00) → **HTTP** → **Code** → **Message** to the Maestro. The HTTP settings:
+
+```json
+{
+  "metodo": "GET",
+  "url": "https://api.clickup.com/api/v2/list/LIST-NUMBER/task",
+  "consulta": [{ "nome": "archived", "valor": "false" }],
+  "cabecalhos": [],
+  "corpo": { "tipo": "nenhum", "valor": "" },
+  "credencial": "ClickUp"
+}
+```
+
+The Code (the response has the list in `corpo.tasks`):
+
+```js
+const tarefas = $input.first().json.corpo.tasks ?? []
+if (!tarefas.length) return []
+const linhas = tarefas.slice(0, 30).map((t) => `${t.name} (${t.status?.status ?? 'no status'})`)
+return [{ json: { total: tarefas.length, lista: linhas.join('\n') } }]
+```
+
+And the Message text, in two lines: `ClickUp: {{ total }} open tasks in the list.` and, below, `{{ lista }}`. Turn it
+on: the confirmation shows the HTTP and Code nodes in full. To test first, add a **Manual** trigger linked to the HTTP
+node and use **Rodar fluxo**.
+
+### 8. A Google spreadsheet via MCP (MCP tool)
+
+Reads a range of a Google spreadsheet through an MCP server's tool and sends the result to the Maestro. The Google
+login stays with the MCP server: pick a spreadsheet server that runs on your PC (stdio) and handles its own login. The
+Orkester only keeps the command and, if the server asks for one, a key as a **Segredo** (Conexões › MCP › Segredos
+dos servidores).
+
+1. In Configurações › Conexões › MCP › **Servidores de fora**, register the server (or **Importar do Claude Code**, if
+   it is already there). Click **Testar** (test): the app lists the tools and keeps each one's fingerprint.
+2. Build: **Manual** → **Ferramenta MCP** → **Message** to the Maestro. In the MCP node, pick the server and the read
+   tool (the name changes from server to server; in this recipe, `ler_planilha`). The settings end up like this:
+
+```json
+{
+  "servidor": { "id": "REGISTRATION-ID", "nome": "Planilhas" },
+  "ferramenta": "ler_planilha",
+  "argumentos": "{ \"planilha\": \"SPREADSHEET-ID\", \"intervalo\": \"A1:C20\" }"
+}
+```
+
+3. In the Message: `Planilha: {{ texto }}`. To handle the tool failing, put an **If** before the message with the
+   condition `{{ erro }}` · `falso`: the true output goes on to the message.
+4. **Rodar fluxo** asks for the sensitive node's confirmation (server, tool and arguments): **Aprovar e rodar uma vez**
+   (approve and run once). To run on its own, swap the Manual for a **Relógio** (clock) and turn it on.
+
+If the server changes the tool later (an update of its own), the node stops with "reveja em Conexões › MCP" until you
+approve the new version.
+
 ## When something goes wrong
 
 - **The flow does not turn on.** The message says what is missing: a trigger, a card or column "a escolher" (to
@@ -1175,9 +1332,14 @@ linked to the Query node and use **Rodar fluxo**.
 - **The flow turned itself off.** The list says why: it fired too often (over the hourly cap), one of its cards
   disappeared, one of its columns left the Kanban ("desligado: uma coluna saiu do kanban"), or a sensitive node changed
   without approval.
-- **I deleted a Kanban column.** The app tells you in the window (and in the `ork` answer) which flows used the column,
-  in a task-changed-column trigger or a Task node, and which were turned off: the enabled ones turn off right away.
-  Open each one, choose another column and turn it on again.
+- **Deleting a Kanban column.** From the Kanban page, deleting a column that a flow uses (in a task-changed-column
+  trigger or a Task node) asks for confirmation first, listing the flows (each one once) with **Ver o fluxo** (see
+  the flow), which opens the editor. If the app cannot check, it does not delete and asks you to try again. Through
+  `ork` or MCP, the warning comes afterwards, as before. Either way, the enabled flows that used the column turn off
+  right away: open each one, choose another column and turn it on again.
+- **A field came out empty.** Open the run: the top strip says which `{{ }}` came out empty and in which node.
+- **MCP tool: "está bloqueada: reveja em Conexões › MCP"** (blocked: review it). The tool changed since you approved
+  it. Review it in Conexões › MCP › **Rever ferramentas mudadas**.
 - **"barrado: laço" or "barrado: excesso"** (blocked: loop / excess) in the runs: see
   [Guards and limits](#guards-and-limits).
 - **"junte os itens antes, no nó Código"** (merge the items first, in a Code node). More than 5 items reached an
@@ -1187,7 +1349,9 @@ linked to the Query node and use **Rodar fluxo**.
   ([above](#the-http-node-and-the-network)). If a name points to a local address, write the IP instead of the name and
   allow the IP.
 - **HTTP: "credencial X: só vai por https" or "não está nos domínios dela"** (only over https / not in its domains).
-  Check the URL and the credential's domains.
+  Check the URL and the API's domains.
+- **HTTP: "a API X só lê"** (API X only reads). The node uses a writing method with a read-only API: switch the API to
+  **Lê e escreve** in Conexões › APIs, or use GET.
 - **A flow file does not open.** The list shows the files that failed to load, with the reason; they do not run. The
   app deletes nothing.
 - An enabled flow that fails notifies you (in the window corner or in a notification), at most once every 10 minutes

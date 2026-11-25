@@ -120,16 +120,17 @@ export const VERBOS = [
   {
     // `--espaco` é declarado só para o agente ouvir um "não" claro (ele só mexe no kanban do próprio espaço);
     // pela chave de usuário ele sai antes da validação e escolhe o espaço, como nos outros verbos
-    nome: 'kanban', aliases: [], posicionais: [{ nome: 'ver|criar|mover|editar|atribuir|pegar|soltar|comentar|apagar|coluna' }, { nome: 'argumentos', resto: true }],
-    opcoes: [texto('coluna'), texto('para'), texto('etiqueta'), texto('titulo'), texto('descricao'), texto('arquivo'), texto('posicao'), bandeira('confirmar'), texto('espaco')],
+    nome: 'kanban', aliases: [], posicionais: [{ nome: 'ver|criar|mover|editar|pasta|atribuir|pegar|soltar|comentar|apagar|coluna' }, { nome: 'argumentos', resto: true }],
+    opcoes: [texto('coluna'), texto('para'), texto('etiqueta'), texto('titulo'), texto('descricao'), texto('arquivo'), texto('posicao'), texto('pasta'), bandeira('confirmar'), texto('espaco')],
     descricao: 'as tarefas do espaço: ver, criar, pegar, soltar, mover, comentar',
     ajuda:
       '  ork kanban [ver] [--coluna C] [--para Nome|eu|ninguem] [--etiqueta e]\n                                      as tarefas do espaço, por coluna, com quem trabalha em cada uma\n                                      (`ork kanban ver 12` mostra uma inteira; --para: quem está nela)\n' +
-      '  ork kanban criar "Título" [--descricao T | --arquivo f.md] [--coluna C] [--para Nome] [--etiqueta a,b]\n                                      sem --coluna, nasce em Fazendo (Demandas é do usuário)\n' +
+      '  ork kanban criar "Título" [--descricao T | --arquivo f.md] [--coluna C] [--para Nome] [--etiqueta a,b] [--pasta P]\n                                      sem --coluna, nasce em Fazendo (Demandas é do usuário)\n' +
       '  ork kanban pegar <n>                         você entra na lista de quem trabalha nela; de Demandas ou\n                                      Com o Maestro ela vai para Fazendo, senão fica onde está\n' +
       '  ork kanban soltar <n> [Nome]                 você sai da lista (tirar outro: só o Maestro e o usuário)\n' +
       '  ork kanban mover <n> "Coluna" [--posicao topo|fim|N]\n                                      Com o Maestro é do usuário; Feito, do usuário e do Maestro\n' +
-      '  ork kanban editar <n> [--titulo T] [--descricao T | --arquivo f.md] [--etiqueta +a,-b]\n' +
+      '  ork kanban editar <n> [--titulo T] [--descricao T | --arquivo f.md] [--etiqueta +a,-b] [--pasta P|-]\n' +
+      '  ork kanban pasta <n> ["nome"]                põe a tarefa numa pasta da coluna (até 40 letras); sem o nome, tira.\n                                      Chegando em Feito com etiqueta de versão, ela vai sozinha para a pasta\n                                      da versão (o usuário desliga na página). Organizar várias de uma vez\n                                      é do usuário, no menu ⋯ da coluna\n' +
       '  ork kanban atribuir <n> Nome|eu|ninguem      põe na lista e avisa o agente na caixa dele (ninguem esvazia)\n' +
       '  ork kanban comentar <n> "texto" | --arquivo f.md\n' +
       '  ork kanban apagar <n> --confirmar            vai para a lixeira (a página recupera)\n' +

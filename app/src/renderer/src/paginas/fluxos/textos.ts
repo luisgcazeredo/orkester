@@ -193,7 +193,7 @@ export function selosDoFluxo(f: Pick<ResumoDeFluxo, 'desligadoPor' | 'sensivel' 
   else if (d?.motivo === 'cartao-sumiu') selos.push({ texto: 'desligado: um cartão saiu do quadro', tipo: 'atencao' })
   else if (d?.motivo === 'coluna-sumiu') selos.push({ texto: 'desligado: uma coluna saiu do kanban', tipo: 'atencao' })
   else if (d?.motivo === 'mudou-sem-aprovacao') selos.push({ texto: 'desligado: mudou sem a sua aprovação', tipo: 'atencao' })
-  if (f.sensivel) selos.push({ texto: 'Código, HTTP ou comando', tipo: 'neutro' })
+  if (f.sensivel) selos.push({ texto: 'Código, HTTP, MCP ou comando', tipo: 'neutro' })
   if (f.criadoPor?.id) selos.push({ texto: 'criado por agente', tipo: 'atencao' })
   if (f.editadoPor?.id && textoDeQuemEditou(f)) selos.push({ texto: 'editado por agente', tipo: 'atencao' })
   return selos
